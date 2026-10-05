@@ -2,7 +2,7 @@
                                         
 MMRA - MEDICATION REMINDER ASSISTANT: Là ứng dụng di động hỗ trợ quản lý, nhắc nhở lịch uống thuốc thông minh và kết nối theo dõi giữa các thành viên trong gia đình. Ứng dụng đặc biệt tối ưu cho người lớn tuổi và giúp người thân/con cháu dễ dàng theo dõi trạng thái uống thuốc từ xa.
 
-1.	Tính năng chính
+1.	TÍNH NĂNG CHÍNH
    
 - Nhắc nhở uống thuốc thông minh
 
@@ -12,7 +12,7 @@ MMRA - MEDICATION REMINDER ASSISTANT: Là ứng dụng di động hỗ trợ qu�
 
 - Kết nối gia đình
   
-2.	Thông tin nhóm thực hiện
+2.	THÔNG TIN NHÓM THỰC HIỆN 
    
 - GVHD: Trương Quang Tuấn
   
@@ -24,7 +24,7 @@ MMRA - MEDICATION REMINDER ASSISTANT: Là ứng dụng di động hỗ trợ qu�
   
         052206007572_Đặng Phạm Gia Huy 
 
-3.	Công nghệ sử dụng
+3.	CÔNG NGHỆ SỬ DỤNG 
 
 - Ngôn ngữ: Kotlin
   
@@ -32,6 +32,6 @@ MMRA - MEDICATION REMINDER ASSISTANT: Là ứng dụng di động hỗ trợ qu�
   
 - Công cụ quản lý mã nguồn: Github
 
-5.	Cấu trúc thư mục dự án
+5.	CẤU TRÚC DỰ ÁN
 
-6.	Hướng dẫn chạy chương trình 
+6.	HƯỚNG DẪN CHẠY CHƯƠNG TRÌNH  
