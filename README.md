@@ -108,7 +108,7 @@ Market Gap cần được kiểm chứng bằng:
 - Hỗ trợ nhận diện thuốc bằng hình ảnh.
 # 9. Workflow và từng chức năng của dự án
 ## 9.1 Workflow của MMRA
-![MMRA – Sơ đồ luồng hoạt động hệ thống.png](../../Downloads/MMRA%20%E2%80%93%20S%C6%A1%20%C4%91%E1%BB%93%20lu%E1%BB%93ng%20ho%E1%BA%A1t%20%C4%91%E1%BB%99ng%20h%E1%BB%87%20th%E1%BB%91ng.png)
+![MMRA - Sơ đồ luồng hoạt động hệ thống](docs/images/mmra-system-flow.png)
 ## 9.2 Chức năng đăng ký tài khoản
 Chức năng đăng ký tài khoản là bước đầu tiên trong quá trình người dùng bắt đầu sử dụng MMRA. Luồng xử lý của chức năng này thể hiện rõ sự liên kết giữa người dùng, ứng dụng Android, FastAPI Backend và cơ sở dữ liệu PostgreSQL. Đầu tiên, người dùng lựa chọn chức năng “Đăng ký” trên ứng dụng, sau đó nhập các thông tin cần thiết như họ tên, số điện thoại hoặc email, mật khẩu và các thông tin xác thực theo thiết kế của hệ thống. Sau khi hoàn tất việc nhập thông tin, người dùng nhấn nút “Đăng ký” để bắt đầu quá trình tạo tài khoản.
 
