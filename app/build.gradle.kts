@@ -4,13 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.project_lttbd"
+    namespace = "com.example.mmra_medicationmanager"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.project_lttbd"
+        applicationId = "com.example.mmra_medicationmanager"
         minSdk = 24
         targetSdk = 37
         versionCode = 1
@@ -22,7 +22,8 @@ android {
     buildTypes {
         release {
             optimization {
-                enable = false
+                enable = true
+                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
     }
@@ -49,6 +50,6 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    implementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    debugImplementation(libs.androidx.compose.ui.tooling)
 }

@@ -1,0 +1,129 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="100dp"
+    android:viewportWidth="320"
+    android:viewportHeight="160">
+
+    <!-- Background Kitchen / Room Wall -->
+    <path
+        android:fillColor="#F4ECE1"
+        android:pathData="M0,0h320v160H0z" />
+
+    <!-- Window on the Left -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,20h50v70H20z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#D5C4B1"
+        android:strokeWidth="2"
+        android:pathData="M20,20h50v70H20z M45,20v70 M20,55h50" />
+
+    <!-- Plants on windowsill -->
+    <path
+        android:fillColor="#769382"
+        android:pathData="M15,85c2,-10 10,-15 15,-10c5,-10 15,-10 15,0c5,-5 12,0 10,10z" />
+    <path
+        android:fillColor="#8BA896"
+        android:pathData="M50,85c2,-8 8,-12 12,-8c4,-8 12,-8 12,0c4,-4 10,0 8,8z" />
+    <path
+        android:fillColor="#C8A88B"
+        android:pathData="M22,85h16l-2,10h-12z M54,85h14l-2,8h-10z" />
+
+    <!-- Shelves on the Right -->
+    <path
+        android:fillColor="#C2A890"
+        android:pathData="M240,25h60v4h-60z M240,55h60v4h-60z" />
+    <!-- Teapot and cup on shelf -->
+    <path
+        android:fillColor="#A2B7AA"
+        android:pathData="M250,25c0,-8 12,-8 12,0h-12z M248,20h16v2h-16z" />
+    <path
+        android:fillColor="#E3D1BE"
+        android:pathData="M275,25c0,-5 8,-5 8,0h-8z" />
+
+    <!-- Table Surface -->
+    <path
+        android:fillColor="#D9BA9B"
+        android:pathData="M0,110h320v50H0z" />
+    <path
+        android:fillColor="#CBA886"
+        android:pathData="M0,110h320v4H0z" />
+
+    <!-- Elderly Person (Left) -->
+    <!-- Hair -->
+    <path
+        android:fillColor="#CCCCCC"
+        android:pathData="M115,35c-10,-5 -25,0 -25,15c-5,5 -5,15 0,20c2,2 5,5 10,5c10,5 20,0 25,-10c5,-10 0,-25 -10,-30z" />
+    <!-- Face -->
+    <path
+        android:fillColor="#FAD3B2"
+        android:pathData="M100,45c0,0 12,0 12,12c0,8 -6,12 -12,12c-6,0 -12,-4 -12,-12c0,-12 12,-12 12,-12z" />
+    <!-- Clothes (Patterned shirt) -->
+    <path
+        android:fillColor="#E8DFD1"
+        android:pathData="M70,110c0,-25 10,-35 30,-35c20,0 30,10 30,35H70z" />
+    <path
+        android:fillColor="#8C7A6B"
+        android:pathData="M80,85c2,2 8,2 10,0 M100,85c2,2 8,2 10,0 M85,95c2,2 8,2 10,0 M105,95c2,2 8,2 10,0" />
+
+    <!-- Caregiver / Younger Person (Right) -->
+    <!-- Hair -->
+    <path
+        android:fillColor="#5A3E2B"
+        android:pathData="M170,30c-15,0 -20,15 -20,25c0,15 5,25 10,30c5,-10 5,-35 25,-35c10,0 15,10 15,20c5,-10 0,-40 -30,-40z" />
+    <!-- Face -->
+    <path
+        android:fillColor="#FCE0CA"
+        android:pathData="M175,45c0,0 10,0 10,10c0,6 -4,10 -10,10c-6,0 -10,-4 -10,-10c0,-10 10,-10 10,-10z" />
+    <!-- Clothes (Sage green sweater) -->
+    <path
+        android:fillColor="#8A9E8C"
+        android:pathData="M145,110c0,-20 15,-30 30,-30c15,0 30,10 30,30H145z" />
+
+    <!-- Hands & Interaction -->
+    <path
+        android:fillColor="#FCE0CA"
+        android:pathData="M130,95c5,2 15,8 20,8c5,0 8,-4 5,-8c-5,-4 -15,-6 -25,-2z" />
+
+    <!-- Pill Organizer Box on Table -->
+    <path
+        android:fillColor="#E5EFEA"
+        android:pathData="M110,120h80v18h-80z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#A8C3B8"
+        android:strokeWidth="1.5"
+        android:pathData="M110,120h80v18h-80z M121,120v18 M132,120v18 M144,120v18 M155,120v18 M166,120v18 M178,120v18 M110,129h80" />
+
+    <!-- Medicine Bottles & Glasses on Table -->
+    <!-- Water Glass -->
+    <path
+        android:fillColor="#D8E8F5"
+        android:pathData="M80,122h14l-2,18h-10z" />
+    <path
+        android:fillColor="#BBE0FF"
+        android:pathData="M82,128h10l-1,10h-8z" />
+
+    <!-- Pill Bottle 1 -->
+    <path
+        android:fillColor="#E08B3D"
+        android:pathData="M210,120h14v20h-14z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M208,116h18v5h-18z M210,126h14v8h-14z" />
+
+    <!-- Pill Bottle 2 -->
+    <path
+        android:fillColor="#E08B3D"
+        android:pathData="M232,125h12v15h-12z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M230,122h16v4h-16z" />
+
+    <!-- Small Bowl -->
+    <path
+        android:fillColor="#D6C5B3"
+        android:pathData="M255,130c0,10 20,10 20,0h-20z" />
+
+</vector>

@@ -1,3 +1,132 @@
 <resources>
-    <string name="app_name">Project_LTTBDĐ</string>
+    <string name="app_name">MMRA_MedicationManager</string>
+    <string name="welcome_app_name">MMRA</string>
+    <string name="welcome_app_subtitle">MEDICATION REMINDER ASSISTANT</string>
+    <string name="welcome_headline">Uống thuốc đúng giờ,\nnhẹ lòng mỗi ngày</string>
+    <string name="welcome_description">MMRA giúp bạn nhận diện thuốc, sắp lịch và nhắc đúng lúc — bằng cách dễ hiểu nhất.</string>
+    <string name="welcome_info_card">Dễ dùng, dễ đọc. Luôn có người thân đồng hành cùng bạn.</string>
+    <string name="welcome_btn_login">Đăng nhập</string>
+    <string name="welcome_btn_register">Đăng ký</string>
+    <string name="welcome_footer_privacy">Thông tin của bạn được bảo vệ. MMRA luôn đồng hành, từng bước một.</string>
+    <string name="cd_welcome_illustration">Hình ảnh minh họa người cao tuổi và người chăm sóc</string>
+
+    <string name="login_title">Đăng nhập</string>
+    <string name="login_subtitle">Chào mừng bạn trở lại MMRA</string>
+    <string name="login_question">Bạn muốn đăng nhập thế nào?</string>
+    <string name="login_question_subtitle">Chọn cách quen thuộc nhất với bạn.</string>
+    <string name="login_continue_google">Tiếp tục với Google</string>
+    <string name="login_or_mmra">hoặc dùng tài khoản MMRA</string>
+    <string name="login_continue_phone">Tiếp tục với số điện thoại</string>
+    <string name="login_continue_email">Tiếp tục với email</string>
+    <string name="login_no_account_prefix">Chưa có tài khoản?</string>
+    <string name="login_register">Đăng ký</string>
+    <string name="login_info_note">Đã thiết lập trước đó? Đăng nhập sẽ đưa bạn thẳng đến Trang chủ, giữ nguyên các lựa chọn đã lưu.</string>
+
+    <string name="phone_login_title">Số điện thoại</string>
+    <string name="auth_subtitle_mmra">Đăng nhập vào MMRA</string>
+    <string name="phone_login_headline">Dùng số điện thoại của bạn</string>
+    <string name="phone_login_desc">Nhập số đã đăng ký và mật khẩu.</string>
+    <string name="label_phone">Số điện thoại</string>
+    <string name="hint_phone">0912 345 678</string>
+    <string name="phone_supporting_text">Số điện thoại Việt Nam (+84)</string>
+
+    <string name="email_login_title">Email</string>
+    <string name="email_login_desc">Nhập email đã đăng ký và mật khẩu của bạn.</string>
+    <string name="label_email">Email</string>
+    <string name="hint_email">lan.nguyen@gmail.com</string>
+
+    <string name="label_password">Mật khẩu</string>
+    <string name="action_forgot_password">Quên mật khẩu?</string>
+    <string name="btn_login">Đăng nhập</string>
+    <string name="btn_login_otp">Đăng nhập bằng mã OTP</string>
+    <string name="or_divider">hoặc</string>
+
+    <string name="register_title">Đăng ký</string>
+    <string name="register_subtitle">Tạo tài khoản MMRA của bạn</string>
+    <string name="register_desc">Điền thông tin bên dưới. MMRA sẽ gửi mã để xác minh số điện thoại của bạn.</string>
+    <string name="label_fullname">Họ và tên</string>
+    <string name="hint_fullname">Nguyễn Thị Lan</string>
+    <string name="register_password_note">Ít nhất 8 ký tự, gồm chữ và số. Không dùng mật khẩu dễ đoán hoặc chia sẻ với người khác.</string>
+    <string name="register_terms_note">Khi đăng ký, bạn đồng ý với Điều khoản sử dụng và Chính sách bảo mật.</string>
+    <string name="already_has_account_prefix">Đã có tài khoản?</string>
+    <string name="action_login">Đăng nhập</string>
+
+    <string name="verify_phone_title">Xác minh số điện thoại</string>
+    <string name="verify_phone_subtitle">Mã xác minh qua SMS</string>
+    <string name="verify_code_headline">Nhập mã xác minh</string>
+    <string name="verify_phone_desc">Mã gồm 6 chữ số đã được gửi qua SMS đến:</string>
+    <string name="sample_phone_masked">0912 ••• 678</string>
+    <string name="label_verify_code">Mã xác minh</string>
+    <string name="verify_code_validity">Mã có hiệu lực trong 5 phút. Không chia sẻ mã này.</string>
+    <string name="btn_verify_continue">Xác minh và tiếp tục</string>
+    <string name="resend_code_timer">Gửi lại mã sau 00:45</string>
+    <string name="btn_change_phone">Thay đổi số điện thoại</string>
+    <string name="verify_phone_sms_note">Hãy mở tin nhắn SMS để xem mã, rồi quay lại MMRA.</string>
+
+    <string name="verify_email_title">Xác minh email</string>
+    <string name="verify_email_subtitle">Mã xác minh qua email</string>
+    <string name="verify_email_desc">Mã gồm 6 chữ số đã được gửi qua email đến:</string>
+    <string name="sample_email_masked">lan.n•••••@gmail.com</string>
+    <string name="btn_change_email">Thay đổi email</string>
+    <string name="verify_email_spam_note">Chưa thấy email? Hãy kiểm tra thư mục Thư rác.</string>
+
+    <string name="forgot_password_title">Quên mật khẩu</string>
+    <string name="forgot_password_subtitle">Khôi phục tài khoản • Bước 1 / 3</string>
+    <string name="forgot_password_headline">Chúng tôi sẽ giúp bạn</string>
+    <string name="forgot_password_desc">Nhập email hoặc số điện thoại đã đăng ký để nhận mã xác minh.</string>
+    <string name="label_email_or_phone">Email hoặc số điện thoại</string>
+    <string name="hint_email_or_phone_example">Ví dụ: email của bạn hoặc 0912 345 678</string>
+    <string name="btn_send_verify_code">Gửi mã xác minh</string>
+    <string name="forgot_password_next_step">Tiếp theo: nhập mã OTP từ email hoặc SMS, rồi tạo mật khẩu mới.</string>
+    <string name="action_back_to_login">Quay lại Đăng nhập</string>
+
+    <string name="create_password_title">Tạo mật khẩu mới</string>
+    <string name="create_password_subtitle">Khôi phục tài khoản • Bước 3 / 3</string>
+    <string name="verified_email_banner">Đã xác minh lan.n•••••@gmail.com. Bạn có thể tạo mật khẩu mới.</string>
+    <string name="create_password_desc">Chọn mật khẩu mới, khác với mật khẩu cũ của bạn.</string>
+    <string name="label_new_password">Mật khẩu mới</string>
+    <string name="label_confirm_password">Nhập lại mật khẩu mới</string>
+    <string name="btn_save_new_password">Lưu mật khẩu mới</string>
+    <string name="save_password_note">Sau khi lưu, hãy đăng nhập lại bằng mật khẩu mới.</string>
+
+    <string name="completion_title">Hoàn tất</string>
+    <string name="completion_subtitle">Khôi phục tài khoản</string>
+    <string name="completion_headline">Mật khẩu đã được cập nhật</string>
+    <string name="completion_desc">Cô Lan có thể đăng nhập lại bằng số điện thoại hoặc email và mật khẩu mới.</string>
+    <string name="btn_back_to_login">Quay lại Đăng nhập</string>
+    <string name="completion_info_note">Lịch uống thuốc và các lựa chọn đã lưu của bạn không thay đổi.</string>
+
+    <string name="cd_back_button">Quay lại</string>
+    <string name="cd_app_logo">Logo ứng dụng</string>
+    <string name="cd_google_logo">Logo Google</string>
+    <string name="cd_phone_icon">Biểu tượng điện thoại</string>
+    <string name="cd_email_icon">Biểu tượng email</string>
+    <string name="cd_shield_icon">Biểu tượng bảo mật</string>
+    <string name="cd_password_visibility">Chuyển đổi hiển thị mật khẩu</string>
+
+    <!-- Initial Setup Screens -->
+    <string name="setup_target_title">Bạn dùng MMRA cho ai?</string>
+    <string name="setup_target_subtitle">Thiết lập lần đầu • Bước 1 / 2</string>
+    <string name="setup_target_desc">Chọn vai trò phù hợp để MMRA hỗ trợ bạn dễ dàng hơn.</string>
+    <string name="setup_target_option_user_title">Người uống thuốc</string>
+    <string name="setup_target_option_user_desc">Tôi quản lý thuốc của mình và nhận nhắc nhở uống thuốc đúng giờ.</string>
+    <string name="setup_target_option_caregiver_title">Người chăm sóc</string>
+    <string name="setup_target_option_caregiver_desc">Tôi theo dõi lịch uống thuốc và nhận cảnh báo để hỗ trợ người thân.</string>
+    <string name="setup_btn_continue">Tiếp tục</string>
+    <string name="setup_target_info_note">Chỉ chọn khi tạo tài khoản lần đầu. Lần đăng nhập sau sẽ mở Trang chủ của bạn.</string>
+
+    <string name="setup_display_title">Thiết lập ban đầu</string>
+    <string name="setup_display_subtitle">Thiết lập lần đầu • Bước 2 / 2</string>
+    <string name="setup_display_headline">Bạn muốn hiển thị thế nào?</string>
+    <string name="setup_display_desc">Chọn cách đọc và nghe phù hợp với bạn.</string>
+    <string name="setup_display_large_text_title">Chữ lớn, dễ đọc</string>
+    <string name="setup_display_large_text_desc">Tăng cỡ chữ và khoảng cách.</string>
+    <string name="setup_display_voice_title">Hướng dẫn bằng giọng nói</string>
+    <string name="setup_display_voice_desc">Đọc to nhắc nhở và nút bấm.</string>
+    <string name="setup_display_status_on">Đang bật</string>
+    <string name="setup_display_status_off">Đang tắt</string>
+    <string name="setup_display_preview_label">Xem thử cỡ chữ</string>
+    <string name="setup_display_preview_text">Chào cô Lan, MMRA luôn ở đây.</string>
+    <string name="setup_btn_save_continue">Lưu và tiếp tục</string>
+    <string name="setup_display_info_note">Các lựa chọn được lưu. Thiết lập sẽ không lặp lại, trừ khi bạn đặt lại trong Cài đặt trợ năng.</string>
 </resources>
