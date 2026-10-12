@@ -182,12 +182,12 @@ fun AppNavigation(
         AuthDestination.INITIAL_SETUP_TARGET -> {
             SetupTargetUserScreen(
                 modifier = modifier,
-                initialTargetUser = setupPreferences.targetUser,
+                initialSelectedRoles = setupPreferences.selectedRoles,
                 onBackClick = {
                     // Do not allow returning to Login/Register screens once authenticated
                 },
-                onContinueClick = { targetUser ->
-                    setupPreferences = setupPreferences.copy(targetUser = targetUser)
+                onContinueClick = { roles ->
+                    setupPreferences = setupPreferences.copy(selectedRoles = roles)
                     currentDestination = AuthDestination.INITIAL_SETUP_DISPLAY
                 },
             )

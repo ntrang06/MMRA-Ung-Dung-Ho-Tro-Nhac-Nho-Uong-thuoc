@@ -37,16 +37,16 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mmra_medicationmanager.R
-import com.example.mmra_medicationmanager.model.TargetUser
+import com.example.mmra_medicationmanager.model.TargetRole
 
 @Composable
 fun SetupTargetUserScreen(
     modifier: Modifier = Modifier,
-    initialTargetUser: TargetUser? = TargetUser.MEDICATION_USER,
+    initialSelectedRoles: Set<TargetRole> = setOf(TargetRole.PATIENT),
     onBackClick: () -> Unit = {},
-    onContinueClick: (TargetUser) -> Unit = {},
+    onContinueClick: (Set<TargetRole>) -> Unit = {},
 ) {
-    var selectedUser by remember { mutableStateOf(initialTargetUser) }
+    var selectedRoles by remember { mutableStateOf(initialSelectedRoles) }
 
     val primaryColor = Color(0xFF0F5B51)
     val lightBgColor = Color(0xFFE0F0EC)
@@ -54,7 +54,7 @@ fun SetupTargetUserScreen(
     val subTextColor = Color(0xFF5A6E6A)
     val borderColor = Color(0xFFE2E8E6)
     val infoBgColor = Color(0xFFEFF6F4)
-    val unselectedCheckBorder = Color(0xFFCDE0DC)
+    val unselectedCheckboxBorder = Color(0xFFCDE0DC)
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -98,6 +98,7 @@ fun SetupTargetUserScreen(
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = darkTextColor,
+                        lineHeight = 26.sp,
                     )
                     Text(
                         text = stringResource(id = R.string.setup_target_subtitle),
@@ -118,18 +119,24 @@ fun SetupTargetUserScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Option 1: Người uống thuốc
-            val isOption1Selected = selectedUser == TargetUser.MEDICATION_USER
+            // Option 1: Người uống thuốc (Patient)
+            val isPatientSelected = selectedRoles.contains(TargetRole.PATIENT)
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = if (isOption1Selected) lightBgColor else Color.White,
+                color = if (isPatientSelected) lightBgColor else Color.White,
                 border = BorderStroke(
-                    if (isOption1Selected) 1.5.dp else 1.dp,
-                    if (isOption1Selected) primaryColor else borderColor,
+                    if (isPatientSelected) 1.5.dp else 1.dp,
+                    if (isPatientSelected) primaryColor else borderColor,
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { selectedUser = TargetUser.MEDICATION_USER },
+                    .clickable {
+                        selectedRoles = if (isPatientSelected) {
+                            selectedRoles - TargetRole.PATIENT
+                        } else {
+                            selectedRoles + TargetRole.PATIENT
+                        }
+                    },
             ) {
                 Row(
                     modifier = Modifier.padding(18.dp),
@@ -166,9 +173,10 @@ fun SetupTargetUserScreen(
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    if (isOption1Selected) {
+                    // Multi-select Checkbox indicator
+                    if (isPatientSelected) {
                         Surface(
-                            shape = CircleShape,
+                            shape = RoundedCornerShape(6.dp),
                             color = primaryColor,
                             modifier = Modifier.size(24.dp),
                         ) {
@@ -186,9 +194,9 @@ fun SetupTargetUserScreen(
                         }
                     } else {
                         Surface(
-                            shape = CircleShape,
-                            color = Color.Transparent,
-                            border = BorderStroke(1.5.dp, unselectedCheckBorder),
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.5.dp, unselectedCheckboxBorder),
                             modifier = Modifier.size(24.dp),
                         ) {}
                     }
@@ -197,18 +205,24 @@ fun SetupTargetUserScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Option 2: Người chăm sóc
-            val isOption2Selected = selectedUser == TargetUser.CAREGIVER
+            // Option 2: Người chăm sóc (Caregiver)
+            val isCaregiverSelected = selectedRoles.contains(TargetRole.CAREGIVER)
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = if (isOption2Selected) lightBgColor else Color.White,
+                color = if (isCaregiverSelected) lightBgColor else Color.White,
                 border = BorderStroke(
-                    if (isOption2Selected) 1.5.dp else 1.dp,
-                    if (isOption2Selected) primaryColor else borderColor,
+                    if (isCaregiverSelected) 1.5.dp else 1.dp,
+                    if (isCaregiverSelected) primaryColor else borderColor,
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { selectedUser = TargetUser.CAREGIVER },
+                    .clickable {
+                        selectedRoles = if (isCaregiverSelected) {
+                            selectedRoles - TargetRole.CAREGIVER
+                        } else {
+                            selectedRoles + TargetRole.CAREGIVER
+                        }
+                    },
             ) {
                 Row(
                     modifier = Modifier.padding(18.dp),
@@ -245,9 +259,10 @@ fun SetupTargetUserScreen(
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    if (isOption2Selected) {
+                    // Multi-select Checkbox indicator
+                    if (isCaregiverSelected) {
                         Surface(
-                            shape = CircleShape,
+                            shape = RoundedCornerShape(6.dp),
                             color = primaryColor,
                             modifier = Modifier.size(24.dp),
                         ) {
@@ -265,9 +280,9 @@ fun SetupTargetUserScreen(
                         }
                     } else {
                         Surface(
-                            shape = CircleShape,
-                            color = Color.Transparent,
-                            border = BorderStroke(1.5.dp, unselectedCheckBorder),
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.5.dp, unselectedCheckboxBorder),
                             modifier = Modifier.size(24.dp),
                         ) {}
                     }
@@ -278,9 +293,11 @@ fun SetupTargetUserScreen(
 
             Button(
                 onClick = {
-                    selectedUser?.let { onContinueClick(it) }
+                    if (selectedRoles.isNotEmpty()) {
+                        onContinueClick(selectedRoles)
+                    }
                 },
-                enabled = selectedUser != null,
+                enabled = selectedRoles.isNotEmpty(),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = primaryColor,

@@ -1,7 +1,7 @@
 package com.example.mmra_medicationmanager.model
 
-enum class TargetUser {
-    MEDICATION_USER,
+enum class TargetRole {
+    PATIENT,
     CAREGIVER,
 }
 
@@ -12,10 +12,15 @@ enum class DisplayPreference {
 }
 
 data class InitialSetupPreferences(
-    val targetUser: TargetUser? = null,
+    val selectedRoles: Set<TargetRole> = setOf(TargetRole.PATIENT),
     val isLargeTextEnabled: Boolean = true,
     val isVoiceGuidanceEnabled: Boolean = true,
 ) {
+    val isPatientMode: Boolean get() = selectedRoles.contains(TargetRole.PATIENT)
+    val isCaregiverMode: Boolean get() = selectedRoles.contains(TargetRole.CAREGIVER)
+    val isCombinedMode: Boolean get() = isPatientMode && isCaregiverMode
+    val hasAnyRoleSelected: Boolean get() = selectedRoles.isNotEmpty()
+
     val displayPreference: DisplayPreference
         get() = when {
             isLargeTextEnabled && isVoiceGuidanceEnabled -> DisplayPreference.BOTH

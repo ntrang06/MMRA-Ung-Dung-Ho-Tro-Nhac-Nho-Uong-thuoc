@@ -105,15 +105,15 @@
     <string name="cd_password_visibility">Chuyển đổi hiển thị mật khẩu</string>
 
     <!-- Initial Setup Screens -->
-    <string name="setup_target_title">Bạn dùng MMRA cho ai?</string>
+    <string name="setup_target_title">Bạn muốn sử dụng MMRA như thế nào?</string>
     <string name="setup_target_subtitle">Thiết lập lần đầu • Bước 1 / 2</string>
-    <string name="setup_target_desc">Chọn vai trò phù hợp để MMRA hỗ trợ bạn dễ dàng hơn.</string>
+    <string name="setup_target_desc">Chọn một hoặc cả hai chế độ để MMRA hỗ trợ bạn phù hợp hơn. Bạn có thể chọn một hoặc cả hai tùy chọn dưới đây.</string>
     <string name="setup_target_option_user_title">Người uống thuốc</string>
-    <string name="setup_target_option_user_desc">Tôi quản lý thuốc của mình và nhận nhắc nhở uống thuốc đúng giờ.</string>
+    <string name="setup_target_option_user_desc">Quản lý thuốc của mình và nhận nhắc nhở uống thuốc đúng giờ.</string>
     <string name="setup_target_option_caregiver_title">Người chăm sóc</string>
-    <string name="setup_target_option_caregiver_desc">Tôi theo dõi lịch uống thuốc và nhận cảnh báo để hỗ trợ người thân.</string>
+    <string name="setup_target_option_caregiver_desc">Theo dõi lịch uống thuốc của các thành viên gia đình đã liên kết.</string>
     <string name="setup_btn_continue">Tiếp tục</string>
-    <string name="setup_target_info_note">Chỉ chọn khi tạo tài khoản lần đầu. Lần đăng nhập sau sẽ mở Trang chủ của bạn.</string>
+    <string name="setup_target_info_note">Bạn có thể thay đổi chế độ sử dụng trong phần Tài khoản sau này.</string>
 
     <string name="setup_display_title">Thiết lập ban đầu</string>
     <string name="setup_display_subtitle">Thiết lập lần đầu • Bước 2 / 2</string>
