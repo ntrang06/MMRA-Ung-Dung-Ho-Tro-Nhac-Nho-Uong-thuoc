@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Project_LTTBDĐ"
+rootProject.name = "mmra"
 include(":app")
  
