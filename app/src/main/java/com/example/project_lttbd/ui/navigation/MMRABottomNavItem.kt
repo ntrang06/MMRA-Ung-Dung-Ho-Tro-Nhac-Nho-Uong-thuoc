@@ -1,33 +1,43 @@
 package com.example.project_lttbd.ui.navigation
 
+import androidx.annotation.DrawableRes
+import com.example.project_lttbd.R
+
 data class MMRABottomNavItem(
     val route: String,
-    val label: String
+    val label: String,
+    @DrawableRes val iconRes: Int
 )
 
 val mmraBottomNavItems = listOf(
     MMRABottomNavItem(
         route = MMRADestinations.HOME,
-        label = "Trang chủ"
+        label = "Trang chủ",
+        iconRes = R.drawable.home
     ),
     MMRABottomNavItem(
         route = MMRADestinations.MEDICINE,
-        label = "Thuốc"
+        label = "Thuốc",
+        iconRes = R.drawable.thuoc
     ),
     MMRABottomNavItem(
         route = MMRADestinations.SCHEDULE,
-        label = "Lịch uống"
+        label = "Lịch uống",
+        iconRes = R.drawable.lich
     ),
     MMRABottomNavItem(
         route = MMRADestinations.SCAN,
-        label = "Quét thuốc"
+        label = "Quét thuốc",
+        iconRes = R.drawable.scan
     ),
     MMRABottomNavItem(
         route = MMRADestinations.HISTORY,
-        label = "Lịch sử"
+        label = "Lịch sử",
+        iconRes = R.drawable.history
     ),
     MMRABottomNavItem(
         route = MMRADestinations.FAMILY,
-        label = "Gia đình"
+        label = "Gia đình",
+        iconRes = R.drawable.family
     )
 )

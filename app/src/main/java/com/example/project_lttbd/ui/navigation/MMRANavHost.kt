@@ -1,14 +1,19 @@
 package com.example.project_lttbd.ui.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.project_lttbd.ui.screens.account.AccountScreen
+import com.example.project_lttbd.ui.screens.auth.LoginScreen
+import com.example.project_lttbd.ui.screens.auth.RegisterScreen
+import com.example.project_lttbd.ui.screens.family.FamilyScreen
+import com.example.project_lttbd.ui.screens.history.HistoryScreen
+import com.example.project_lttbd.ui.screens.home.HomeScreen
+import com.example.project_lttbd.ui.screens.medicine.MedicineScreen
+import com.example.project_lttbd.ui.screens.scan.ScanScreen
+import com.example.project_lttbd.ui.screens.schedule.ScheduleScreen
 
 @Composable
 fun MMRANavHost(
@@ -21,49 +26,40 @@ fun MMRANavHost(
         modifier = modifier
     ) {
         composable(MMRADestinations.LOGIN) {
-            PlaceholderScreen("Đăng nhập")
+            LoginScreen()
         }
 
         composable(MMRADestinations.REGISTER) {
-            PlaceholderScreen("Đăng ký")
-        }
-
-        composable(MMRADestinations.HOME) {
-            PlaceholderScreen("Trang chủ")
-        }
-
-        composable(MMRADestinations.MEDICINE) {
-            PlaceholderScreen("Thuốc của tôi")
-        }
-
-        composable(MMRADestinations.SCHEDULE) {
-            PlaceholderScreen("Lịch uống thuốc")
-        }
-
-        composable(MMRADestinations.SCAN) {
-            PlaceholderScreen("Quét thuốc")
-        }
-
-        composable(MMRADestinations.HISTORY) {
-            PlaceholderScreen("Lịch sử")
-        }
-
-        composable(MMRADestinations.FAMILY) {
-            PlaceholderScreen("Gia đình")
+            RegisterScreen()
         }
 
         composable(MMRADestinations.ACCOUNT) {
-            PlaceholderScreen("Tài khoản")
+            AccountScreen()
         }
-    }
-}
 
-@Composable
-private fun PlaceholderScreen(title: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = title)
+        composable(MMRADestinations.HOME) {
+            HomeScreen()
+        }
+
+        composable(MMRADestinations.MEDICINE) {
+            MedicineScreen()
+        }
+
+        composable(MMRADestinations.SCHEDULE) {
+            ScheduleScreen()
+        }
+
+        composable(MMRADestinations.SCAN) {
+            ScanScreen()
+        }
+
+        composable(MMRADestinations.HISTORY) {
+            HistoryScreen()
+        }
+
+        composable(MMRADestinations.FAMILY) {
+            FamilyScreen()
+        }
+
     }
 }
