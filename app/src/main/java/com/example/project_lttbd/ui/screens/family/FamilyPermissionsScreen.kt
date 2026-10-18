@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -37,9 +38,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.R
 
 @Composable
 fun FamilyPermissionsScreen(
@@ -84,11 +87,11 @@ fun FamilyPermissionsScreen(
                     .clickable { onBackClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "←",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_arrow_back),
+                    contentDescription = "Quay lại",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -229,7 +232,7 @@ fun FamilyPermissionsScreen(
             )
 
             PermissionSwitchCard(
-                icon = "💊",
+                iconResId = R.drawable.ic_pill,
                 title = "Xem danh sách thuốc",
                 description = "Tên thuốc, liều lượng và hướng dẫn đã lưu.",
                 checked = canViewMedicineList,
@@ -237,7 +240,7 @@ fun FamilyPermissionsScreen(
             )
 
             PermissionSwitchCard(
-                icon = "📅",
+                iconResId = R.drawable.ic_calendar,
                 title = "Xem lịch uống thuốc",
                 description = "Giờ uống và trạng thái xác nhận từng liều.",
                 checked = canViewSchedule,
@@ -245,7 +248,7 @@ fun FamilyPermissionsScreen(
             )
 
             PermissionSwitchCard(
-                icon = "🕒",
+                iconResId = R.drawable.ic_clock,
                 title = "Xem lịch sử dùng thuốc",
                 description = "Các xác nhận và hoạt động dùng thuốc theo ngày.",
                 checked = canViewHistory,
@@ -253,7 +256,7 @@ fun FamilyPermissionsScreen(
             )
 
             PermissionSwitchCard(
-                icon = "🔔",
+                iconResId = R.drawable.ic_bell,
                 title = "Nhận cảnh báo",
                 description = "Thông báo liều quá giờ chưa xác nhận.",
                 checked = canReceiveAlerts,
@@ -261,7 +264,7 @@ fun FamilyPermissionsScreen(
             )
 
             PermissionSwitchCard(
-                icon = "💬",
+                iconResId = R.drawable.ic_message_circle,
                 title = "Gửi nhắc nhở",
                 description = "$memberName có thể gửi nhắc nhở uống thuốc cho bạn.",
                 checked = canSendReminder,
@@ -361,7 +364,7 @@ fun FamilyPermissionsScreen(
 
 @Composable
 private fun PermissionSwitchCard(
-    icon: String,
+    iconResId: Int,
     title: String,
     description: String,
     checked: Boolean,
@@ -384,7 +387,12 @@ private fun PermissionSwitchCard(
                     .background(Color(0xFFF3F4F6)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = icon, fontSize = 18.sp)
+                Icon(
+                    painter = painterResource(id = iconResId),
+                    contentDescription = null,
+                    tint = Color(0xFF4B5563),
+                    modifier = Modifier.size(20.dp)
+                )
             }
 
             Spacer(modifier = Modifier.width(14.dp))

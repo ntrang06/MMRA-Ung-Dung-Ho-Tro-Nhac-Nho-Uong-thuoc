@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -40,9 +41,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.R
 import com.example.project_lttbd.data.mock.DoseStatus
 import com.example.project_lttbd.data.mock.FamilyMember
 import com.example.project_lttbd.data.mock.MockFamilyData
@@ -130,11 +133,11 @@ fun CaregiverMemberDetailScreen(
                     .clickable { onBackClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "←",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_arrow_back),
+                    contentDescription = "Quay lại",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -165,9 +168,11 @@ fun CaregiverMemberDetailScreen(
                     .clickable { onPermissionsClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "⚙️",
-                    fontSize = 17.sp
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_settings),
+                    contentDescription = "Cài đặt phân quyền",
+                    tint = Color(0xFF0F6053),
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -262,7 +267,12 @@ fun CaregiverMemberDetailScreen(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "📶", fontSize = 11.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_wifi),
+                                contentDescription = null,
+                                tint = Color(0xFF0F6053),
+                                modifier = Modifier.size(12.dp)
+                            )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "ĐANG HOẠT ĐỘNG",
@@ -295,7 +305,12 @@ fun CaregiverMemberDetailScreen(
                                     .background(Color(0xFFBE123C)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(text = "⚠️", fontSize = 16.sp)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_triangle_alert),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
 
                             Spacer(modifier = Modifier.width(12.dp))
@@ -363,7 +378,16 @@ fun CaregiverMemberDetailScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {
-                                Text("📞 Gọi cho ${member.relationship.lowercase()}", fontSize = 13.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_phone),
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Gọi cho ${member.relationship.lowercase()}", fontSize = 13.sp)
+                                }
                             }
 
                             OutlinedButton(
@@ -374,7 +398,16 @@ fun CaregiverMemberDetailScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
                             ) {
-                                Text("💬 Nhắn kiểm tra", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_message_circle),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Nhắn kiểm tra", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
+                                }
                             }
                         }
                     }
@@ -425,7 +458,12 @@ fun CaregiverMemberDetailScreen(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "✓", color = Color(0xFF0F6053), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_check),
+                                    contentDescription = null,
+                                    tint = Color(0xFF0F6053),
+                                    modifier = Modifier.size(12.dp)
+                                )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(text = "08:00 Đã uống", fontWeight = FontWeight.Bold, color = Color(0xFF0F6053), fontSize = 11.sp)
                             }
@@ -441,7 +479,12 @@ fun CaregiverMemberDetailScreen(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "⚠️", fontSize = 11.sp)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_triangle_alert),
+                                    contentDescription = null,
+                                    tint = Color(0xFFDC2626),
+                                    modifier = Modifier.size(12.dp)
+                                )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(text = "13:00 Trễ", fontWeight = FontWeight.Bold, color = Color(0xFFDC2626), fontSize = 11.sp)
                             }
@@ -457,7 +500,12 @@ fun CaregiverMemberDetailScreen(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "🕒", fontSize = 11.sp)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_clock),
+                                    contentDescription = null,
+                                    tint = Color(0xFF4B5563),
+                                    modifier = Modifier.size(12.dp)
+                                )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(text = "20:00 Sắp tới", fontWeight = FontWeight.Bold, color = Color(0xFF4B5563), fontSize = 11.sp)
                             }
@@ -494,7 +542,8 @@ fun CaregiverMemberDetailScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     ActivityItem(
-                        icon = "💬",
+                        iconResId = R.drawable.ic_message_circle,
+                        iconTint = Color(0xFF0284C7),
                         iconBg = Color(0xFFE0F2FE),
                         title = "Đã gửi lời nhắc kiểm tra",
                         description = "Bạn nhắn: “Mẹ nhớ uống thuốc nhé.”",
@@ -502,7 +551,8 @@ fun CaregiverMemberDetailScreen(
                     )
                     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF3F4F6)))
                     ActivityItem(
-                        icon = "✓",
+                        iconResId = R.drawable.ic_check,
+                        iconTint = Color(0xFF0F6053),
                         iconBg = Color(0xFFE8F7F2),
                         title = "Đã uống Amlodipine 5 mg",
                         description = "Đúng giờ • Xác nhận bởi cô Lan",
@@ -510,7 +560,8 @@ fun CaregiverMemberDetailScreen(
                     )
                     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF3F4F6)))
                     ActivityItem(
-                        icon = "✓",
+                        iconResId = R.drawable.ic_check,
+                        iconTint = Color(0xFF0F6053),
                         iconBg = Color(0xFFE8F7F2),
                         title = "Hoàn thành 3/3 liều",
                         description = "Tất cả liều đúng lịch",
@@ -526,10 +577,11 @@ fun CaregiverMemberDetailScreen(
 
 @Composable
 private fun ActivityItem(
-    icon: String,
+    iconResId: Int,
     title: String,
     description: String,
     time: String,
+    iconTint: Color = Color(0xFF0F6053),
     iconBg: Color = Color(0xFFEAF5F2)
 ) {
     Row(
@@ -545,7 +597,12 @@ private fun ActivityItem(
                 .background(iconBg),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = icon, fontSize = 16.sp)
+            Icon(
+                painter = painterResource(id = iconResId),
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(16.dp)
+            )
         }
 
         Spacer(modifier = Modifier.width(12.dp))

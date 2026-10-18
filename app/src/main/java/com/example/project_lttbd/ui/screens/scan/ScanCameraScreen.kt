@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -33,11 +35,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.example.project_lttbd.R
 import com.example.project_lttbd.ui.components.MMRAButton
 
 @Composable
@@ -94,11 +98,11 @@ fun ScanCameraScreen(
                         .clickable { onCloseClick() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "✕",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_close),
+                        contentDescription = "Đóng",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
@@ -132,10 +136,11 @@ fun ScanCameraScreen(
                         .clickable { isFlashOn = !isFlashOn },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = if (isFlashOn) "⚡" else "⚡",
-                        color = if (isFlashOn) Color.Yellow else Color.White,
-                        fontSize = 18.sp
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_zap),
+                        contentDescription = "Bật/Tắt Flash",
+                        tint = if (isFlashOn) Color(0xFFFACC15) else Color.White,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -158,15 +163,26 @@ fun ScanCameraScreen(
                         shape = RoundedCornerShape(16.dp),
                         color = Color(0xFF1D3B34)
                     ) {
-                        Text(
-                            text = "⛶ GIỮ MÁY ỔN ĐỊNH",
-                            color = Color(0xFF85D5C7),
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
-                            ),
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_scan),
+                                contentDescription = null,
+                                tint = Color(0xFF85D5C7),
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "GIỮ MÁY ỔN ĐỊNH",
+                                color = Color(0xFF85D5C7),
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -240,12 +256,23 @@ fun ScanCameraScreen(
                         shape = RoundedCornerShape(14.dp),
                         color = Color(0xFF1D3B34)
                     ) {
-                        Text(
-                            text = "☀ Đủ sáng • Không bị lóa",
-                            color = Color(0xFFB1CCC4),
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                        )
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_sun),
+                                contentDescription = null,
+                                tint = Color(0xFFB1CCC4),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Đủ sáng • Không bị lóa",
+                                color = Color(0xFFB1CCC4),
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp)
+                            )
+                        }
                     }
                 }
             }
@@ -285,7 +312,12 @@ fun ScanCameraScreen(
                                 .background(MaterialTheme.colorScheme.primary),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "📷", fontSize = 28.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_camera),
+                                contentDescription = "Chụp ảnh",
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
                         }
                     }
 
@@ -298,7 +330,13 @@ fun ScanCameraScreen(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "⌨ ", fontSize = 16.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_keyboard),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Nhập thông tin thủ công",
                             style = MaterialTheme.typography.bodyMedium.copy(
@@ -317,7 +355,13 @@ fun ScanCameraScreen(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "🖼 ", fontSize = 16.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_image),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Hoặc chọn ảnh từ thư viện",
                             style = MaterialTheme.typography.bodyMedium.copy(

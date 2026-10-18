@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -37,11 +38,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.R
 import com.example.project_lttbd.ui.components.MMRAButton
 import com.example.project_lttbd.ui.components.MMRATextField
 
@@ -75,11 +78,11 @@ fun InviteFamilyScreen(
                     .clickable { onBackClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "←",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_arrow_back),
+                    contentDescription = "Quay lại",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -146,7 +149,12 @@ fun InviteFamilyScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Text(text = "📱", fontSize = 48.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_qr_code),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(48.dp)
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "MÃ QR KẾT NỐI",
@@ -226,13 +234,16 @@ fun InviteFamilyScreen(
                                 ),
                                 modifier = Modifier.weight(1f)
                             )
-                            Text(
-                                text = "📋",
-                                fontSize = 16.sp,
-                                modifier = Modifier.clickable {
-                                    clipboardManager.setText(AnnotatedString(inviteLink))
-                                    Toast.makeText(context, "Đã sao chép liên kết!", Toast.LENGTH_SHORT).show()
-                                }
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_copy),
+                                contentDescription = "Sao chép liên kết",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clickable {
+                                        clipboardManager.setText(AnnotatedString(inviteLink))
+                                        Toast.makeText(context, "Đã sao chép liên kết!", Toast.LENGTH_SHORT).show()
+                                    }
                             )
                         }
                     }
@@ -250,10 +261,22 @@ fun InviteFamilyScreen(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text(
-                            text = "Sao chép đường link",
-                            style = MaterialTheme.typography.labelLarge
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_copy),
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Sao chép đường link",
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
                     }
 
                     Text(
@@ -305,12 +328,24 @@ fun InviteFamilyScreen(
                         shape = RoundedCornerShape(12.dp),
                         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
                     ) {
-                        Text(
-                            text = "Gửi lời mời qua email",
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                color = MaterialTheme.colorScheme.primary
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_mail),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
                             )
-                        )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Gửi lời mời qua email",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                        }
                     }
                 }
             }

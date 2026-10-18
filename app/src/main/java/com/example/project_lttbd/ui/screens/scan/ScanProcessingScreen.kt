@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -64,11 +65,11 @@ fun ScanProcessingScreen(
                     .clickable { onBackClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "←",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_arrow_back),
+                    contentDescription = "Quay lại",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -135,7 +136,12 @@ fun ScanProcessingScreen(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "✓", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_check),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(13.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Ảnh rõ • Đủ sáng",
@@ -176,7 +182,12 @@ fun ScanProcessingScreen(
                                 .background(Color(0xFFE8F7F2)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "⛶", fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_scan),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                     }
 
@@ -216,7 +227,12 @@ fun ScanProcessingScreen(
                                     .background(Color(0xFFDDF2EE)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(text = "✓", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_check),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(13.dp)
+                                )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
@@ -257,7 +273,12 @@ fun ScanProcessingScreen(
                     modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "🛡", fontSize = 16.sp)
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_shield_check),
+                        contentDescription = null,
+                        tint = Color(0xFF1E8272),
+                        modifier = Modifier.size(18.dp)
+                    )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Ứng dụng đang đối chiếu ảnh với cơ sở dữ liệu thuốc tin cậy.",

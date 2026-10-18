@@ -37,9 +37,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.R
 import com.example.project_lttbd.data.mock.ScanResult
 import com.example.project_lttbd.ui.components.MMRATextField
 
@@ -122,11 +124,11 @@ fun ScanResultScreen(
                     .clickable { onBackClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "←",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_arrow_back),
+                    contentDescription = "Quay lại",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -168,7 +170,12 @@ fun ScanResultScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    Text(text = "✨", fontSize = 20.sp)
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_sparkles),
+                        contentDescription = null,
+                        tint = Color(0xFFC2410C),
+                        modifier = Modifier.size(20.dp)
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
@@ -214,7 +221,12 @@ fun ScanResultScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = "💊", fontSize = 18.sp)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_pill),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
                                 Text(
                                     text = scanResult.pillCode,
                                     fontSize = 10.sp,
@@ -232,15 +244,26 @@ fun ScanResultScreen(
                                 shape = RoundedCornerShape(8.dp),
                                 color = Color(0xFFDDF2EE)
                             ) {
-                                Text(
-                                    text = "⛶ KHỚP CAO • ${scanResult.matchScore}%",
-                                    color = MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
-                                    ),
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_scan),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "KHỚP CAO • ${scanResult.matchScore}%",
+                                        color = MaterialTheme.colorScheme.primary,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(4.dp))
@@ -272,7 +295,12 @@ fun ScanResultScreen(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "🛡", fontSize = 18.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_shield_check),
+                                contentDescription = null,
+                                tint = Color(0xFF0F6053),
+                                modifier = Modifier.size(20.dp)
+                            )
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
@@ -312,7 +340,7 @@ fun ScanResultScreen(
             ) {
                 Column {
                     InfoRow(
-                        icon = "💊",
+                        iconResId = R.drawable.ic_pill,
                         label = "Hoạt chất",
                         value = activeIngredient,
                         onClick = {
@@ -322,7 +350,7 @@ fun ScanResultScreen(
                     )
                     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF3F4F6)))
                     InfoRow(
-                        icon = "🏭",
+                        iconResId = R.drawable.ic_factory,
                         label = "Nhà sản xuất",
                         value = manufacturer,
                         onClick = {
@@ -332,7 +360,7 @@ fun ScanResultScreen(
                     )
                     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF3F4F6)))
                     InfoRow(
-                        icon = "📦",
+                        iconResId = R.drawable.ic_package,
                         label = "Quy cách",
                         value = packaging,
                         onClick = {
@@ -353,7 +381,12 @@ fun ScanResultScreen(
                     modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "❓", fontSize = 16.sp)
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_circle_help),
+                        contentDescription = null,
+                        tint = Color(0xFF1D4ED8),
+                        modifier = Modifier.size(18.dp)
+                    )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Tên và hàm lượng có đúng với thuốc của bạn?",
@@ -401,11 +434,11 @@ fun ScanResultScreen(
                 Button(
                     onClick = {
                         val confirmed = scanResult.copy(
-                            medicineName = medicineName,
-                            dosage = dosage,
-                            activeIngredient = activeIngredient,
-                            manufacturer = manufacturer,
-                            packaging = packaging
+                             medicineName = medicineName,
+                             dosage = dosage,
+                             activeIngredient = activeIngredient,
+                             manufacturer = manufacturer,
+                             packaging = packaging
                         )
                         onConfirmClick(confirmed)
                     },
@@ -417,11 +450,11 @@ fun ScanResultScreen(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Text(
-                        text = "✓",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_check),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
@@ -436,7 +469,7 @@ fun ScanResultScreen(
 
 @Composable
 private fun InfoRow(
-    icon: String,
+    iconResId: Int,
     label: String,
     value: String,
     onClick: () -> Unit
@@ -455,7 +488,12 @@ private fun InfoRow(
                 .background(Color(0xFFF3F4F6)),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = icon, fontSize = 16.sp)
+            Icon(
+                painter = painterResource(id = iconResId),
+                contentDescription = null,
+                tint = Color(0xFF4B5563),
+                modifier = Modifier.size(18.dp)
+            )
         }
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -478,11 +516,11 @@ private fun InfoRow(
             )
         }
 
-        Text(
-            text = "›",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF9CA3AF)
+        Icon(
+            painter = painterResource(id = R.drawable.ic_chevron_right),
+            contentDescription = null,
+            tint = Color(0xFF9CA3AF),
+            modifier = Modifier.size(18.dp)
         )
     }
 }

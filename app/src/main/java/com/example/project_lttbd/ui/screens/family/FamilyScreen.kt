@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -36,10 +37,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.R
 import com.example.project_lttbd.data.mock.FamilyMember
 import com.example.project_lttbd.data.mock.MockFamilyData
 
@@ -64,11 +67,11 @@ fun FamilyScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+                .padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Người thân",
                     style = MaterialTheme.typography.headlineSmall.copy(
@@ -86,26 +89,45 @@ fun FamilyScreen(
                 )
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
                 // Nút chuông cảnh báo
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE8F2F0))
-                        .clickable { onAlertsClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = "🔔", fontSize = 18.sp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE8F2F0))
+                            .clickable { onAlertsClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_bell),
+                            contentDescription = "Thông báo",
+                            tint = Color(0xFF0F6053),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Thông báo",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 9.sp,
+                            color = Color(0xFF0F6053),
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
                 // Avatar nhỏ tài khoản
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(Color(0xFFDDF2EE)),
                         contentAlignment = Alignment.Center
@@ -148,13 +170,16 @@ fun FamilyScreen(
                     text = "Người thân của bạn",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp
-                    )
+                        fontSize = 17.sp,
+                        lineHeight = 24.sp
+                    ),
+                    modifier = Modifier.alignByBaseline()
                 )
 
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFFE8F7F2)
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFE8F7F2),
+                    modifier = Modifier.alignByBaseline()
                 ) {
                     Text(
                         text = "Đã liên kết • ${membersList.size}",
@@ -244,7 +269,12 @@ fun FamilyScreen(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = "⏱", fontSize = 12.sp)
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_clock),
+                                        contentDescription = null,
+                                        tint = Color(0xFF92400E),
+                                        modifier = Modifier.size(13.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "Đang chờ phản hồi",
@@ -256,14 +286,25 @@ fun FamilyScreen(
                                 }
                             }
 
-                            Text(
-                                text = "Chi tiết ›",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                ),
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.clickable { onInviteDetailClick() }
-                            )
+                            ) {
+                                Text(
+                                    text = "Chi tiết",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_chevron_right),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
 
                         Text(
@@ -284,7 +325,11 @@ fun FamilyScreen(
                             Button(
                                 onClick = {
                                     hasPendingInvite = false
-                                    Toast.makeText(context, "Đã chấp nhận kết nối!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        "Đã chấp nhận kết nối!",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 },
                                 modifier = Modifier
                                     .weight(1f)
@@ -294,13 +339,26 @@ fun FamilyScreen(
                                     containerColor = MaterialTheme.colorScheme.primary
                                 )
                             ) {
-                                Text("✓ Chấp nhận", fontSize = 13.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_check),
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Chấp nhận", fontSize = 13.sp)
+                                }
                             }
 
                             OutlinedButton(
                                 onClick = {
                                     hasPendingInvite = false
-                                    Toast.makeText(context, "Đã từ chối lời mời", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        "Đã từ chối lời mời",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 },
                                 modifier = Modifier
                                     .weight(1f)
@@ -308,7 +366,16 @@ fun FamilyScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(1.dp, Color(0xFFE5E7EB))
                             ) {
-                                Text("✕ Từ chối", color = Color(0xFF4B5563), fontSize = 13.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_close),
+                                        contentDescription = null,
+                                        tint = Color(0xFF4B5563),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Từ chối", color = Color(0xFF4B5563), fontSize = 13.sp)
+                                }
                             }
                         }
                     }
@@ -351,7 +418,12 @@ fun FamilyScreen(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "⏱", fontSize = 12.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_clock),
+                                contentDescription = null,
+                                tint = Color(0xFF92400E),
+                                modifier = Modifier.size(13.dp)
+                            )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Đang chờ chấp nhận",
@@ -375,7 +447,11 @@ fun FamilyScreen(
 
                     OutlinedButton(
                         onClick = {
-                            Toast.makeText(context, "Đã hủy lời mời gửi cho Nguyễn Thị B", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "Đã hủy lời mời gửi cho Nguyễn Thị B",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -383,7 +459,16 @@ fun FamilyScreen(
                         shape = RoundedCornerShape(10.dp),
                         border = BorderStroke(1.dp, Color(0xFFE5E7EB))
                     ) {
-                        Text("✕ Hủy lời mời", color = Color(0xFF4B5563), fontSize = 13.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_close),
+                                contentDescription = null,
+                                tint = Color(0xFF4B5563),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Hủy lời mời", color = Color(0xFF4B5563), fontSize = 13.sp)
+                        }
                     }
                 }
             }
@@ -407,7 +492,12 @@ fun FamilyScreen(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "👤", fontSize = 12.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_users),
+                                contentDescription = null,
+                                tint = Color(0xFFDC2626),
+                                modifier = Modifier.size(13.dp)
+                            )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Đã từ chối",
@@ -450,7 +540,12 @@ fun FamilyScreen(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "⏱", fontSize = 12.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_clock),
+                                contentDescription = null,
+                                tint = Color(0xFF4B5563),
+                                modifier = Modifier.size(13.dp)
+                            )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Đã hết hạn",
@@ -474,7 +569,11 @@ fun FamilyScreen(
 
                     Button(
                         onClick = {
-                            Toast.makeText(context, "Đã gửi lại lời mời cho Nguyễn Thị D!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "Đã gửi lại lời mời cho Nguyễn Thị D!",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -484,7 +583,16 @@ fun FamilyScreen(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text("🔄 Gửi lại", fontSize = 13.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_refresh),
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Gửi lại", fontSize = 13.sp)
+                        }
                     }
                 }
             }
@@ -528,7 +636,12 @@ fun FamilyScreen(
                             .background(Color(0xFFE8F7F2)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "👥", fontSize = 24.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_users),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
 
                     Text(
@@ -559,10 +672,19 @@ fun FamilyScreen(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text(
-                            text = "+ Mời người thân",
-                            style = MaterialTheme.typography.labelLarge
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_user_plus),
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Mời người thân",
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
                     }
                 }
             }
@@ -634,11 +756,11 @@ private fun FamilyMemberCard(
                     )
                 }
 
-                Text(
-                    text = "›",
-                    fontSize = 22.sp,
-                    color = Color(0xFF9CA3AF),
-                    fontWeight = FontWeight.Bold
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_chevron_right),
+                    contentDescription = null,
+                    tint = Color(0xFF9CA3AF),
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -658,7 +780,8 @@ private fun FamilyMemberCard(
 
                 val statusPillText = if (member.hasLateDose) "Cần chú ý" else "Chờ xác nhận"
                 val statusPillBg = if (member.hasLateDose) Color(0xFFFEE2E2) else Color(0xFFFEF3C7)
-                val statusPillColor = if (member.hasLateDose) Color(0xFFDC2626) else Color(0xFF92400E)
+                val statusPillColor =
+                    if (member.hasLateDose) Color(0xFFDC2626) else Color(0xFF92400E)
 
                 Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -705,7 +828,12 @@ private fun FamilyMemberCard(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "⏱", fontSize = 14.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_clock),
+                            contentDescription = null,
+                            tint = Color(0xFFBE123C),
+                            modifier = Modifier.size(14.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Liều 08:00 quá giờ chưa xác nhận",
