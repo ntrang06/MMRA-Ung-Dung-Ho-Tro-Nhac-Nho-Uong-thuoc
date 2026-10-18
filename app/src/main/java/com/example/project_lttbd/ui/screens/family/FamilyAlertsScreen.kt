@@ -178,6 +178,7 @@ fun FamilyAlertsScreen(
             filteredAlerts.forEach { alert ->
                 AlertCard(
                     alert = alert,
+                    onClick = { onAlertClick(alert) },
                     onCallClick = {
                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${alert.memberPhone.replace(" ", "")}"))
                         context.startActivity(intent)
@@ -249,6 +250,7 @@ private fun FilterTab(
 @Composable
 private fun AlertCard(
     alert: CaregiverAlert,
+    onClick: () -> Unit = {},
     onCallClick: () -> Unit,
     onRemindClick: () -> Unit
 ) {
@@ -257,7 +259,9 @@ private fun AlertCard(
     val bgColor = if (isLate && !alert.isRead) Color(0xFFFFF7F7) else Color.White
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(18.dp),
         color = bgColor,
         border = BorderStroke(1.dp, borderColor)

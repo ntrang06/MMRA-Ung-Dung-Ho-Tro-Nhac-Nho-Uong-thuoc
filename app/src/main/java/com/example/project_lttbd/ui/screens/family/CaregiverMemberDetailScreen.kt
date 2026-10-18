@@ -52,6 +52,7 @@ fun CaregiverMemberDetailScreen(
     memberId: String,
     onBackClick: () -> Unit,
     onViewHistoryClick: () -> Unit = {},
+    onPermissionsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -139,7 +140,7 @@ fun CaregiverMemberDetailScreen(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Theo dõi người thân",
                     style = MaterialTheme.typography.titleMedium.copy(
@@ -153,6 +154,20 @@ fun CaregiverMemberDetailScreen(
                         color = MaterialTheme.colorScheme.secondary,
                         fontSize = 11.sp
                     )
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE8F2F0))
+                    .clickable { onPermissionsClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "⚙️",
+                    fontSize = 18.sp
                 )
             }
         }
