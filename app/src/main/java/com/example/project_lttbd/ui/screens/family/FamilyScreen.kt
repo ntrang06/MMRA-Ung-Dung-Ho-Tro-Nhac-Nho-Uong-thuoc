@@ -102,18 +102,29 @@ fun FamilyScreen(
                 Spacer(modifier = Modifier.width(10.dp))
 
                 // Avatar nhỏ tài khoản
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFDDF2EE)),
-                    contentAlignment = Alignment.Center
-                ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFDDF2EE)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "MA",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 13.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "H",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 16.sp
+                        text = "Tài khoản",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 9.sp,
+                            color = Color(0xFF0F6053),
+                            fontWeight = FontWeight.Bold
+                        )
                     )
                 }
             }
@@ -165,23 +176,50 @@ fun FamilyScreen(
             }
 
             // Section 2: Lời mời người thân
-            Text(
-                text = "Lời mời người thân",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "XEM TRƯỚC TRẠNG THÁI LỜI MỜI",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = Color(0xFF0F6053),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        letterSpacing = 0.5.sp
+                    )
                 )
-            )
-
-            Text(
-                text = "Các trạng thái minh họa kết nối gia đình. Chấp nhận kết nối không tự động cấp quyền dữ liệu sức khỏe.",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    color = Color(0xFF6B7280),
-                    lineHeight = 18.sp
+                Text(
+                    text = "Lời mời người thân",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
                 )
-            )
+                Text(
+                    text = "Các trạng thái minh họa, không phải người thân đã liên kết. Chấp nhận kết nối không cấp quyền dữ liệu sức khỏe; cần cấp quyền riêng biệt.",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = Color(0xFF6B7280),
+                        lineHeight = 18.sp
+                    )
+                )
+            }
 
-            // Lời mời nhận được
+            // Nhận lời mời subsection
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "NHẬN LỜI MỜI",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = Color(0xFF0F6053),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        letterSpacing = 0.5.sp
+                    )
+                )
+                Text(
+                    text = "Bạn nhận được lời mời và có thể chọn chấp nhận hoặc từ chối.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF6B7280))
+                )
+            }
+
+            // Lời mời nhận được card
             if (hasPendingInvite) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -198,16 +236,24 @@ fun FamilyScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "⏱", fontSize = 14.sp)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Đang chờ phản hồi",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = Color(0xFF92400E),
-                                        fontWeight = FontWeight.Bold
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFFEF3C7)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = "⏱", fontSize = 12.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Đang chờ phản hồi",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            color = Color(0xFF92400E),
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     )
-                                )
+                                }
                             }
 
                             Text(
@@ -221,7 +267,7 @@ fun FamilyScreen(
                         }
 
                         Text(
-                            text = "Lời mời nhận • Từ Nguyễn Minh Anh",
+                            text = "Lời mời nhận • Từ Nguyễn Văn A • Gửi hôm nay",
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.Bold
                             )
@@ -269,7 +315,201 @@ fun FamilyScreen(
                 }
             }
 
-            // Section 3: Thẻ Mời người thân mới
+            // Subsection: LỜI MỜI ĐÃ GỬI
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "LỜI MỜI ĐÃ GỬI",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = Color(0xFF0F6053),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        letterSpacing = 0.5.sp
+                    )
+                )
+                Text(
+                    text = "Bạn đã gửi lời mời và chỉ có thể xem trạng thái hoặc thực hiện hành động phù hợp.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF6B7280))
+                )
+            }
+
+            // Card 1: Gửi cho Nguyễn Thị B (Đang chờ)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2ECEA))
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFFEF3C7)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "⏱", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Đang chờ chấp nhận",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = Color(0xFF92400E),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Lời mời mẫu • Gửi cho Nguyễn Thị B • Gửi hôm nay",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+
+                    Text(
+                        text = "Chưa chấp nhận • Chưa liên kết • Chưa chia sẻ dữ liệu",
+                        style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF6B7280))
+                    )
+
+                    OutlinedButton(
+                        onClick = {
+                            Toast.makeText(context, "Đã hủy lời mời gửi cho Nguyễn Thị B", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                    ) {
+                        Text("✕ Hủy lời mời", color = Color(0xFF4B5563), fontSize = 13.sp)
+                    }
+                }
+            }
+
+            // Card 2: Gửi cho Nguyễn Văn C (Đã từ chối)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2ECEA))
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFFEE2E2)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "👤", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Đã từ chối",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = Color(0xFFDC2626),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Lời mời mẫu • Gửi cho Nguyễn Văn C • Người nhận đã từ chối",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+
+                    Text(
+                        text = "Không liên kết • Tôn trọng lựa chọn của người nhận",
+                        style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF6B7280))
+                    )
+                }
+            }
+
+            // Card 3: Gửi cho Nguyễn Thị D (Đã hết hạn)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE2ECEA))
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFF3F4F6)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "⏱", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Đã hết hạn",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = Color(0xFF4B5563),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Lời mời mẫu • Gửi cho Nguyễn Thị D • Quá thời hạn chấp nhận",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+
+                    Text(
+                        text = "Chưa liên kết • Có thể gửi lời mời mới",
+                        style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF6B7280))
+                    )
+
+                    Button(
+                        onClick = {
+                            Toast.makeText(context, "Đã gửi lại lời mời cho Nguyễn Thị D!", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("🔄 Gửi lại", fontSize = 13.sp)
+                    }
+                }
+            }
+
+            // Section 3: XEM TRƯỚC TRẠNG THÁI THAY THẾ
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "XEM TRƯỚC TRẠNG THÁI THAY THẾ",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = Color(0xFF0F6053),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        letterSpacing = 0.5.sp
+                    )
+                )
+                Text(
+                    text = "Khi chưa liên kết người thân — không phải trạng thái hiện tại của dữ liệu minh họa ở trên.",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = Color(0xFF6B7280),
+                        lineHeight = 18.sp
+                    )
+                )
+            }
+
+            // Thẻ Mời người thân mới (Empty state preview)
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -299,7 +539,7 @@ fun FamilyScreen(
                     )
 
                     Text(
-                        text = "Mời người thân để cùng theo dõi lịch uống thuốc và nhận thông báo khi có liều trễ nhé.",
+                        text = "Bạn chưa liên kết người thân. Mời người thân để cùng theo dõi lịch uống thuốc nhé.",
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = Color(0xFF6B7280),
                             textAlign = TextAlign.Center,
@@ -416,34 +656,22 @@ private fun FamilyMemberCard(
                     )
                 )
 
-                if (member.hasLateDose) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFFFEE2E2)
-                    ) {
-                        Text(
-                            text = "Cần chú ý",
-                            color = Color(0xFFDC2626),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                } else {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFFFEF3C7)
-                    ) {
-                        Text(
-                            text = "Đúng tiến độ",
-                            color = Color(0xFF92400E),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
+                val statusPillText = if (member.hasLateDose) "Cần chú ý" else "Chờ xác nhận"
+                val statusPillBg = if (member.hasLateDose) Color(0xFFFEE2E2) else Color(0xFFFEF3C7)
+                val statusPillColor = if (member.hasLateDose) Color(0xFFDC2626) else Color(0xFF92400E)
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = statusPillBg
+                ) {
+                    Text(
+                        text = statusPillText,
+                        color = statusPillColor,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
                 }
             }
 
@@ -457,25 +685,34 @@ private fun FamilyMemberCard(
                 trackColor = Color(0xFFE5E7EB)
             )
 
+            Text(
+                text = "${member.todayTakenCount} đã xác nhận • 1 đang chờ • ${if (member.hasLateDose) 1 else 0} quá giờ chưa xác nhận",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = Color(0xFF6B7280),
+                    fontSize = 11.sp
+                )
+            )
+
             // Cảnh báo nếu có liều trễ
             if (member.hasLateDose) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFFFFF1F2)
+                    color = Color(0xFFFFF1F2),
+                    border = BorderStroke(1.dp, Color(0xFFFECDD3))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "⏱", fontSize = 13.sp)
+                        Text(text = "⏱", fontSize = 14.sp)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Có liều thuốc quá giờ chưa xác nhận",
+                            text = "Liều 08:00 quá giờ chưa xác nhận",
                             color = Color(0xFFBE123C),
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontWeight = FontWeight.Medium,
-                                fontSize = 11.sp
+                                fontSize = 12.sp
                             )
                         )
                     }

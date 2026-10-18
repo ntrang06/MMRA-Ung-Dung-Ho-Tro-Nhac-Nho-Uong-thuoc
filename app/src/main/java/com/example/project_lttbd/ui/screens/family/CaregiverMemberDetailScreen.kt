@@ -149,7 +149,7 @@ fun CaregiverMemberDetailScreen(
                     )
                 )
                 Text(
-                    text = "Cập nhật lúc hôm nay • Trực quan sức khỏe",
+                    text = "Cập nhật lúc 13:24",
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = MaterialTheme.colorScheme.secondary,
                         fontSize = 11.sp
@@ -159,7 +159,7 @@ fun CaregiverMemberDetailScreen(
 
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFE8F2F0))
                     .clickable { onPermissionsClick() },
@@ -167,7 +167,35 @@ fun CaregiverMemberDetailScreen(
             ) {
                 Text(
                     text = "⚙️",
-                    fontSize = 18.sp
+                    fontSize = 17.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFDDF2EE)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "NL",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 13.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Tài khoản",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        color = Color(0xFF0F6053),
+                        fontWeight = FontWeight.Bold
+                    )
                 )
             }
         }
@@ -199,7 +227,7 @@ fun CaregiverMemberDetailScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = member.relationship.take(1),
+                            text = "NL",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
@@ -219,7 +247,7 @@ fun CaregiverMemberDetailScreen(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "${member.relationship} • ${member.age} tuổi • ${member.doseSchedules.size} loại thuốc",
+                            text = "${member.relationship} • ${member.age} tuổi • ${member.doseSchedules.size} thuốc",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = Color(0xFF6B7280)
                             )
@@ -227,16 +255,22 @@ fun CaregiverMemberDetailScreen(
                     }
 
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(12.dp),
                         color = Color(0xFFE8F7F2)
                     ) {
-                        Text(
-                            text = "📶 HOẠT ĐỘNG",
-                            color = Color(0xFF0F6053),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "📶", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "ĐANG HOẠT ĐỘNG",
+                                color = Color(0xFF0F6053),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -256,7 +290,7 @@ fun CaregiverMemberDetailScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(38.dp)
                                     .clip(CircleShape)
                                     .background(Color(0xFFBE123C)),
                                 contentAlignment = Alignment.Center
@@ -268,14 +302,14 @@ fun CaregiverMemberDetailScreen(
 
                             Column {
                                 Text(
-                                    text = "Đã trễ liều uống thuốc!",
-                                    style = MaterialTheme.typography.titleSmall.copy(
+                                    text = "Đã trễ liều 24 phút",
+                                    style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF9F1239)
                                     )
                                 )
                                 Text(
-                                    text = "Liều Atorvastatin 10 mg • Chưa có xác nhận",
+                                    text = "Liều 13:00 • Metformin 500 mg",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         color = Color(0xFFBE123C),
                                         fontSize = 12.sp
@@ -296,16 +330,23 @@ fun CaregiverMemberDetailScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "1 viên • Trước khi đi ngủ",
+                                    text = "1 viên • Cùng bữa trưa",
                                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
                                 )
-                                Text(
-                                    text = "CHƯA XÁC NHẬN",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFDC2626)
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFFFEE2E2)
+                                ) {
+                                    Text(
+                                        text = "CHƯA XÁC NHẬN",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFDC2626),
+                                            fontSize = 10.sp
+                                        ),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     )
-                                )
+                                }
                             }
                         }
 
@@ -322,7 +363,7 @@ fun CaregiverMemberDetailScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {
-                                Text("📞 Gọi cho ${member.relationship}", fontSize = 13.sp)
+                                Text("📞 Gọi cho ${member.relationship.lowercase()}", fontSize = 13.sp)
                             }
 
                             OutlinedButton(
@@ -361,7 +402,7 @@ fun CaregiverMemberDetailScreen(
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
-                            text = "${member.todayTakenCount} / ${member.todayTotalCount} liều",
+                            text = "1 / 3 liều",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
@@ -369,36 +410,56 @@ fun CaregiverMemberDetailScreen(
                         )
                     }
 
-                    // Các viên thuốc liều uống
+                    // 3 viên thuốc liều uống theo Figma
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        member.doseSchedules.forEach { dose ->
-                            val (bgColor, textColor, icon) = when (dose.status) {
-                                DoseStatus.TAKEN -> Triple(Color(0xFFDDF2EE), Color(0xFF0F6053), "✓")
-                                DoseStatus.LATE -> Triple(Color(0xFFFEE2E2), Color(0xFFDC2626), "⚠️")
-                                else -> Triple(Color(0xFFF3F4F6), Color(0xFF6B7280), "🕒")
-                            }
-
-                            Surface(
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                color = bgColor
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFE8F7F2)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(text = "$icon ${dose.scheduledTime}", fontWeight = FontWeight.Bold, color = textColor, fontSize = 12.sp)
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = dose.medicineName,
-                                        fontSize = 11.sp,
-                                        color = textColor,
-                                        maxLines = 1
-                                    )
-                                }
+                                Text(text = "✓", color = Color(0xFF0F6053), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "08:00 Đã uống", fontWeight = FontWeight.Bold, color = Color(0xFF0F6053), fontSize = 11.sp)
+                            }
+                        }
+
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFFEE2E2)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "⚠️", fontSize = 11.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "13:00 Trễ", fontWeight = FontWeight.Bold, color = Color(0xFFDC2626), fontSize = 11.sp)
+                            }
+                        }
+
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFF3F4F6)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "🕒", fontSize = 11.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "20:00 Sắp tới", fontWeight = FontWeight.Bold, color = Color(0xFF4B5563), fontSize = 11.sp)
                             }
                         }
                     }
@@ -416,7 +477,7 @@ fun CaregiverMemberDetailScreen(
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
                 Text(
-                    text = "Xem lịch sử ›",
+                    text = "Xem lịch sử",
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
@@ -434,22 +495,25 @@ fun CaregiverMemberDetailScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     ActivityItem(
                         icon = "💬",
+                        iconBg = Color(0xFFE0F2FE),
                         title = "Đã gửi lời nhắc kiểm tra",
-                        description = "Bạn nhắn: “Bố nhớ uống thuốc nhé.”",
+                        description = "Bạn nhắn: “Mẹ nhớ uống thuốc nhé.”",
                         time = "13:22"
                     )
                     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF3F4F6)))
                     ActivityItem(
                         icon = "✓",
+                        iconBg = Color(0xFFE8F7F2),
                         title = "Đã uống Amlodipine 5 mg",
-                        description = "Đúng giờ • Tự xác nhận trên máy",
-                        time = "07:30"
+                        description = "Đúng giờ • Xác nhận bởi cô Lan",
+                        time = "08:03"
                     )
                     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF3F4F6)))
                     ActivityItem(
                         icon = "✓",
+                        iconBg = Color(0xFFE8F7F2),
                         title = "Hoàn thành 3/3 liều",
-                        description = "Tất cả các liều đều đúng lịch",
+                        description = "Tất cả liều đúng lịch",
                         time = "Hôm qua"
                     )
                 }
@@ -465,7 +529,8 @@ private fun ActivityItem(
     icon: String,
     title: String,
     description: String,
-    time: String
+    time: String,
+    iconBg: Color = Color(0xFFEAF5F2)
 ) {
     Row(
         modifier = Modifier
@@ -477,7 +542,7 @@ private fun ActivityItem(
             modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFEAF5F2)),
+                .background(iconBg),
             contentAlignment = Alignment.Center
         ) {
             Text(text = icon, fontSize = 16.sp)
