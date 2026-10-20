@@ -1,21 +1,57 @@
 package com.example.project_lttbd.ui.screens.home
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 @Composable
-fun HomeScreen(
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+fun HomeScreen(modifier: Modifier = Modifier) {
+    // Dữ liệu mẫu phục vụ việc dựng giao diện FE.
+    val nextDose = NextDoseUiModel(
+        medicineId = "medicine_02",
+        time = "13:00",
+        medicineName = "Metformin 500 mg",
+        instruction = "1 viên • Cùng bữa trưa",
+        medicineCode = "M500",
+        countdownText = "Còn 1 giờ 18 phút"
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
     ) {
-        // TODO: Thay bằng giao diện Trang chủ theo Figma.
-        Text(text = "Trang chủ")
+        HomeHeader(
+            greeting = "Chào buổi sáng, cô Lan",
+            dateText = "Thứ Sáu, 02 tháng 10",
+            initials = "NL",
+            onNotificationsClick = {
+                // Nối màn thông báo sau.
+            },
+            onAccountClick = {
+                // Nối màn tài khoản sau.
+            }
+        )
+
+        Column(
+            modifier = Modifier.padding(
+                start = 20.dp,
+                top = 6.dp,
+                end = 20.dp,
+                bottom = 14.dp
+            )
+        ) {
+            NextDoseCard(
+                dose = nextDose,
+                onViewDoseClick = {
+                    // Nối màn chi tiết liều thuốc sau.
+                }
+            )
+        }
     }
 }
