@@ -11,7 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
+fun HomeScreen(
+    modifier: Modifier = Modifier,
+    onViewAllClick: () -> Unit = {}
+) {
     // Dữ liệu mẫu FE.
     val nextDose = NextDoseUiModel(
         medicineId = "medicine_02",
@@ -56,10 +59,10 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             dateText = "Thứ Sáu, 02 tháng 10",
             initials = "NL",
             onNotificationsClick = {
-                // Nối màn thông báo sau.
+                // Chờ ghép phần thông báo của nhóm.
             },
             onAccountClick = {
-                // Nối màn tài khoản sau.
+                // Chờ ghép phần tài khoản của nhóm.
             }
         )
 
@@ -87,9 +90,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
 
             TodayScheduleSection(
                 doses = todayDoses,
-                onViewAllClick = {
-                    // Nối sang màn Lịch uống sau.
-                },
+                onViewAllClick = onViewAllClick,
                 onDoseClick = { doseId ->
                     // Nối màn chi tiết theo doseId sau.
                 }

@@ -38,7 +38,17 @@ fun MMRANavHost(
         }
 
         composable(MMRADestinations.HOME) {
-            HomeScreen()
+            HomeScreen(
+                onViewAllClick = {
+                    navController.navigate(MMRADestinations.SCHEDULE) {
+                        popUpTo(MMRADestinations.HOME) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            )
         }
 
         composable(MMRADestinations.MEDICINE) {
