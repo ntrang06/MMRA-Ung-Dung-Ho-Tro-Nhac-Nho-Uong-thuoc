@@ -23,6 +23,13 @@ import com.example.project_lttbd.ui.screens.reminder.ReminderDoseUiModel
 import com.example.project_lttbd.ui.screens.scan.ScanScreen
 import com.example.project_lttbd.ui.screens.schedule.ScheduleScreen
 
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.example.project_lttbd.data.mock.MockDoseAction
+import com.example.project_lttbd.data.mock.MockDoseActions
 @Composable
 fun MMRANavHost(
     navController: NavHostController,
@@ -96,7 +103,6 @@ fun MMRANavHost(
         ) { backStackEntry ->
             val doseId = backStackEntry.arguments?.getString("doseId")
 
-            // Dữ liệu mẫu FE của liều tiếp theo ở Trang chủ.
             val dose = if (doseId == "dose_02") {
                 ReminderDoseUiModel(
                     doseId = "dose_02",
@@ -111,25 +117,163 @@ fun MMRANavHost(
                 null
             }
 
+            var dialogAction by rememberSaveable(doseId) {
+                mutableStateOf<String?>(null)
+            }
+
             if (dose != null) {
+                val record = MockDoseActions.get(dose.doseId)
+                val finished = MockDoseActions.isFinished(dose.doseId)
+
                 DoseReminderScreen(
                     dose = dose,
+                    actionsEnabled = !finished,
                     onClose = {
                         navController.popBackStack()
                     },
                     onTaken = {
-                        // Nối cập nhật trạng thái FE ở bước sau.
+                        dialogAction = "CONFIRM_TAKEN"
                     },
-                    onSnooze = {
-                        // Nối trạng thái nhắc lại ở bước sau.
+                    onSnooze = { selectedDoseId ->
+                        MockDoseActions.record(
+                            doseId = selectedDoseId,
+                            action = MockDoseAction.SNOOZED
+                        )
+
+                        dialogAction = "SNOOZED"
                     },
                     onSkip = {
-                        // Nối trạng thái bỏ qua ở bước sau.
+                        dialogAction = "CONFIRM_SKIP"
                     },
                     onPlayInstructions = {
                         // Chưa nối âm thanh.
                     }
                 )
+
+                val currentDialog = dialogAction
+
+                if (currentDialog != null) {
+                    val needsConfirmation =
+                        currentDialog == "CONFIRM_TAKEN" ||
+                                currentDialog == "CONFIRM_SKIP"
+
+                    val title = when (currentDialog) {
+                        "CONFIRM_TAKEN" -> "Xác nhận đã uống?"
+                        "CONFIRM_SKIP" -> "Bỏ qua liều này?"
+                        "TAKEN" -> "Đã ghi nhận uống thuốc"
+                        "SKIPPED" -> "Đã ghi nhận bỏ qua"
+                        else -> "Đã chọn nhắc lại"
+                    }
+
+                    val message = when (currentDialog) {
+                        "CONFIRM_TAKEN" ->
+                            "Bạn đã uống ${dose.quantityText} " +
+                                    "${dose.medicineName} cho liều ${dose.timeLabel}?"
+
+                        "CONFIRM_SKIP" ->
+                            "Liều ${dose.medicineName} sẽ được đánh dấu bỏ qua."
+
+                        "TAKEN" ->
+                            "Liều này đã được đánh dấu đã uống."
+
+                        "SKIPPED" ->
+                            "Liều này đã được đánh dấu bỏ qua."
+
+                        else ->
+                            "Bạn đã chọn nhắc lại sau 10 phút. " +
+                                    "Liều này vẫn chưa được đánh dấu đã uống."
+                    }
+
+                    AlertDialog(
+                        onDismissRequest = {
+                            dialogAction = null
+                        },
+                        title = {
+                            Text(title)
+                        },
+                        text = {
+                            Text(message)
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    when (currentDialog) {
+                                        "CONFIRM_TAKEN" -> {
+                                            MockDoseActions.record(
+                                                doseId = dose.doseId,
+                                                action = MockDoseAction.TAKEN
+                                            )
+
+                                            dialogAction = "TAKEN"
+                                        }
+
+                                        "CONFIRM_SKIP" -> {
+                                            MockDoseActions.record(
+                                                doseId = dose.doseId,
+                                                action = MockDoseAction.SKIPPED
+                                            )
+
+                                            dialogAction = "SKIPPED"
+                                        }
+
+                                        else -> {
+                                            dialogAction = null
+                                            navController.popBackStack()
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    if (needsConfirmation) {
+                                        "Xác nhận"
+                                    } else {
+                                        "Quay lại"
+                                    }
+                                )
+                            }
+                        },
+                        dismissButton = {
+                            if (needsConfirmation) {
+                                TextButton(
+                                    onClick = {
+                                        dialogAction = null
+                                    }
+                                ) {
+                                    Text("Hủy")
+                                }
+                            }
+                        }
+                    )
+                } else if (finished && record != null) {
+                    // Khi mở lại liều đã xử lý, hiển thị trạng thái
+                    // và giữ các nút thao tác ở trạng thái bị khóa.
+                    AlertDialog(
+                        onDismissRequest = {
+                            navController.popBackStack()
+                        },
+                        title = {
+                            Text(
+                                if (record.action == MockDoseAction.TAKEN) {
+                                    "Liều này đã được ghi nhận uống"
+                                } else {
+                                    "Liều này đã được bỏ qua"
+                                }
+                            )
+                        },
+                        text = {
+                            Text("Bạn có thể xem lại trong lịch sử khi hoàn thiện màn đó.")
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    navController.popBackStack()
+                                }
+                            ) {
+                                Text("Quay lại")
+                            }
+                        }
+                    )
+                }
             } else {
                 Column {
                     Text("Không tìm thấy liều thuốc.")
