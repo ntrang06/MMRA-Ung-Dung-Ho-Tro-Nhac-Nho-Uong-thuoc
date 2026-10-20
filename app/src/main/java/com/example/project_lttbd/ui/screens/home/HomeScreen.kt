@@ -1,5 +1,6 @@
 package com.example.project_lttbd.ui.screens.home
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -44,13 +45,20 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                 top = 6.dp,
                 end = 20.dp,
                 bottom = 14.dp
-            )
+            ),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             NextDoseCard(
                 dose = nextDose,
                 onViewDoseClick = {
                     // Nối màn chi tiết liều thuốc sau.
                 }
+            )
+
+            TodayProgressCard(
+                takenDoses = 1,
+                totalDoses = 3,
+                onTimeDoses = 1
             )
         }
     }
