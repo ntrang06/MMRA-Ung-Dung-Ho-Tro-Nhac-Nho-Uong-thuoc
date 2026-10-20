@@ -116,7 +116,7 @@ fun NextDoseCard(
             }
 
             Surface(
-                onClick = { onViewDoseClick(dose.medicineId) },
+                onClick = { onViewDoseClick(dose.doseId) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 color = Color.White,
@@ -258,6 +258,7 @@ private fun NextDoseCardPreview() {
     MMRATheme {
         NextDoseCard(
             dose = NextDoseUiModel(
+                doseId = "dose_02",
                 medicineId = "medicine_02",
                 time = "13:00",
                 medicineName = "Metformin 500 mg",

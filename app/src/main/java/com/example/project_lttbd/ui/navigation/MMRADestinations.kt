@@ -10,4 +10,5 @@ object MMRADestinations {
     const val HISTORY = "history"
     const val FAMILY = "family"
     const val ACCOUNT = "account"
+    const val REMINDER = "reminder/{doseId}"
 }

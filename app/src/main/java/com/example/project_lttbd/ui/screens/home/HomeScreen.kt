@@ -13,10 +13,12 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    onViewAllClick: () -> Unit = {}
+    onViewAllClick: () -> Unit = {},
+    onViewDoseClick: (String) -> Unit = {}
 ) {
     // Dữ liệu mẫu FE.
     val nextDose = NextDoseUiModel(
+        doseId = "dose_02",
         medicineId = "medicine_02",
         time = "13:00",
         medicineName = "Metformin 500 mg",
@@ -77,9 +79,7 @@ fun HomeScreen(
         ) {
             NextDoseCard(
                 dose = nextDose,
-                onViewDoseClick = {
-                    // Nối màn chi tiết liều thuốc sau.
-                }
+                onViewDoseClick = onViewDoseClick
             )
 
             TodayProgressCard(
