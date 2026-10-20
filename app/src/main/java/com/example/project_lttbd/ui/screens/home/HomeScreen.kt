@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun HomeScreen(modifier: Modifier = Modifier) {
-    // Dữ liệu mẫu phục vụ việc dựng giao diện FE.
+    // Dữ liệu mẫu FE.
     val nextDose = NextDoseUiModel(
         medicineId = "medicine_02",
         time = "13:00",
@@ -20,6 +20,30 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         instruction = "1 viên • Cùng bữa trưa",
         medicineCode = "M500",
         countdownText = "Còn 1 giờ 18 phút"
+    )
+
+    val todayDoses = listOf(
+        HomeDoseUiModel(
+            doseId = "dose_01",
+            time = "08:00",
+            medicineName = "Amlodipine 5 mg",
+            instruction = "1 viên • Sau ăn sáng",
+            status = HomeDoseStatus.TAKEN
+        ),
+        HomeDoseUiModel(
+            doseId = "dose_02",
+            time = "13:00",
+            medicineName = "Metformin 500 mg",
+            instruction = "1 viên • Cùng bữa trưa",
+            status = HomeDoseStatus.NEXT
+        ),
+        HomeDoseUiModel(
+            doseId = "dose_03",
+            time = "20:00",
+            medicineName = "Atorvastatin 20 mg",
+            instruction = "1 viên • Buổi tối",
+            status = HomeDoseStatus.UPCOMING
+        )
     )
 
     Column(
@@ -59,6 +83,16 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                 takenDoses = 1,
                 totalDoses = 3,
                 onTimeDoses = 1
+            )
+
+            TodayScheduleSection(
+                doses = todayDoses,
+                onViewAllClick = {
+                    // Nối sang màn Lịch uống sau.
+                },
+                onDoseClick = { doseId ->
+                    // Nối màn chi tiết theo doseId sau.
+                }
             )
         }
     }
