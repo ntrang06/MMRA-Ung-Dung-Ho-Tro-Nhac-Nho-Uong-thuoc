@@ -28,24 +28,33 @@ fun TodayProgressCard(
     takenDoses: Int,
     totalDoses: Int,
     onTimeDoses: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    skippedDoses: Int = 0
 ) {
     val total = totalDoses.coerceAtLeast(0)
     val taken = takenDoses.coerceIn(0, total)
+    val skipped = skippedDoses.coerceIn(0, total - taken)
     val onTime = onTimeDoses.coerceIn(0, taken)
-    val remaining = total - taken
+    val remaining = total - taken - skipped
 
     val title = when {
         total == 0 -> "Hôm nay chưa có lịch uống"
         taken == total -> "Đã hoàn thành lịch hôm nay"
+        remaining == 0 -> "Không còn liều chờ xử lý"
+        skipped > 0 || onTime < taken -> "Tiến độ uống thuốc hôm nay"
         taken == 0 -> "Hôm nay có $total liều thuốc"
-        onTime == taken -> "Hôm nay đang đúng lịch"
-        else -> "Tiến độ uống thuốc hôm nay"
+        else -> "Hôm nay đang đúng lịch"
     }
 
     val description = when {
         total == 0 -> "Thêm lịch uống để theo dõi tại đây."
+
+        skipped > 0 ->
+            "Đã uống $taken liều, bỏ qua $skipped liều. " +
+                    "Còn $remaining liều."
+
         taken == total -> "Đã uống đủ $total liều trong ngày."
+
         else -> "Đã uống $taken liều. Còn $remaining liều trong ngày."
     }
 
@@ -79,7 +88,7 @@ fun TodayProgressCard(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = "$onTime/$total",
+                        text = "$taken/$total",
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontSize = 22.sp,
                             lineHeight = 26.sp,
@@ -90,7 +99,7 @@ fun TodayProgressCard(
                     )
 
                     Text(
-                        text = "ĐÚNG GIỜ",
+                        text = "ĐÃ UỐNG",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = 9.sp,
                             lineHeight = 12.sp,

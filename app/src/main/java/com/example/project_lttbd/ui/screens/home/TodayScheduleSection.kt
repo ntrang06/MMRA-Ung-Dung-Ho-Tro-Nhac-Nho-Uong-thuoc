@@ -31,7 +31,9 @@ import com.example.project_lttbd.R
 enum class HomeDoseStatus {
     TAKEN,
     NEXT,
-    UPCOMING
+    UPCOMING,
+    SNOOZED,
+    SKIPPED
 }
 
 data class HomeDoseUiModel(
@@ -116,18 +118,24 @@ private fun TodayDoseRow(
         HomeDoseStatus.TAKEN -> Color(0xFF287A4D)
         HomeDoseStatus.NEXT -> Color(0xFF126B62)
         HomeDoseStatus.UPCOMING -> Color(0xFF526565)
+        HomeDoseStatus.SNOOZED -> Color(0xFFAA5B00)
+        HomeDoseStatus.SKIPPED -> Color(0xFF526565)
     }
 
     val statusText = when (dose.status) {
         HomeDoseStatus.TAKEN -> "Đã uống"
         HomeDoseStatus.NEXT -> "Tiếp theo"
         HomeDoseStatus.UPCOMING -> "Sắp tới"
+        HomeDoseStatus.SNOOZED -> "Nhắc lại"
+        HomeDoseStatus.SKIPPED -> "Đã bỏ qua"
     }
 
     val iconBackground = when (dose.status) {
         HomeDoseStatus.TAKEN -> Color(0xFFE3F4E9)
         HomeDoseStatus.NEXT -> Color(0xFF126B62)
         HomeDoseStatus.UPCOMING -> Color(0xFFEEF5F3)
+        HomeDoseStatus.SNOOZED -> Color(0xFFFFF1D6)
+        HomeDoseStatus.SKIPPED -> Color(0xFFEEF5F3)
     }
 
     Row(

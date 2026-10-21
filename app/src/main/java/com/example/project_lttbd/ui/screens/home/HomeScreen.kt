@@ -1,14 +1,25 @@
 package com.example.project_lttbd.ui.screens.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.example.project_lttbd.data.mock.MockDoseAction
+import com.example.project_lttbd.data.mock.MockDoseActions
+import com.example.project_lttbd.data.mock.MockReminderDoses
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
@@ -16,40 +27,66 @@ fun HomeScreen(
     onViewAllClick: () -> Unit = {},
     onViewDoseClick: (String) -> Unit = {}
 ) {
-    // Dữ liệu mẫu FE.
-    val nextDose = NextDoseUiModel(
-        doseId = "dose_02",
-        medicineId = "medicine_02",
-        time = "13:00",
-        medicineName = "Metformin 500 mg",
-        instruction = "1 viên • Cùng bữa trưa",
-        medicineCode = "M500",
-        countdownText = "Còn 1 giờ 18 phút"
-    )
+    val doses = MockReminderDoses.doses
 
-    val todayDoses = listOf(
+    // Liều sáng đã uống sẵn trong kịch bản mẫu Figma.
+    val initiallyTakenIds = setOf("dose_01")
+
+    fun actionFor(doseId: String): MockDoseAction? {
+        return MockDoseActions.get(doseId)?.action
+            ?: if (doseId in initiallyTakenIds) {
+                MockDoseAction.TAKEN
+            } else {
+                null
+            }
+    }
+
+    // Chọn liều chưa uống và chưa bỏ qua theo thứ tự dữ liệu mẫu.
+    val nextDose = doses.firstOrNull { dose ->
+        val action = actionFor(dose.doseId)
+
+        action != MockDoseAction.TAKEN &&
+                action != MockDoseAction.SKIPPED
+    }
+
+    val todayDoses = doses.map { dose ->
+        val instruction = dose.mealInstruction
+            .lowercase(Locale.forLanguageTag("vi-VN"))
+            .replaceFirstChar { it.titlecase() }
+
+        val status = when (actionFor(dose.doseId)) {
+            MockDoseAction.TAKEN -> HomeDoseStatus.TAKEN
+            MockDoseAction.SKIPPED -> HomeDoseStatus.SKIPPED
+            MockDoseAction.SNOOZED -> HomeDoseStatus.SNOOZED
+
+            null -> {
+                if (dose.doseId == nextDose?.doseId) {
+                    HomeDoseStatus.NEXT
+                } else {
+                    HomeDoseStatus.UPCOMING
+                }
+            }
+        }
+
         HomeDoseUiModel(
-            doseId = "dose_01",
-            time = "08:00",
-            medicineName = "Amlodipine 5 mg",
-            instruction = "1 viên • Sau ăn sáng",
-            status = HomeDoseStatus.TAKEN
-        ),
-        HomeDoseUiModel(
-            doseId = "dose_02",
-            time = "13:00",
-            medicineName = "Metformin 500 mg",
-            instruction = "1 viên • Cùng bữa trưa",
-            status = HomeDoseStatus.NEXT
-        ),
-        HomeDoseUiModel(
-            doseId = "dose_03",
-            time = "20:00",
-            medicineName = "Atorvastatin 20 mg",
-            instruction = "1 viên • Buổi tối",
-            status = HomeDoseStatus.UPCOMING
+            doseId = dose.doseId,
+            time = dose.timeLabel.substringBefore(" •"),
+            medicineName = dose.medicineName,
+            instruction = listOf(
+                dose.quantityText,
+                instruction
+            ).filter { it.isNotBlank() }.joinToString(" • "),
+            status = status
         )
-    )
+    }
+
+    val takenCount = todayDoses.count {
+        it.status == HomeDoseStatus.TAKEN
+    }
+
+    val skippedCount = todayDoses.count {
+        it.status == HomeDoseStatus.SKIPPED
+    }
 
     Column(
         modifier = modifier
@@ -77,22 +114,68 @@ fun HomeScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            NextDoseCard(
-                dose = nextDose,
-                onViewDoseClick = onViewDoseClick
-            )
+            if (nextDose != null) {
+                val row = todayDoses.first {
+                    it.doseId == nextDose.doseId
+                }
+
+                val medicineCode = when (nextDose.medicineId) {
+                    "medicine_01" -> "A5"
+                    "medicine_02" -> "M500"
+                    "medicine_03" -> "A20"
+                    else -> ""
+                }
+
+                NextDoseCard(
+                    dose = NextDoseUiModel(
+                        doseId = nextDose.doseId,
+                        medicineId = nextDose.medicineId,
+                        time = row.time,
+                        medicineName = nextDose.medicineName,
+                        instruction = row.instruction,
+                        medicineCode = medicineCode,
+                        countdownText = if (
+                            row.status == HomeDoseStatus.SNOOZED
+                        ) {
+                            "Đã chọn nhắc lại"
+                        } else {
+                            "Liều sắp tới"
+                        }
+                    ),
+                    onViewDoseClick = onViewDoseClick
+                )
+            } else {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color.White,
+                    border = BorderStroke(
+                        1.dp,
+                        Color(0xFFD7E2DF)
+                    )
+                ) {
+                    Text(
+                        text = "Không còn liều chờ xử lý hôm nay.",
+                        modifier = Modifier.padding(18.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color(0xFF102A2A)
+                    )
+                }
+            }
 
             TodayProgressCard(
-                takenDoses = 1,
-                totalDoses = 3,
+                takenDoses = takenCount,
+                totalDoses = todayDoses.size,
+                skippedDoses = skippedCount,
+                // Giữ số liều đúng giờ mẫu, chưa đánh giá giờ thực tế.
                 onTimeDoses = 1
             )
 
             TodayScheduleSection(
                 doses = todayDoses,
                 onViewAllClick = onViewAllClick,
-                onDoseClick = { doseId ->
-                    // Nối màn chi tiết theo doseId sau.
+                onDoseClick = {
+                    // Nối thao tác mở từng dòng ở bước sau.
                 }
             )
         }

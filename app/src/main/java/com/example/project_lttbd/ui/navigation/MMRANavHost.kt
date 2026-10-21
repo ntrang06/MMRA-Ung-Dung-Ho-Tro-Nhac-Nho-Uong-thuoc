@@ -19,7 +19,6 @@ import com.example.project_lttbd.ui.screens.history.HistoryScreen
 import com.example.project_lttbd.ui.screens.home.HomeScreen
 import com.example.project_lttbd.ui.screens.medicine.MedicineScreen
 import com.example.project_lttbd.ui.screens.reminder.DoseReminderScreen
-import com.example.project_lttbd.ui.screens.reminder.ReminderDoseUiModel
 import com.example.project_lttbd.ui.screens.scan.ScanScreen
 import com.example.project_lttbd.ui.screens.schedule.ScheduleScreen
 
@@ -30,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.example.project_lttbd.data.mock.MockDoseAction
 import com.example.project_lttbd.data.mock.MockDoseActions
+import com.example.project_lttbd.data.mock.MockReminderDoses
 @Composable
 fun MMRANavHost(
     navController: NavHostController,
@@ -103,19 +103,7 @@ fun MMRANavHost(
         ) { backStackEntry ->
             val doseId = backStackEntry.arguments?.getString("doseId")
 
-            val dose = if (doseId == "dose_02") {
-                ReminderDoseUiModel(
-                    doseId = "dose_02",
-                    medicineId = "medicine_02",
-                    timeLabel = "13:00 • Hôm nay",
-                    medicineName = "Metformin 500 mg",
-                    quantityText = "1 viên",
-                    mealInstruction = "CÙNG BỮA TRƯA",
-                    audioDurationLabel = "0:08"
-                )
-            } else {
-                null
-            }
+            val dose = MockReminderDoses.findById(doseId)
 
             var dialogAction by rememberSaveable(doseId) {
                 mutableStateOf<String?>(null)
