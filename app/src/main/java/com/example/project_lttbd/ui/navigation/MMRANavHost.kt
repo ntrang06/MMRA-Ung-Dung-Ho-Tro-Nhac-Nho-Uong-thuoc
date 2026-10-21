@@ -78,7 +78,15 @@ fun MMRANavHost(
         }
 
         composable(MMRADestinations.SCHEDULE) {
-            ScheduleScreen()
+            ScheduleScreen(
+                onDoseClick = { doseId ->
+                    navController.navigate(
+                        "reminder/${android.net.Uri.encode(doseId)}"
+                    ) {
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
 
         composable(MMRADestinations.SCAN) {

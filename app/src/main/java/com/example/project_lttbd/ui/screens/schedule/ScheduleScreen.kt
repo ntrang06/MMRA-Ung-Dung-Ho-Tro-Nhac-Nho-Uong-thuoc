@@ -25,13 +25,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.data.mock.MockDoseAction
+import com.example.project_lttbd.data.mock.MockDoseActions
+import com.example.project_lttbd.data.mock.MockReminderDoses
 import com.example.project_lttbd.ui.theme.MMRATheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 @Composable
-fun ScheduleScreen(modifier: Modifier = Modifier) {
+fun ScheduleScreen(
+    modifier: Modifier = Modifier,
+    onDoseClick: (String) -> Unit = {}
+) {
     val context = LocalContext.current
 
     val todayMillis = remember {
@@ -42,58 +49,43 @@ fun ScheduleScreen(modifier: Modifier = Modifier) {
         mutableStateOf(todayMillis)
     }
 
-    // Dữ liệu mẫu chỉ được gắn với ngày hôm nay.
-    val sampleDoses = remember {
-        listOf(
-            ScheduleDoseUiModel(
-                doseId = "schedule_dose_01",
-                medicineId = "medicine_01",
-                time = "07:30",
-                medicineName = "Amlodipine 5 mg",
-                quantityText = "1 viên",
-                instruction = "Sau ăn sáng",
-                status = ScheduleDoseStatus.TAKEN
-            ),
-            ScheduleDoseUiModel(
-                doseId = "schedule_dose_02",
-                medicineId = "medicine_02",
-                time = "12:00",
-                medicineName = "Metformin 500 mg",
-                quantityText = "1 viên",
-                instruction = "Cùng bữa trưa",
-                status = ScheduleDoseStatus.PENDING
-            ),
-            ScheduleDoseUiModel(
-                doseId = "schedule_dose_03",
-                medicineId = "medicine_04",
-                time = "16:00",
-                medicineName = "Vitamin D3 1000 IU",
-                quantityText = "1 viên",
-                instruction = "Sau ăn",
-                status = ScheduleDoseStatus.OVERDUE
-            ),
-            ScheduleDoseUiModel(
-                doseId = "schedule_dose_04",
-                medicineId = "medicine_03",
-                time = "20:30",
-                medicineName = "Atorvastatin 20 mg",
-                quantityText = "1 viên",
-                instruction = "Sau ăn tối",
-                status = ScheduleDoseStatus.UNCONFIRMED
-            )
-        )
-    }
-
     val dateFormat = remember {
         SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
     }
 
-    val doses = if (
-        dateFormat.format(selectedDateMillis) ==
-        dateFormat.format(todayMillis)
-    ) {
-        sampleDoses
+    val isToday =
+        dateFormat.format(Date(selectedDateMillis)) ==
+                dateFormat.format(Date(todayMillis))
+
+    // Dữ liệu mẫu dùng chung với Trang chủ.
+    // Đọc trạng thái trực tiếp để giao diện cập nhật khi có thao tác.
+    val doses: List<ScheduleDoseUiModel> = if (isToday) {
+        MockReminderDoses.doses.map { dose ->
+            val status = when (
+                MockDoseActions.get(dose.doseId)?.action
+            ) {
+                MockDoseAction.TAKEN -> ScheduleDoseStatus.TAKEN
+                MockDoseAction.SNOOZED -> ScheduleDoseStatus.SNOOZED
+                MockDoseAction.SKIPPED -> ScheduleDoseStatus.SKIPPED
+                null -> ScheduleDoseStatus.PENDING
+            }
+
+            val instruction = dose.mealInstruction
+                .lowercase(Locale.forLanguageTag("vi-VN"))
+                .replaceFirstChar { it.titlecase() }
+
+            ScheduleDoseUiModel(
+                doseId = dose.doseId,
+                medicineId = dose.medicineId,
+                time = dose.timeLabel.substringBefore(" •"),
+                medicineName = dose.medicineName,
+                quantityText = dose.quantityText,
+                instruction = instruction,
+                status = status
+            )
+        }
     } else {
+        // Hiện tại dữ liệu mẫu chỉ có lịch của hôm nay.
         emptyList()
     }
 
@@ -187,9 +179,7 @@ fun ScheduleScreen(modifier: Modifier = Modifier) {
                     doses.forEach { dose ->
                         ScheduleDoseCard(
                             dose = dose,
-                            onClick = {
-                                // Nối màn chi tiết liều thuốc sau.
-                            }
+                            onClick = onDoseClick
                         )
                     }
                 }

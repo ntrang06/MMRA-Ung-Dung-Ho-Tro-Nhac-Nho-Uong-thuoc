@@ -14,7 +14,14 @@ data class MockDoseActionRecord(
 )
 
 object MockDoseActions {
-    private val records = mutableStateMapOf<String, MockDoseActionRecord>()
+
+    // Trạng thái ban đầu của kịch bản mẫu FE.
+    private val records = mutableStateMapOf<String, MockDoseActionRecord>(
+        "dose_01" to MockDoseActionRecord(
+            action = MockDoseAction.TAKEN,
+            recordedAtMillis = System.currentTimeMillis()
+        )
+    )
 
     fun get(doseId: String): MockDoseActionRecord? {
         return records[doseId]

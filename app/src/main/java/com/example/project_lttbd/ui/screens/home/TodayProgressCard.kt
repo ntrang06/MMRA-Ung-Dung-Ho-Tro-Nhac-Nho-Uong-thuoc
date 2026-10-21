@@ -41,11 +41,8 @@ fun TodayProgressCard(
         total == 0 -> "Hôm nay chưa có lịch uống"
         taken == total -> "Đã hoàn thành lịch hôm nay"
         remaining == 0 -> "Không còn liều chờ xử lý"
-        skipped > 0 || onTime < taken -> "Tiến độ uống thuốc hôm nay"
-        taken == 0 -> "Hôm nay có $total liều thuốc"
-        else -> "Hôm nay đang đúng lịch"
+        else -> "Tiến độ uống thuốc hôm nay"
     }
-
     val description = when {
         total == 0 -> "Thêm lịch uống để theo dõi tại đây."
 

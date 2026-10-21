@@ -50,6 +50,18 @@ enum class ScheduleDoseStatus(
         "?",
         Color(0xFFAA5B00),
         Color(0xFFFFF1D6)
+    ),
+    SNOOZED(
+        "NHẮC LẠI",
+        "◷",
+        Color(0xFFAA5B00),
+        Color(0xFFFFF1D6)
+    ),
+    SKIPPED(
+        "ĐÃ BỎ QUA",
+        "−",
+        Color(0xFF526565),
+        Color(0xFFEEF5F3)
     )
 }
 

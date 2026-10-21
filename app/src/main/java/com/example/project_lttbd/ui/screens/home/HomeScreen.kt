@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import com.example.project_lttbd.data.mock.MockDoseAction
 import com.example.project_lttbd.data.mock.MockDoseActions
 import com.example.project_lttbd.data.mock.MockReminderDoses
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 
 @Composable
@@ -29,16 +31,9 @@ fun HomeScreen(
 ) {
     val doses = MockReminderDoses.doses
 
-    // Liều sáng đã uống sẵn trong kịch bản mẫu Figma.
-    val initiallyTakenIds = setOf("dose_01")
-
+    // Đọc trạng thái từ nguồn dữ liệu mẫu dùng chung.
     fun actionFor(doseId: String): MockDoseAction? {
         return MockDoseActions.get(doseId)?.action
-            ?: if (doseId in initiallyTakenIds) {
-                MockDoseAction.TAKEN
-            } else {
-                null
-            }
     }
 
     // Chọn liều chưa uống và chưa bỏ qua theo thứ tự dữ liệu mẫu.
@@ -75,7 +70,9 @@ fun HomeScreen(
             instruction = listOf(
                 dose.quantityText,
                 instruction
-            ).filter { it.isNotBlank() }.joinToString(" • "),
+            )
+                .filter { it.isNotBlank() }
+                .joinToString(" • "),
             status = status
         )
     }
@@ -88,6 +85,13 @@ fun HomeScreen(
         it.status == HomeDoseStatus.SKIPPED
     }
 
+    val todayText = SimpleDateFormat(
+        "EEEE, dd 'tháng' MM",
+        Locale.forLanguageTag("vi-VN")
+    )
+        .format(Calendar.getInstance().time)
+        .replaceFirstChar { it.titlecase() }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -95,7 +99,7 @@ fun HomeScreen(
     ) {
         HomeHeader(
             greeting = "Chào buổi sáng, cô Lan",
-            dateText = "Thứ Sáu, 02 tháng 10",
+            dateText = todayText,
             initials = "NL",
             onNotificationsClick = {
                 // Chờ ghép phần thông báo của nhóm.
@@ -167,16 +171,14 @@ fun HomeScreen(
                 takenDoses = takenCount,
                 totalDoses = todayDoses.size,
                 skippedDoses = skippedCount,
-                // Giữ số liều đúng giờ mẫu, chưa đánh giá giờ thực tế.
+                // Số mẫu cũ, chưa nối thống kê đúng giờ.
                 onTimeDoses = 1
             )
 
             TodayScheduleSection(
                 doses = todayDoses,
                 onViewAllClick = onViewAllClick,
-                onDoseClick = {
-                    // Nối thao tác mở từng dòng ở bước sau.
-                }
+                onDoseClick = onViewDoseClick
             )
         }
     }
