@@ -5,6 +5,7 @@ object MMRADestinations {
     const val REGISTER = "register"
     const val HOME = "home"
     const val MEDICINE = "medicine"
+    const val MANUAL_MEDICINE = "medicine/manual"
     const val SCHEDULE = "schedule"
     const val SCAN = "scan"
     const val HISTORY = "history"

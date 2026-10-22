@@ -2,16 +2,7 @@ package com.example.project_lttbd.ui.screens.medicine
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -109,7 +100,7 @@ fun MedicineScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF5FAF9))
+            .background(Color(0xFFF7FAF9))
             .imePadding()
             .verticalScroll(rememberScrollState())
     ) {
@@ -274,7 +265,7 @@ private fun AddMedicineButton(
 }
 
 @Composable
-private fun MedicineNotice(
+internal fun MedicineNotice(
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -329,8 +320,8 @@ private fun MedicineNotice(
                         "Hãy dùng thuốc theo đơn của bác sĩ.",
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 11.sp,
-                    lineHeight = 16.5.sp,
+                    fontSize = 13.sp,
+                    lineHeight = 19.5.sp,
                     letterSpacing = 0.sp,
                     fontWeight = FontWeight.Normal
                 ),
