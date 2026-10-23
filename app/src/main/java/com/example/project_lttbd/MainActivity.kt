@@ -14,6 +14,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.project_lttbd.ui.components.MMRABottomBar
+import com.example.project_lttbd.ui.navigation.MMRADestinations
 import com.example.project_lttbd.ui.navigation.MMRANavHost
 import com.example.project_lttbd.ui.navigation.mmraBottomNavItems
 import com.example.project_lttbd.ui.theme.MMRATheme
@@ -32,7 +33,7 @@ class MainActivity : ComponentActivity() {
 
                 val showBottomBar = mmraBottomNavItems.any {
                     it.route == currentRoute
-                }
+                } && currentRoute != MMRADestinations.SCAN
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
