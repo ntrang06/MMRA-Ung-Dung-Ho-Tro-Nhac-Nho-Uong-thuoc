@@ -5,9 +5,13 @@ object MMRADestinations {
     const val REGISTER = "register"
     const val HOME = "home"
     const val MEDICINE = "medicine"
+    const val MANUAL_MEDICINE = "medicine/manual"
+    const val EDIT_MEDICINE = "medicine/edit/{medicineId}"
     const val SCHEDULE = "schedule"
+    const val SCHEDULE_SETUP = "schedule/setup"
     const val SCAN = "scan"
     const val HISTORY = "history"
     const val FAMILY = "family"
     const val ACCOUNT = "account"
+    const val REMINDER = "reminder/{doseId}?readOnly={readOnly}"
 }
