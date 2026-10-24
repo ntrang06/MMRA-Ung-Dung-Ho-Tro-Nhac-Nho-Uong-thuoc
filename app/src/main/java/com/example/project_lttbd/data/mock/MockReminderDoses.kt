@@ -1,37 +1,77 @@
 package com.example.project_lttbd.data.mock
 
 import com.example.project_lttbd.ui.screens.reminder.ReminderDoseUiModel
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 object MockReminderDoses {
-    val doses = listOf(
-        ReminderDoseUiModel(
-            doseId = "dose_01",
-            medicineId = "medicine_01",
-            timeLabel = "08:00 • Hôm nay",
-            medicineName = "Amlodipine 5 mg",
-            quantityText = "1 viên",
-            mealInstruction = "SAU ĂN SÁNG"
-        ),
-        ReminderDoseUiModel(
-            doseId = "dose_02",
-            medicineId = "medicine_02",
-            timeLabel = "13:00 • Hôm nay",
-            medicineName = "Metformin 500 mg",
-            quantityText = "1 viên",
-            mealInstruction = "CÙNG BỮA TRƯA",
-            audioDurationLabel = "0:08"
-        ),
-        ReminderDoseUiModel(
-            doseId = "dose_03",
-            medicineId = "medicine_03",
-            timeLabel = "20:00 • Hôm nay",
-            medicineName = "Atorvastatin 20 mg",
-            quantityText = "1 viên",
-            mealInstruction = "BUỔI TỐI"
-        )
-    )
+    val doses: List<ReminderDoseUiModel>
+        get() = forDate(MockCalendar.today())
+
+    fun forDate(date: Long): List<ReminderDoseUiModel> {
+        val generated = MockMedicines.forDate(date).flatMap { medicine ->
+            val schedule = medicine.schedule
+
+            if (schedule == null || !schedule.contains(date)) {
+                emptyList()
+            } else {
+                schedule.times.map { time ->
+                    val dateLabel =
+                        if (MockCalendar.day(date) == MockCalendar.today()) {
+                            "Hôm nay"
+                        } else {
+                            MockCalendar.date(date)
+                        }
+
+                    ReminderDoseUiModel(
+                        doseId = MockCalendar.doseId(
+                            medicine.medicineId,
+                            date,
+                            time
+                        ),
+                        medicineId = medicine.medicineId,
+                        timeLabel = "${MockCalendar.time(time)} • $dateLabel",
+                        medicineName = medicine.medicineName,
+                        quantityText = schedule.quantityText,
+                        mealInstruction = schedule.meal,
+                        scheduledAtMillis = MockCalendar.at(date, time)
+                    )
+                }
+            }
+        }
+
+        // Giữ thông tin các liều đã uống hoặc đã bỏ qua.
+        val recorded = MockDoseActions.snapshots().filter {
+            MockDoseActions.isFinished(it.doseId) &&
+                    MockCalendar.day(it.scheduledAtMillis) ==
+                    MockCalendar.day(date)
+        }
+
+        return (generated + recorded)
+            .associateBy { it.doseId }
+            .values
+            .sortedBy { it.scheduledAtMillis }
+    }
 
     fun findById(doseId: String?): ReminderDoseUiModel? {
-        return doses.firstOrNull { it.doseId == doseId }
+        if (doseId == null) return null
+
+        if (MockDoseActions.isFinished(doseId)) {
+            MockDoseActions.snapshot(doseId)?.let {
+                return it
+            }
+        }
+
+        val dateKey = doseId.split('|').getOrNull(1) ?: return null
+
+        val date = runCatching {
+            SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply {
+                isLenient = false
+            }.parse(dateKey)?.time
+        }.getOrNull() ?: return null
+
+        return forDate(date).firstOrNull {
+            it.doseId == doseId
+        }
     }
 }

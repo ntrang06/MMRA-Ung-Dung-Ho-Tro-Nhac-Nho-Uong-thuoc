@@ -26,11 +26,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.data.mock.MockCalendar
 import com.example.project_lttbd.data.mock.MockMedicines
-import com.example.project_lttbd.data.mock.MockReminderDoses
 import com.example.project_lttbd.ui.components.MMRASearchField
 import com.example.project_lttbd.ui.theme.MMRATheme
-import java.util.Locale
 
 @Composable
 fun MedicineScreen(
@@ -44,54 +43,42 @@ fun MedicineScreen(
     }
 
     val medicines = MockMedicines.medicines.map { medicine ->
-        val schedules = MockReminderDoses.doses.filter {
-            it.medicineId == medicine.medicineId
-        }
+        val schedule = medicine.schedule
 
-        val quantities = schedules
-            .map { it.quantityText }
-            .filter { it.isNotBlank() }
-            .distinct()
-
-        val quantityText = when {
-            quantities.isEmpty() -> medicine.quantityText
-            quantities.size == 1 -> quantities.first()
-            else -> "Liều lượng theo lịch"
-        }
-
-        val scheduleText = schedules.joinToString("\n") { dose ->
-            val time = dose.timeLabel.substringBefore(" •")
-
-            val instruction = dose.mealInstruction
-                .lowercase(Locale.forLanguageTag("vi-VN"))
-                .replaceFirstChar { it.titlecase() }
-
-            listOf(time, instruction)
-                .filter { it.isNotBlank() }
-                .joinToString(" • ")
-        }
-
-        val accent = when (medicine.medicineId) {
-            "medicine_02" -> MedicineAccent.BLUE
-            "medicine_03" -> MedicineAccent.AMBER
-            else -> MedicineAccent.GREEN
-        }
+        val scheduleText = schedule
+            ?.times
+            ?.sorted()
+            ?.joinToString("\n") { minute ->
+                listOf(
+                    MockCalendar.time(minute),
+                    schedule.meal
+                )
+                    .filter { it.isNotBlank() }
+                    .joinToString(" • ")
+            }
+            .orEmpty()
 
         MedicineUiModel(
             medicineId = medicine.medicineId,
             medicineName = medicine.medicineName,
             medicineCode = medicine.medicineCode,
-            quantityText = quantityText,
+            quantityText =
+                schedule?.quantityText ?: medicine.quantityText,
             scheduleText = scheduleText,
-            hasSchedule = schedules.isNotEmpty(),
-            accent = accent
+            hasSchedule =
+                schedule != null && schedule.times.isNotEmpty(),
+            accent = when (medicine.medicineId) {
+                "medicine_02" -> MedicineAccent.BLUE
+                "medicine_03" -> MedicineAccent.AMBER
+                else -> MedicineAccent.GREEN
+            }
         )
     }
 
     val query = searchQuery.trim()
 
-    val visibleMedicines = medicines.filter { medicine ->
-        medicine.medicineName.contains(
+    val visibleMedicines = medicines.filter {
+        it.medicineName.contains(
             other = query,
             ignoreCase = true
         )
@@ -121,7 +108,9 @@ fun MedicineScreen(
         ) {
             MMRASearchField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = {
+                    searchQuery = it
+                },
                 placeholder = "Tìm tên thuốc"
             )
 

@@ -14,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -25,54 +24,51 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.data.mock.MockCalendar
 import com.example.project_lttbd.data.mock.MockDoseAction
 import com.example.project_lttbd.data.mock.MockDoseActions
 import com.example.project_lttbd.data.mock.MockReminderDoses
 import com.example.project_lttbd.ui.theme.MMRATheme
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun ScheduleScreen(
     modifier: Modifier = Modifier,
-    onDoseClick: (String) -> Unit = {}
+    onDoseClick: (String) -> Unit = {},
+    onAccountClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
-
-    val todayMillis = remember {
-        Calendar.getInstance().timeInMillis
-    }
+    val now = System.currentTimeMillis()
+    val todayMillis = MockCalendar.day(now)
 
     var selectedDateMillis by rememberSaveable {
         mutableStateOf(todayMillis)
     }
 
-    val dateFormat = remember {
-        SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
-    }
-
-    val isToday =
-        dateFormat.format(Date(selectedDateMillis)) ==
-                dateFormat.format(Date(todayMillis))
-
-    // Dữ liệu mẫu dùng chung với Trang chủ.
-    // Đọc trạng thái trực tiếp để giao diện cập nhật khi có thao tác.
-    val doses: List<ScheduleDoseUiModel> = if (isToday) {
-        MockReminderDoses.doses.map { dose ->
+    val doses = MockReminderDoses
+        .forDate(selectedDateMillis)
+        .map { dose ->
             val status = when (
                 MockDoseActions.get(dose.doseId)?.action
             ) {
-                MockDoseAction.TAKEN -> ScheduleDoseStatus.TAKEN
-                MockDoseAction.SNOOZED -> ScheduleDoseStatus.SNOOZED
-                MockDoseAction.SKIPPED -> ScheduleDoseStatus.SKIPPED
-                null -> ScheduleDoseStatus.PENDING
-            }
+                MockDoseAction.TAKEN ->
+                    ScheduleDoseStatus.TAKEN
 
-            val instruction = dose.mealInstruction
-                .lowercase(Locale.forLanguageTag("vi-VN"))
-                .replaceFirstChar { it.titlecase() }
+                MockDoseAction.SNOOZED ->
+                    ScheduleDoseStatus.SNOOZED
+
+                MockDoseAction.SKIPPED ->
+                    ScheduleDoseStatus.SKIPPED
+
+                null -> {
+                    // Quy ước mô phỏng FE: quá 10 phút chưa xác nhận.
+                    if (dose.scheduledAtMillis + 600_000L < now) {
+                        ScheduleDoseStatus.OVERDUE
+                    } else {
+                        ScheduleDoseStatus.PENDING
+                    }
+                }
+            }
 
             ScheduleDoseUiModel(
                 doseId = dose.doseId,
@@ -80,14 +76,10 @@ fun ScheduleScreen(
                 time = dose.timeLabel.substringBefore(" •"),
                 medicineName = dose.medicineName,
                 quantityText = dose.quantityText,
-                instruction = instruction,
+                instruction = dose.mealInstruction,
                 status = status
             )
         }
-    } else {
-        // Hiện tại dữ liệu mẫu chỉ có lịch của hôm nay.
-        emptyList()
-    }
 
     Column(
         modifier = modifier
@@ -104,19 +96,18 @@ fun ScheduleScreen(
                 DatePickerDialog(
                     context,
                     { _, year, month, day ->
-                        selectedDateMillis = Calendar.getInstance().apply {
-                            clear()
-                            set(year, month, day, 12, 0, 0)
-                        }.timeInMillis
+                        selectedDateMillis =
+                            Calendar.getInstance().apply {
+                                clear()
+                                set(year, month, day, 12, 0, 0)
+                            }.timeInMillis
                     },
                     selectedDate.get(Calendar.YEAR),
                     selectedDate.get(Calendar.MONTH),
                     selectedDate.get(Calendar.DAY_OF_MONTH)
                 ).show()
             },
-            onAccountClick = {
-                // Chờ ghép phần tài khoản của nhóm.
-            }
+            onAccountClick = onAccountClick
         )
 
         Column(
@@ -131,7 +122,9 @@ fun ScheduleScreen(
             ScheduleWeekPicker(
                 selectedDateMillis = selectedDateMillis,
                 todayMillis = todayMillis,
-                onDateSelected = { selectedDateMillis = it }
+                onDateSelected = {
+                    selectedDateMillis = it
+                }
             )
 
             Row(

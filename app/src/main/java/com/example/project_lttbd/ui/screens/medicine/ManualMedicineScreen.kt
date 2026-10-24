@@ -12,17 +12,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -50,57 +42,49 @@ import com.example.project_lttbd.ui.theme.MMRATheme
 fun ManualMedicineScreen(
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit = {},
-    onContinue: (ManualMedicineDraft) -> Unit = {}
+    onContinue: (ManualMedicineDraft) -> Unit = {},
+    initialDraft: ManualMedicineDraft? = null
 ) {
-    var medicineName by rememberSaveable { mutableStateOf("") }
-    var strength by rememberSaveable { mutableStateOf("") }
-    var strengthUnit by rememberSaveable { mutableStateOf("mg") }
-    var dosageForm by rememberSaveable { mutableStateOf("") }
-    var note by rememberSaveable { mutableStateOf("") }
-    var imageUri by rememberSaveable { mutableStateOf<String?>(null) }
-    var attemptedContinue by rememberSaveable { mutableStateOf(false) }
+    var medicineName by rememberSaveable {
+        mutableStateOf(initialDraft?.medicineName.orEmpty())
+    }
+    var strength by rememberSaveable {
+        mutableStateOf(initialDraft?.strength.orEmpty())
+    }
+    var strengthUnit by rememberSaveable {
+        mutableStateOf(initialDraft?.strengthUnit ?: "mg")
+    }
+    var dosageForm by rememberSaveable {
+        mutableStateOf(initialDraft?.dosageForm.orEmpty())
+    }
+    var note by rememberSaveable {
+        mutableStateOf(initialDraft?.note.orEmpty())
+    }
+    var imageUri by rememberSaveable {
+        mutableStateOf<String?>(initialDraft?.imageUri)
+    }
+    var attemptedContinue by rememberSaveable {
+        mutableStateOf(false)
+    }
 
     val focusManager = LocalFocusManager.current
     val isPreview = LocalInspectionMode.current
 
     val imagePicker = if (!isPreview) {
         rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.GetContent()
+            ActivityResultContracts.GetContent()
         ) { uri ->
-            if (uri != null) {
-                imageUri = uri.toString()
-            }
+            if (uri != null) imageUri = uri.toString()
         }
-    } else {
-        null
-    }
+    } else null
 
     val trimmedStrength = strength.trim()
 
-    val validStrength = trimmedStrength.isEmpty() ||
-            (
-                    trimmedStrength.matches(Regex("""\d+([.,]\d+)?""")) &&
-                            trimmedStrength
-                                .replace(',', '.')
-                                .toBigDecimalOrNull()
-                                ?.signum() == 1
-                    )
-
-    val nameError = if (
-        attemptedContinue && medicineName.isBlank()
-    ) {
-        "Vui lòng nhập tên thuốc."
-    } else {
-        null
-    }
-
-    val strengthError = if (
-        attemptedContinue && !validStrength
-    ) {
-        "Nhập hàm lượng là số lớn hơn 0."
-    } else {
-        null
-    }
+    val validStrength = trimmedStrength.isEmpty() || (
+            trimmedStrength.matches(Regex("\\d+([.,]\\d+)?")) &&
+                    trimmedStrength.replace(',', '.')
+                        .toBigDecimalOrNull()?.signum() == 1
+            )
 
     Column(
         modifier = modifier
@@ -108,45 +92,40 @@ fun ManualMedicineScreen(
             .background(Color(0xFFF7FAF9))
             .imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(
-                horizontal = 20.dp,
-                vertical = 14.dp
-            ),
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Tiêu đề và nút quay lại.
         Row(
-            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
                 onClick = onBackClick,
-                modifier = Modifier
-                    .size(44.dp)
-                    .semantics {
-                        contentDescription = "Quay lại"
-                    },
+                modifier = Modifier.size(44.dp).semantics {
+                    contentDescription = "Quay lại"
+                },
                 shape = CircleShape,
                 color = Color(0xFFEEF5F3)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(contentAlignment = Alignment.Center) {
                     ManualMedicineIcon(
-                        kind = ManualIconKind.BACK,
-                        modifier = Modifier.size(20.dp),
-                        color = Color(0xFF102A2A)
+                        ManualIconKind.BACK,
+                        Modifier.size(20.dp),
+                        Color(0xFF102A2A)
                     )
                 }
             }
 
             Column(
-                modifier = Modifier.weight(1f),
+                Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = "Nhập thông tin thuốc",
+                    text = if (initialDraft == null) {
+                        "Nhập thông tin thuốc"
+                    } else {
+                        "Sửa thông tin thuốc"
+                    },
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontSize = 22.sp,
                         lineHeight = 27.sp,
@@ -157,7 +136,11 @@ fun ManualMedicineScreen(
                 )
 
                 Text(
-                    text = "Bước 1/3 • Nhập thủ công",
+                    text = if (initialDraft == null) {
+                        "Bước 1/3 • Nhập thủ công"
+                    } else {
+                        "Kiểm tra thông tin và lịch uống"
+                    },
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontSize = 13.sp,
                         lineHeight = 19.5.sp,
@@ -169,7 +152,7 @@ fun ManualMedicineScreen(
         }
 
         Text(
-            text = "Nhập thông tin theo vỏ hộp hoặc đơn thuốc.",
+            "Nhập thông tin theo vỏ hộp hoặc đơn thuốc.",
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontSize = 13.sp,
                 lineHeight = 19.5.sp,
@@ -178,52 +161,41 @@ fun ManualMedicineScreen(
             color = Color(0xFF526565)
         )
 
-        // Ảnh đính kèm cho thuốc nhập thủ công.
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
             color = Color.White,
-            border = BorderStroke(
-                width = 1.dp,
-                color = Color(0xFFD7E2DF)
-            )
+            border = BorderStroke(1.dp, Color(0xFFD7E2DF))
         ) {
             Row(
-                modifier = Modifier.padding(12.dp),
+                Modifier.padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    modifier = Modifier.size(52.dp),
+                    Modifier.size(52.dp),
                     shape = RoundedCornerShape(14.dp),
                     color = Color(0xFFD9EEEA)
                 ) {
-                    Box(
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(contentAlignment = Alignment.Center) {
                         ManualMedicineIcon(
-                            kind = ManualIconKind.CAMERA,
-                            modifier = Modifier.size(30.dp)
+                            ManualIconKind.CAMERA,
+                            Modifier.size(30.dp)
                         )
                     }
                 }
 
                 Column(
-                    modifier = Modifier.weight(1f),
+                    Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Text(
-                        text = "Ảnh thuốc",
+                        "Ảnh thuốc",
                         style = MaterialTheme.typography.titleMedium,
                         color = Color(0xFF102A2A)
                     )
-
                     Text(
-                        text = if (imageUri == null) {
-                            "Không bắt buộc"
-                        } else {
-                            "Đã chọn ảnh"
-                        },
+                        if (imageUri == null) "Không bắt buộc" else "Đã chọn ảnh",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFF526565)
                     )
@@ -236,34 +208,21 @@ fun ManualMedicineScreen(
                     },
                     modifier = Modifier.heightIn(min = 48.dp),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = Color(0xFF126B62)
-                    )
+                    border = BorderStroke(1.dp, Color(0xFF126B62))
                 ) {
-                    Text(
-                        text = if (imageUri == null) {
-                            "Thêm ảnh"
-                        } else {
-                            "Đổi ảnh"
-                        }
-                    )
+                    Text(if (imageUri == null) "Thêm ảnh" else "Đổi ảnh")
                 }
             }
         }
 
-        // Form nhập thông tin thuốc.
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
             color = Color.White,
-            border = BorderStroke(
-                width = 1.dp,
-                color = Color(0xFFD7E2DF)
-            )
+            border = BorderStroke(1.dp, Color(0xFFD7E2DF))
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 MMRATextField(
@@ -273,14 +232,17 @@ fun ManualMedicineScreen(
                     placeholder = "Ví dụ: Metformin",
                     modifier = Modifier.fillMaxWidth(),
                     labelOutside = true,
-                    errorMessage = nameError,
+                    errorMessage =
+                        if (attemptedContinue && medicineName.isBlank()) {
+                            "Vui lòng nhập tên thuốc."
+                        } else null,
                     keyboardOptions = KeyboardOptions(
                         imeAction = ImeAction.Next
                     )
                 )
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.Top
                 ) {
@@ -291,7 +253,10 @@ fun ManualMedicineScreen(
                         placeholder = "Ví dụ: 500",
                         modifier = Modifier.weight(1f),
                         labelOutside = true,
-                        errorMessage = strengthError,
+                        errorMessage =
+                            if (attemptedContinue && !validStrength) {
+                                "Nhập hàm lượng là số lớn hơn 0."
+                            } else null,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Decimal,
                             imeAction = ImeAction.Next
@@ -302,14 +267,7 @@ fun ManualMedicineScreen(
                         label = "Đơn vị",
                         value = strengthUnit,
                         placeholder = "",
-                        options = listOf(
-                            "mg",
-                            "g",
-                            "mcg",
-                            "IU",
-                            "mg/ml",
-                            "%"
-                        ),
+                        options = listOf("mg", "g", "mcg", "IU", "mg/ml", "%"),
                         onSelect = { strengthUnit = it },
                         modifier = Modifier.weight(0.55f)
                     )
@@ -320,12 +278,8 @@ fun ManualMedicineScreen(
                     value = dosageForm,
                     placeholder = "Chọn dạng thuốc",
                     options = listOf(
-                        "Viên nén",
-                        "Viên nang",
-                        "Dung dịch",
-                        "Siro",
-                        "Thuốc nhỏ",
-                        "Khác"
+                        "Viên nén", "Viên nang", "Dung dịch",
+                        "Siro", "Thuốc nhỏ", "Khác"
                     ),
                     onSelect = { dosageForm = it }
                 )
@@ -344,20 +298,17 @@ fun ManualMedicineScreen(
         }
 
         Text(
-            text = "* Thông tin bắt buộc",
+            "* Thông tin bắt buộc",
             style = MaterialTheme.typography.bodySmall,
             color = Color(0xFF526565)
         )
 
-        // Thêm viền tại màn này, vẫn dùng cảnh báo chung.
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(
-                    width = 1.dp,
-                    color = Color(0xFFAA5B00),
-                    shape = RoundedCornerShape(12.dp)
-                )
+            Modifier.fillMaxWidth().border(
+                1.dp,
+                Color(0xFFAA5B00),
+                RoundedCornerShape(12.dp)
+            )
         ) {
             MedicineNotice()
         }
@@ -370,24 +321,23 @@ fun ManualMedicineScreen(
 
                 if (medicineName.isNotBlank() && validStrength) {
                     focusManager.clearFocus()
-
                     onContinue(
                         ManualMedicineDraft(
-                            medicineName = medicineName.trim(),
-                            strength = trimmedStrength,
-                            strengthUnit = strengthUnit,
-                            dosageForm = dosageForm,
-                            note = note.trim(),
-                            imageUri = imageUri
+                            medicineName.trim(),
+                            trimmedStrength,
+                            strengthUnit,
+                            dosageForm,
+                            note.trim(),
+                            imageUri
                         )
                     )
                 }
             },
             trailingIcon = {
                 ManualMedicineIcon(
-                    kind = ManualIconKind.FORWARD,
-                    modifier = Modifier.size(20.dp),
-                    color = Color.White
+                    ManualIconKind.FORWARD,
+                    Modifier.size(20.dp),
+                    Color.White
                 )
             }
         )
@@ -403,16 +353,14 @@ private fun ManualMedicineDropdown(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by rememberSaveable {
-        mutableStateOf(false)
-    }
+    var expanded by rememberSaveable { mutableStateOf(false) }
 
     Column(
-        modifier = modifier,
+        modifier,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
-            text = label,
+            label,
             style = MaterialTheme.typography.labelLarge.copy(
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
@@ -428,24 +376,17 @@ private fun ManualMedicineDropdown(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 color = Color.White,
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = Color(0xFFD7E2DF)
-                )
+                border = BorderStroke(1.dp, Color(0xFFD7E2DF))
             ) {
                 Row(
-                    modifier = Modifier
-                        .heightIn(min = 56.dp)
-                        .padding(
-                            horizontal = 12.dp,
-                            vertical = 10.dp
-                        ),
+                    Modifier.heightIn(min = 56.dp)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = value.ifEmpty { placeholder },
-                        modifier = Modifier.weight(1f),
+                        value.ifEmpty { placeholder },
+                        Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontSize = 15.sp,
                             lineHeight = 20.sp,
@@ -459,15 +400,15 @@ private fun ManualMedicineDropdown(
                     )
 
                     ManualMedicineIcon(
-                        kind = ManualIconKind.DOWN,
-                        modifier = Modifier.size(18.dp),
-                        color = Color(0xFF526565)
+                        ManualIconKind.DOWN,
+                        Modifier.size(18.dp),
+                        Color(0xFF526565)
                     )
                 }
             }
 
             DropdownMenu(
-                expanded = expanded,
+                expanded,
                 onDismissRequest = { expanded = false }
             ) {
                 options.forEach { option ->
@@ -485,10 +426,7 @@ private fun ManualMedicineDropdown(
 }
 
 internal enum class ManualIconKind {
-    BACK,
-    CAMERA,
-    DOWN,
-    FORWARD
+    BACK, CAMERA, DOWN, FORWARD
 }
 
 @Composable
@@ -497,23 +435,18 @@ internal fun ManualMedicineIcon(
     modifier: Modifier = Modifier,
     color: Color = Color(0xFF126B62)
 ) {
-    Canvas(modifier = modifier) {
+    Canvas(modifier) {
         val w = size.width
         val h = size.height
         val stroke = 1.8.dp.toPx()
 
-        fun line(
-            x1: Float,
-            y1: Float,
-            x2: Float,
-            y2: Float
-        ) {
+        fun line(x1: Float, y1: Float, x2: Float, y2: Float) {
             drawLine(
-                color = color,
-                start = Offset(w * x1, h * y1),
-                end = Offset(w * x2, h * y2),
-                strokeWidth = stroke,
-                cap = StrokeCap.Round
+                color,
+                Offset(w * x1, h * y1),
+                Offset(w * x2, h * y2),
+                stroke,
+                StrokeCap.Round
             )
         }
 
@@ -522,41 +455,28 @@ internal fun ManualMedicineIcon(
                 line(0.65f, 0.2f, 0.35f, 0.5f)
                 line(0.35f, 0.5f, 0.65f, 0.8f)
             }
-
             ManualIconKind.DOWN -> {
                 line(0.2f, 0.35f, 0.5f, 0.65f)
                 line(0.5f, 0.65f, 0.8f, 0.35f)
             }
-
             ManualIconKind.FORWARD -> {
                 line(0.15f, 0.5f, 0.85f, 0.5f)
                 line(0.6f, 0.25f, 0.85f, 0.5f)
                 line(0.85f, 0.5f, 0.6f, 0.75f)
             }
-
             ManualIconKind.CAMERA -> {
                 drawRoundRect(
-                    color = color,
-                    topLeft = Offset(
-                        w * 0.1f,
-                        h * 0.3f
-                    ),
-                    size = Size(
-                        w * 0.8f,
-                        h * 0.55f
-                    ),
-                    cornerRadius = CornerRadius(w * 0.1f),
-                    style = Stroke(width = stroke)
+                    color,
+                    Offset(w * 0.1f, h * 0.3f),
+                    Size(w * 0.8f, h * 0.55f),
+                    CornerRadius(w * 0.1f),
+                    style = Stroke(stroke)
                 )
-
                 drawCircle(
-                    color = color,
-                    radius = w * 0.16f,
-                    center = Offset(
-                        w * 0.5f,
-                        h * 0.57f
-                    ),
-                    style = Stroke(width = stroke)
+                    color,
+                    w * 0.16f,
+                    Offset(w * 0.5f, h * 0.57f),
+                    style = Stroke(stroke)
                 )
 
                 val top = Path().apply {
@@ -565,25 +485,14 @@ internal fun ManualMedicineIcon(
                     lineTo(w * 0.62f, h * 0.16f)
                     lineTo(w * 0.7f, h * 0.3f)
                 }
-
-                drawPath(
-                    path = top,
-                    color = color,
-                    style = Stroke(width = stroke)
-                )
+                drawPath(top, color, style = Stroke(stroke))
             }
         }
     }
 }
 
-@Preview(
-    showBackground = true,
-    widthDp = 390,
-    heightDp = 844
-)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun ManualMedicineScreenPreview() {
-    MMRATheme {
-        ManualMedicineScreen()
-    }
+    MMRATheme { ManualMedicineScreen() }
 }

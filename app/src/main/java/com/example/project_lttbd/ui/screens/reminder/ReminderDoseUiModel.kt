@@ -10,5 +10,6 @@ data class ReminderDoseUiModel(
     val quantityText: String,
     val mealInstruction: String,
     @DrawableRes val imageRes: Int? = null,
-    val audioDurationLabel: String? = null
+    val audioDurationLabel: String? = null,
+    val scheduledAtMillis: Long = 0L
 )
