@@ -264,6 +264,9 @@ fun MMRANavHost(
                 },
                 onDeclineClick = {
                     navController.popBackStack()
+                },
+                onBackClick = {
+                    navController.popBackStack()
                 }
             )
         }
