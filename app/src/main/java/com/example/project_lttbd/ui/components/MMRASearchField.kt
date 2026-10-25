@@ -73,7 +73,7 @@ fun MMRASearchField(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Canvas(modifier = Modifier.size(18.dp)) {
+                Canvas(modifier = Modifier.size(20.dp)) {
                     val strokeWidth = 1.5.dp.toPx()
 
                     drawCircle(

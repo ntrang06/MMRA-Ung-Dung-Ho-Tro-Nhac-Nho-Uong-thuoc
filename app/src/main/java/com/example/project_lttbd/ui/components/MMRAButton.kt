@@ -20,7 +20,8 @@ fun MMRAButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    leadingIcon: (@Composable () -> Unit)? = null
+    leadingIcon: (@Composable () -> Unit)? = null,
+    trailingIcon: (@Composable () -> Unit)? = null
 ) {
     Button(
         onClick = onClick,
@@ -50,6 +51,8 @@ fun MMRAButton(
                 text = text,
                 style = MaterialTheme.typography.labelLarge
             )
+
+            trailingIcon?.invoke()
         }
     }
 }
