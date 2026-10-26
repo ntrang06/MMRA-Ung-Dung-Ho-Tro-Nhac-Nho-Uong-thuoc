@@ -21,6 +21,38 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.mmra_medicationmanager.model.InitialSetupPreferences
+import com.example.mmra_medicationmanager.model.UserProfileManager
+import com.example.mmra_medicationmanager.ui.screens.auth.CompletionScreen
+import com.example.mmra_medicationmanager.ui.screens.auth.CreateNewPasswordScreen
+import com.example.mmra_medicationmanager.ui.screens.auth.EmailLoginScreen
+import com.example.mmra_medicationmanager.ui.screens.auth.ForgotPasswordScreen
+import com.example.mmra_medicationmanager.ui.screens.auth.LoginScreen
+import com.example.mmra_medicationmanager.ui.screens.auth.PhoneLoginScreen
+import com.example.mmra_medicationmanager.ui.screens.auth.RegisterScreen
+import com.example.mmra_medicationmanager.ui.screens.auth.VerifyEmailScreen
+import com.example.mmra_medicationmanager.ui.screens.auth.VerifyPhoneScreen
+import com.example.mmra_medicationmanager.ui.screens.auth.WelcomeScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.AccessibilitySettingsScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.AvatarDeletedScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.AvatarOptionsScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.AvatarUpdatedScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.CaptureAvatarScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.ChangePasswordScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.CropAvatarScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.EditEmailScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.EditNameScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.EditPhoneScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.GalleryPickerScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.LogoutConfirmationScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.ManageUsageModeScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.MyAccountScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.NotificationSettingsScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.ReviewCapturedPhotoScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.SwitchAccountScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.VoiceGuidanceSettingsScreen
+import com.example.mmra_medicationmanager.ui.screens.setup.SetupDisplayPreferenceScreen
+import com.example.mmra_medicationmanager.ui.screens.setup.SetupTargetUserScreen
 import com.example.project_lttbd.data.mock.MockCalendar
 import com.example.project_lttbd.data.mock.MockDoseAction
 import com.example.project_lttbd.data.mock.MockDoseActions
@@ -28,17 +60,14 @@ import com.example.project_lttbd.data.mock.MockFamilyData
 import com.example.project_lttbd.data.mock.MockMedicines
 import com.example.project_lttbd.data.mock.MockReminderDoses
 import com.example.project_lttbd.ui.components.rememberUiNow
-import com.example.project_lttbd.ui.screens.account.AccountScreen
-import com.example.project_lttbd.ui.screens.auth.LoginScreen
-import com.example.project_lttbd.ui.screens.auth.RegisterScreen
+import com.example.project_lttbd.ui.screens.history.HistoryScreen
+import com.example.project_lttbd.ui.screens.home.HomeScreen
 import com.example.project_lttbd.ui.screens.family.CaregiverMemberDetailScreen
 import com.example.project_lttbd.ui.screens.family.FamilyAlertsScreen
 import com.example.project_lttbd.ui.screens.family.FamilyInviteDetailScreen
 import com.example.project_lttbd.ui.screens.family.FamilyPermissionsScreen
 import com.example.project_lttbd.ui.screens.family.FamilyScreen
 import com.example.project_lttbd.ui.screens.family.InviteFamilyScreen
-import com.example.project_lttbd.ui.screens.history.HistoryScreen
-import com.example.project_lttbd.ui.screens.home.HomeScreen
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineDraft
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineScreen
 import com.example.project_lttbd.ui.screens.medicine.MedicineScreen
@@ -58,21 +87,457 @@ fun MMRANavHost(
 ) {
     val context = LocalContext.current
 
+    UserProfileManager.init(context)
+    val isLoggedIn = UserProfileManager.isLoggedIn(context)
+    val isSetupCompleted = UserProfileManager.isSetupCompleted(context)
+
+    val startDest = when {
+        !isLoggedIn -> MMRADestinations.WELCOME
+        !isSetupCompleted -> MMRADestinations.INITIAL_SETUP_TARGET
+        else -> MMRADestinations.HOME
+    }
+
+    var setupPreferences by remember {
+        mutableStateOf(InitialSetupPreferences())
+    }
+
     NavHost(
         navController = navController,
-        startDestination = MMRADestinations.HOME,
+        startDestination = startDest,
         modifier = modifier
     ) {
+        // --- Authentication & Setup ---
+        composable(MMRADestinations.WELCOME) {
+            WelcomeScreen(
+                onLoginClick = {
+                    navController.navigate(MMRADestinations.LOGIN)
+                },
+                onRegisterClick = {
+                    navController.navigate(MMRADestinations.REGISTER)
+                }
+            )
+        }
+
         composable(MMRADestinations.LOGIN) {
-            LoginScreen()
+            LoginScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onGoogleSignInClick = {
+                    authenticateAndProceed(navController, context)
+                },
+                onPhoneSignInClick = {
+                    navController.navigate(MMRADestinations.PHONE_LOGIN)
+                },
+                onEmailSignInClick = {
+                    navController.navigate(MMRADestinations.EMAIL_LOGIN)
+                },
+                onRegisterClick = {
+                    navController.navigate(MMRADestinations.REGISTER)
+                }
+            )
+        }
+
+        composable(MMRADestinations.PHONE_LOGIN) {
+            PhoneLoginScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onLoginClick = {
+                    authenticateAndProceed(navController, context)
+                },
+                onOtpLoginClick = {
+                    authenticateAndProceed(navController, context)
+                },
+                onForgotPasswordClick = {
+                    navController.navigate(MMRADestinations.FORGOT_PASSWORD)
+                },
+                onRegisterClick = {
+                    navController.navigate(MMRADestinations.REGISTER)
+                }
+            )
+        }
+
+        composable(MMRADestinations.EMAIL_LOGIN) {
+            EmailLoginScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onLoginClick = {
+                    authenticateAndProceed(navController, context)
+                },
+                onOtpLoginClick = {
+                    authenticateAndProceed(navController, context)
+                },
+                onGoogleLoginClick = {
+                    authenticateAndProceed(navController, context)
+                },
+                onForgotPasswordClick = {
+                    navController.navigate(MMRADestinations.FORGOT_PASSWORD)
+                },
+                onRegisterClick = {
+                    navController.navigate(MMRADestinations.REGISTER)
+                }
+            )
         }
 
         composable(MMRADestinations.REGISTER) {
-            RegisterScreen()
+            RegisterScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onRegisterClick = {
+                    navController.navigate(MMRADestinations.VERIFY_PHONE)
+                },
+                onGoogleClick = {
+                    authenticateAndProceed(navController, context)
+                },
+                onLoginClick = {
+                    navController.navigate(MMRADestinations.LOGIN)
+                }
+            )
         }
 
+        composable(MMRADestinations.VERIFY_PHONE) {
+            VerifyPhoneScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onVerifyClick = {
+                    navController.navigate(MMRADestinations.VERIFY_EMAIL)
+                },
+                onChangePhoneClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(MMRADestinations.VERIFY_EMAIL) {
+            VerifyEmailScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onVerifyClick = {
+                    navController.navigate(MMRADestinations.COMPLETION)
+                },
+                onChangeEmailClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(MMRADestinations.FORGOT_PASSWORD) {
+            ForgotPasswordScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onSendCodeClick = {
+                    navController.navigate(MMRADestinations.CREATE_NEW_PASSWORD)
+                },
+                onBackToLoginClick = {
+                    navController.navigate(MMRADestinations.LOGIN) {
+                        popUpTo(MMRADestinations.LOGIN) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(MMRADestinations.CREATE_NEW_PASSWORD) {
+            CreateNewPasswordScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onSavePasswordClick = {
+                    navController.navigate(MMRADestinations.COMPLETION)
+                }
+            )
+        }
+
+        composable(MMRADestinations.COMPLETION) {
+            CompletionScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onContinueClick = {
+                    authenticateAndProceed(navController, context)
+                }
+            )
+        }
+
+        composable(MMRADestinations.INITIAL_SETUP_TARGET) {
+            SetupTargetUserScreen(
+                initialSelectedRoles = setupPreferences.selectedRoles,
+                onBackClick = {},
+                onContinueClick = { roles ->
+                    setupPreferences = setupPreferences.copy(selectedRoles = roles)
+                    navController.navigate(MMRADestinations.INITIAL_SETUP_DISPLAY) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable(MMRADestinations.INITIAL_SETUP_DISPLAY) {
+            SetupDisplayPreferenceScreen(
+                initialLargeText = setupPreferences.isLargeTextEnabled,
+                initialVoiceGuidance = setupPreferences.isVoiceGuidanceEnabled,
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onCompleteClick = { isLargeText, isVoiceGuidance ->
+                    setupPreferences = setupPreferences.copy(
+                        isLargeTextEnabled = isLargeText,
+                        isVoiceGuidanceEnabled = isVoiceGuidance
+                    )
+                    UserProfileManager.setSetupCompleted(context, true)
+                    UserProfileManager.setLoggedIn(context, true)
+                    navController.navigate(MMRADestinations.HOME) {
+                        popUpTo(MMRADestinations.WELCOME) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // --- Profile & Account Management ---
+        composable(MMRADestinations.MY_ACCOUNT) {
+            MyAccountScreen(
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onAvatarOptionsClick = {
+                    navController.navigate(MMRADestinations.MY_ACCOUNT_AVATAR_OPTIONS)
+                },
+                onEditNameClick = {
+                    navController.navigate(MMRADestinations.EDIT_NAME)
+                },
+                onEditEmailClick = {
+                    navController.navigate(MMRADestinations.EDIT_EMAIL)
+                },
+                onEditPhoneClick = {
+                    navController.navigate(MMRADestinations.EDIT_PHONE)
+                },
+                onChangePasswordClick = {
+                    navController.navigate(MMRADestinations.CHANGE_PASSWORD)
+                },
+                onNotificationsClick = {
+                    navController.navigate(MMRADestinations.NOTIFICATION_SETTINGS)
+                },
+                onAccessibilityClick = {
+                    navController.navigate(MMRADestinations.ACCESSIBILITY_SETTINGS)
+                },
+                onVoiceGuidanceClick = {
+                    navController.navigate(MMRADestinations.VOICE_GUIDANCE_SETTINGS)
+                },
+                onUsageModeClick = {
+                    navController.navigate(MMRADestinations.MANAGE_USAGE_MODE)
+                },
+                onSwitchAccountClick = {
+                    navController.navigate(MMRADestinations.SWITCH_ACCOUNT)
+                },
+                onLogoutClick = {
+                    navController.navigate(MMRADestinations.LOGOUT_CONFIRMATION)
+                }
+            )
+        }
+
+        composable(MMRADestinations.MY_ACCOUNT_AVATAR_OPTIONS) {
+            AvatarOptionsScreen(
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                onTakePhotoClick = {
+                    navController.navigate(MMRADestinations.CAPTURE_AVATAR)
+                },
+                onPickGalleryClick = {
+                    navController.navigate(MMRADestinations.GALLERY_PICKER)
+                },
+                onDeletePhotoClick = {
+                    UserProfileManager.deleteAvatar(context)
+                    navController.navigate(MMRADestinations.AVATAR_DELETED_SUCCESS)
+                },
+                onCancelClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(MMRADestinations.CAPTURE_AVATAR) {
+            CaptureAvatarScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onPhotoCaptured = { bitmap ->
+                    UserProfileManager.tempCapturedBitmap = bitmap
+                    navController.navigate(MMRADestinations.REVIEW_CAPTURED_PHOTO)
+                },
+                onCancelClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(MMRADestinations.REVIEW_CAPTURED_PHOTO) {
+            ReviewCapturedPhotoScreen(
+                capturedBitmap = UserProfileManager.tempCapturedBitmap,
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onContinueCropClick = {
+                    navController.navigate(MMRADestinations.CROP_AVATAR)
+                },
+                onRetakeClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(MMRADestinations.GALLERY_PICKER) {
+            GalleryPickerScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onPhotoSelected = { bitmap ->
+                    UserProfileManager.tempCapturedBitmap = bitmap
+                    navController.navigate(MMRADestinations.CROP_AVATAR)
+                },
+                onCancelClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(MMRADestinations.CROP_AVATAR) {
+            CropAvatarScreen(
+                inputBitmap = UserProfileManager.tempCapturedBitmap,
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onConfirmCrop = { croppedBitmap ->
+                    UserProfileManager.saveAvatarBitmap(context, croppedBitmap)
+                    navController.navigate(MMRADestinations.AVATAR_UPDATED_SUCCESS)
+                }
+            )
+        }
+
+        composable(MMRADestinations.AVATAR_UPDATED_SUCCESS) {
+            AvatarUpdatedScreen(
+                updatedBitmap = UserProfileManager.currentAvatarBitmap,
+                onBackToAccountClick = {
+                    navController.popBackStack(MMRADestinations.MY_ACCOUNT, false)
+                }
+            )
+        }
+
+        composable(MMRADestinations.AVATAR_DELETED_SUCCESS) {
+            AvatarDeletedScreen(
+                onBackToAccountClick = {
+                    navController.popBackStack(MMRADestinations.MY_ACCOUNT, false)
+                }
+            )
+        }
+
+        composable(MMRADestinations.EDIT_NAME) {
+            EditNameScreen(
+                onBackClick = { navController.popBackStack() },
+                onSaveSuccess = { navController.popBackStack() },
+                onCancelClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(MMRADestinations.EDIT_EMAIL) {
+            EditEmailScreen(
+                onBackClick = { navController.popBackStack() },
+                onContinueVerify = { navController.popBackStack() },
+                onCancelClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(MMRADestinations.EDIT_PHONE) {
+            EditPhoneScreen(
+                onBackClick = { navController.popBackStack() },
+                onContinueVerify = { navController.popBackStack() },
+                onCancelClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(MMRADestinations.CHANGE_PASSWORD) {
+            ChangePasswordScreen(
+                onBackClick = { navController.popBackStack() },
+                onSaveSuccess = { navController.popBackStack() },
+                onForgotPasswordClick = { navController.navigate(MMRADestinations.FORGOT_PASSWORD) },
+                onCancelClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(MMRADestinations.NOTIFICATION_SETTINGS) {
+            NotificationSettingsScreen(
+                onBackClick = { navController.popBackStack() },
+                onSaveSuccess = { navController.popBackStack() }
+            )
+        }
+
+        composable(MMRADestinations.ACCESSIBILITY_SETTINGS) {
+            AccessibilitySettingsScreen(
+                onBackClick = { navController.popBackStack() },
+                onSaveSuccess = { navController.popBackStack() },
+                onResetClick = { navController.navigate(MMRADestinations.INITIAL_SETUP_TARGET) }
+            )
+        }
+
+        composable(MMRADestinations.VOICE_GUIDANCE_SETTINGS) {
+            VoiceGuidanceSettingsScreen(
+                onBackClick = { navController.popBackStack() },
+                onSaveSuccess = { navController.popBackStack() }
+            )
+        }
+
+        composable(MMRADestinations.MANAGE_USAGE_MODE) {
+            ManageUsageModeScreen(
+                initialSelectedRoles = setupPreferences.selectedRoles,
+                onBackClick = { navController.popBackStack() },
+                onCancelClick = { navController.popBackStack() },
+                onConfirmSave = { updatedRoles ->
+                    setupPreferences = setupPreferences.copy(selectedRoles = updatedRoles)
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(MMRADestinations.SWITCH_ACCOUNT) {
+            SwitchAccountScreen(
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                onBackClick = { navController.popBackStack() },
+                onAddAccountClick = { navController.navigate(MMRADestinations.LOGIN) },
+                onCancelClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(MMRADestinations.LOGOUT_CONFIRMATION) {
+            LogoutConfirmationScreen(
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                onBackClick = { navController.popBackStack() },
+                onCancelClick = { navController.popBackStack() },
+                onConfirmLogout = {
+                    UserProfileManager.setLoggedIn(context, false)
+                    UserProfileManager.setSetupCompleted(context, false)
+                    navController.navigate(MMRADestinations.WELCOME) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // --- Main Feature Destinations ---
         composable(MMRADestinations.ACCOUNT) {
-            AccountScreen()
+            MyAccountScreen(
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                onBackClick = { navController.popBackStack() },
+                onLogoutClick = {
+                    UserProfileManager.setLoggedIn(context, false)
+                    navController.navigate(MMRADestinations.WELCOME) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
         }
 
         composable(MMRADestinations.HOME) {
@@ -107,7 +572,7 @@ fun MMRANavHost(
                     }
                 },
                 onAccountClick = {
-                    navController.navigate(MMRADestinations.ACCOUNT)
+                    navController.navigate(MMRADestinations.MY_ACCOUNT)
                 }
             )
         }
@@ -199,7 +664,7 @@ fun MMRANavHost(
                     navController.openReminder(it)
                 },
                 onAccountClick = {
-                    navController.navigate(MMRADestinations.ACCOUNT)
+                    navController.navigate(MMRADestinations.MY_ACCOUNT)
                 }
             )
         }
@@ -229,7 +694,7 @@ fun MMRANavHost(
                     )
                 },
                 onAccountClick = {
-                    navController.navigate(MMRADestinations.ACCOUNT)
+                    navController.navigate(MMRADestinations.MY_ACCOUNT)
                 }
             )
         }
@@ -340,6 +805,23 @@ fun MMRANavHost(
     }
 }
 
+private fun authenticateAndProceed(
+    navController: NavHostController,
+    context: android.content.Context
+) {
+    UserProfileManager.setLoggedIn(context, true)
+    val setupDone = UserProfileManager.isSetupCompleted(context)
+    if (setupDone) {
+        navController.navigate(MMRADestinations.HOME) {
+            popUpTo(MMRADestinations.WELCOME) { inclusive = true }
+        }
+    } else {
+        navController.navigate(MMRADestinations.INITIAL_SETUP_TARGET) {
+            popUpTo(MMRADestinations.WELCOME) { inclusive = true }
+        }
+    }
+}
+
 private fun NavHostController.openReminder(
     doseId: String,
     readOnly: Boolean = false
@@ -438,7 +920,7 @@ private fun ReminderDestination(
         readOnly || !today -> ReminderNoticeUiModel(
             "Chế độ xem chi tiết",
             "Bạn đang xem liều của ngày đã chọn. " +
-                    "Các thao tác xác nhận được thực hiện tại lịch uống hôm nay."
+                    "Các thao tác xác nhận được thực hiện tại lịch uống hôm hôm nay."
         )
 
         finished -> ReminderNoticeUiModel(

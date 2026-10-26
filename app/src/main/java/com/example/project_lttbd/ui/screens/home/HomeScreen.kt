@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.example.mmra_medicationmanager.model.UserProfileManager
 import com.example.project_lttbd.data.mock.MockDoseAction
 import com.example.project_lttbd.data.mock.MockDoseActions
 import com.example.project_lttbd.data.mock.MockReminderDoses
@@ -27,7 +28,8 @@ import java.util.Locale
 fun HomeScreen(
     modifier: Modifier = Modifier,
     onViewAllClick: () -> Unit = {},
-    onViewDoseClick: (String) -> Unit = {}
+    onViewDoseClick: (String) -> Unit = {},
+    onAccountClick: () -> Unit = {}
 ) {
     val doses = MockReminderDoses.doses
 
@@ -100,13 +102,11 @@ fun HomeScreen(
         HomeHeader(
             greeting = "Chào buổi sáng, cô Lan",
             dateText = todayText,
-            initials = "NL",
+            initials = UserProfileManager.getInitials(),
             onNotificationsClick = {
                 // Chờ ghép phần thông báo của nhóm.
             },
-            onAccountClick = {
-                // Chờ ghép phần tài khoản của nhóm.
-            }
+            onAccountClick = onAccountClick
         )
 
         Column(

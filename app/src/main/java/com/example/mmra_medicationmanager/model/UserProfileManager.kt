@@ -159,4 +159,21 @@ object UserProfileManager {
             null
         }
     }
+
+    fun getInitials(): String {
+        val parts = name.trim().split("\\s+".toRegex())
+        return when {
+            parts.size >= 2 -> "${parts.first().take(1)}${parts.last().take(1)}".uppercase()
+            parts.size == 1 -> parts[0].take(2).uppercase()
+            else -> "NL"
+        }
+    }
+
+    fun resetForTesting(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean(KEY_IS_LOGGED_IN, false)
+            .putBoolean(KEY_SETUP_COMPLETED, false)
+            .apply()
+    }
 }
