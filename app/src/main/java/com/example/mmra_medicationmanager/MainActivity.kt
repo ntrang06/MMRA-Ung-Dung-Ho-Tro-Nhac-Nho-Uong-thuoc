@@ -28,14 +28,22 @@ import com.example.mmra_medicationmanager.ui.screens.auth.VerifyEmailScreen
 import com.example.mmra_medicationmanager.ui.screens.auth.VerifyPhoneScreen
 import com.example.mmra_medicationmanager.ui.screens.auth.WelcomeScreen
 import com.example.mmra_medicationmanager.ui.screens.home.HomeScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.AccessibilitySettingsScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.AvatarDeletedScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.AvatarOptionsScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.AvatarUpdatedScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.CaptureAvatarScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.ChangePasswordScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.CropAvatarScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.EditEmailScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.EditNameScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.EditPhoneScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.GalleryPickerScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.ManageUsageModeScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.MyAccountScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.NotificationSettingsScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.ReviewCapturedPhotoScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.VoiceGuidanceSettingsScreen
 import com.example.mmra_medicationmanager.ui.screens.setup.SetupDisplayPreferenceScreen
 import com.example.mmra_medicationmanager.ui.screens.setup.SetupTargetUserScreen
 
@@ -61,6 +69,14 @@ enum class AuthDestination {
     CROP_AVATAR,
     AVATAR_UPDATED_SUCCESS,
     AVATAR_DELETED_SUCCESS,
+    EDIT_NAME,
+    EDIT_EMAIL,
+    EDIT_PHONE,
+    CHANGE_PASSWORD,
+    NOTIFICATION_SETTINGS,
+    ACCESSIBILITY_SETTINGS,
+    VOICE_GUIDANCE_SETTINGS,
+    MANAGE_USAGE_MODE,
 }
 
 class MainActivity : ComponentActivity() {
@@ -352,6 +368,30 @@ fun AppNavigation(
                 onAvatarOptionsClick = {
                     currentDestination = AuthDestination.MY_ACCOUNT_AVATAR_OPTIONS
                 },
+                onEditNameClick = {
+                    currentDestination = AuthDestination.EDIT_NAME
+                },
+                onEditEmailClick = {
+                    currentDestination = AuthDestination.EDIT_EMAIL
+                },
+                onEditPhoneClick = {
+                    currentDestination = AuthDestination.EDIT_PHONE
+                },
+                onChangePasswordClick = {
+                    currentDestination = AuthDestination.CHANGE_PASSWORD
+                },
+                onNotificationsClick = {
+                    currentDestination = AuthDestination.NOTIFICATION_SETTINGS
+                },
+                onAccessibilityClick = {
+                    currentDestination = AuthDestination.ACCESSIBILITY_SETTINGS
+                },
+                onVoiceGuidanceClick = {
+                    currentDestination = AuthDestination.VOICE_GUIDANCE_SETTINGS
+                },
+                onUsageModeClick = {
+                    currentDestination = AuthDestination.MANAGE_USAGE_MODE
+                },
                 onLogoutClick = {
                     isAuthenticated = false
                     currentDestination = AuthDestination.WELCOME
@@ -454,6 +494,81 @@ fun AppNavigation(
             AvatarDeletedScreen(
                 modifier = modifier,
                 onBackToAccountClick = {
+                    currentDestination = AuthDestination.MY_ACCOUNT
+                }
+            )
+        }
+
+        AuthDestination.EDIT_NAME -> {
+            EditNameScreen(
+                modifier = modifier,
+                onBackClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onSaveSuccess = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onCancelClick = { currentDestination = AuthDestination.MY_ACCOUNT }
+            )
+        }
+
+        AuthDestination.EDIT_EMAIL -> {
+            EditEmailScreen(
+                modifier = modifier,
+                onBackClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onContinueVerify = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onCancelClick = { currentDestination = AuthDestination.MY_ACCOUNT }
+            )
+        }
+
+        AuthDestination.EDIT_PHONE -> {
+            EditPhoneScreen(
+                modifier = modifier,
+                onBackClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onContinueVerify = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onCancelClick = { currentDestination = AuthDestination.MY_ACCOUNT }
+            )
+        }
+
+        AuthDestination.CHANGE_PASSWORD -> {
+            ChangePasswordScreen(
+                modifier = modifier,
+                onBackClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onSaveSuccess = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onForgotPasswordClick = { currentDestination = AuthDestination.FORGOT_PASSWORD },
+                onCancelClick = { currentDestination = AuthDestination.MY_ACCOUNT }
+            )
+        }
+
+        AuthDestination.NOTIFICATION_SETTINGS -> {
+            NotificationSettingsScreen(
+                modifier = modifier,
+                onBackClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onSaveSuccess = { currentDestination = AuthDestination.MY_ACCOUNT }
+            )
+        }
+
+        AuthDestination.ACCESSIBILITY_SETTINGS -> {
+            AccessibilitySettingsScreen(
+                modifier = modifier,
+                onBackClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onSaveSuccess = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onResetClick = { currentDestination = AuthDestination.INITIAL_SETUP_TARGET }
+            )
+        }
+
+        AuthDestination.VOICE_GUIDANCE_SETTINGS -> {
+            VoiceGuidanceSettingsScreen(
+                modifier = modifier,
+                onBackClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onSaveSuccess = { currentDestination = AuthDestination.MY_ACCOUNT }
+            )
+        }
+
+        AuthDestination.MANAGE_USAGE_MODE -> {
+            ManageUsageModeScreen(
+                modifier = modifier,
+                initialSelectedRoles = setupPreferences.selectedRoles,
+                onBackClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onCancelClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onConfirmSave = { updatedRoles ->
+                    setupPreferences = setupPreferences.copy(selectedRoles = updatedRoles)
                     currentDestination = AuthDestination.MY_ACCOUNT
                 }
             )

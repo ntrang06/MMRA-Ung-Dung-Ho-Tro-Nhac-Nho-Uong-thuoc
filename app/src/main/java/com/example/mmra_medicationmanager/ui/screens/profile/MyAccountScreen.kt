@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,6 +45,14 @@ fun MyAccountScreen(
     avatarBitmap: Bitmap? = UserProfileManager.currentAvatarBitmap,
     onBackClick: () -> Unit = {},
     onAvatarOptionsClick: () -> Unit = {},
+    onEditNameClick: () -> Unit = {},
+    onEditEmailClick: () -> Unit = {},
+    onEditPhoneClick: () -> Unit = {},
+    onChangePasswordClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
+    onAccessibilityClick: () -> Unit = {},
+    onVoiceGuidanceClick: () -> Unit = {},
+    onUsageModeClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
 ) {
     val primaryColor = Color(0xFF0F5B51)
@@ -237,18 +244,21 @@ fun MyAccountScreen(
                         iconRes = R.drawable.ic_user,
                         title = stringResource(id = R.string.account_edit_name),
                         subtitle = UserProfileManager.name,
+                        onClick = onEditNameClick,
                     )
                     Divider(color = borderColor, thickness = 0.8.dp)
                     AccountSettingRow(
                         iconRes = R.drawable.ic_email,
                         title = stringResource(id = R.string.account_edit_email),
                         subtitle = UserProfileManager.email,
+                        onClick = onEditEmailClick,
                     )
                     Divider(color = borderColor, thickness = 0.8.dp)
                     AccountSettingRow(
                         iconRes = R.drawable.ic_phone,
                         title = stringResource(id = R.string.account_edit_phone),
                         subtitle = UserProfileManager.phone,
+                        onClick = onEditPhoneClick,
                     )
                 }
             }
@@ -268,6 +278,7 @@ fun MyAccountScreen(
                     iconRes = R.drawable.ic_lock,
                     title = stringResource(id = R.string.account_change_password),
                     subtitle = stringResource(id = R.string.account_change_password_sub),
+                    onClick = onChangePasswordClick,
                 )
             }
 
@@ -287,18 +298,21 @@ fun MyAccountScreen(
                         iconRes = R.drawable.ic_bell,
                         title = stringResource(id = R.string.account_notifications),
                         subtitle = stringResource(id = R.string.account_notifications_sub),
+                        onClick = onNotificationsClick,
                     )
                     Divider(color = borderColor, thickness = 0.8.dp)
                     AccountSettingRow(
                         iconRes = R.drawable.ic_text_size,
                         title = stringResource(id = R.string.account_accessibility),
-                        subtitle = stringResource(id = R.string.account_accessibility_sub),
+                        subtitle = if (UserProfileManager.isLargeTextEnabled) stringResource(id = R.string.account_accessibility_sub) else stringResource(id = R.string.setup_display_status_off),
+                        onClick = onAccessibilityClick,
                     )
                     Divider(color = borderColor, thickness = 0.8.dp)
                     AccountSettingRow(
                         iconRes = R.drawable.ic_speaker,
                         title = stringResource(id = R.string.account_voice_guidance),
-                        subtitle = stringResource(id = R.string.account_voice_guidance_sub),
+                        subtitle = if (UserProfileManager.isVoiceGuidanceEnabled) stringResource(id = R.string.account_voice_guidance_sub) else stringResource(id = R.string.setup_display_status_off),
+                        onClick = onVoiceGuidanceClick,
                     )
                 }
             }
@@ -319,6 +333,7 @@ fun MyAccountScreen(
                         iconRes = R.drawable.ic_text_size,
                         title = stringResource(id = R.string.account_usage_mode),
                         subtitle = stringResource(id = R.string.account_usage_mode_sub),
+                        onClick = onUsageModeClick,
                     )
                     Divider(color = borderColor, thickness = 0.8.dp)
                     AccountSettingRow(
