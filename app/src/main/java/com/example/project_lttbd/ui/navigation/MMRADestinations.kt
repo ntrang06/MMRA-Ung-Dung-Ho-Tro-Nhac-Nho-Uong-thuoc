@@ -1,8 +1,20 @@
 package com.example.project_lttbd.ui.navigation
 
 object MMRADestinations {
+    const val WELCOME = "welcome"
     const val LOGIN = "login"
+    const val PHONE_LOGIN = "phone_login"
+    const val EMAIL_LOGIN = "email_login"
     const val REGISTER = "register"
+    const val VERIFY_PHONE = "verify_phone"
+    const val VERIFY_EMAIL = "verify_email"
+    const val FORGOT_PASSWORD = "forgot_password"
+    const val CREATE_NEW_PASSWORD = "create_new_password"
+    const val COMPLETION = "completion"
+
+    const val INITIAL_SETUP_TARGET = "initial_setup_target"
+    const val INITIAL_SETUP_DISPLAY = "initial_setup_display"
+
     const val HOME = "home"
     const val MEDICINE = "medicine"
     const val MANUAL_MEDICINE = "medicine/manual"
@@ -13,6 +25,25 @@ object MMRADestinations {
     const val HISTORY = "history"
     const val FAMILY = "family"
     const val ACCOUNT = "account"
+    const val MY_ACCOUNT = "my_account"
+    const val MY_ACCOUNT_AVATAR_OPTIONS = "my_account_avatar_options"
+    const val CAPTURE_AVATAR = "capture_avatar"
+    const val REVIEW_CAPTURED_PHOTO = "review_captured_photo"
+    const val GALLERY_PICKER = "gallery_picker"
+    const val CROP_AVATAR = "crop_avatar"
+    const val AVATAR_UPDATED_SUCCESS = "avatar_updated_success"
+    const val AVATAR_DELETED_SUCCESS = "avatar_deleted_success"
+    const val EDIT_NAME = "edit_name"
+    const val EDIT_EMAIL = "edit_email"
+    const val EDIT_PHONE = "edit_phone"
+    const val CHANGE_PASSWORD = "change_password"
+    const val NOTIFICATION_SETTINGS = "notification_settings"
+    const val ACCESSIBILITY_SETTINGS = "accessibility_settings"
+    const val VOICE_GUIDANCE_SETTINGS = "voice_guidance_settings"
+    const val MANAGE_USAGE_MODE = "manage_usage_mode"
+    const val SWITCH_ACCOUNT = "switch_account"
+    const val LOGOUT_CONFIRMATION = "logout_confirmation"
+
     const val REMINDER = "reminder/{doseId}?readOnly={readOnly}"
 
     // Màn hình phụ thuộc luồng Quét thuốc & Gia đình (Huy)

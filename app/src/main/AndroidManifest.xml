@@ -26,7 +26,7 @@
         android:theme="@style/Theme.MMRA_MedicationManager">
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.example.project_lttbd.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.MMRA_MedicationManager"
@@ -40,5 +40,5 @@
 
         </activity>
     </application>
-
+    <uses-permission android:name="android.permission.CAMERA" />
 </manifest>

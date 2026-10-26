@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mmra_medicationmanager.R
+import com.example.mmra_medicationmanager.model.UserProfileManager
 import com.example.project_lttbd.data.mock.FamilyMember
 import com.example.project_lttbd.data.mock.MockFamilyData
 
@@ -52,7 +53,8 @@ fun FamilyScreen(
     onMemberClick: (String) -> Unit = {},
     onInviteClick: () -> Unit = {},
     onInviteDetailClick: () -> Unit = {},
-    onAlertsClick: () -> Unit = {}
+    onAlertsClick: () -> Unit = {},
+    onAccountClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var membersList by remember { mutableStateOf(MockFamilyData.mockMembers) }
@@ -129,11 +131,12 @@ fun FamilyScreen(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFDDF2EE)),
+                            .background(Color(0xFFDDF2EE))
+                            .clickable { onAccountClick() },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "MA",
+                            text = UserProfileManager.getInitials(),
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
                             fontSize = 13.sp
