@@ -39,10 +39,12 @@ import com.example.mmra_medicationmanager.ui.screens.profile.EditEmailScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.EditNameScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.EditPhoneScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.GalleryPickerScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.LogoutConfirmationScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.ManageUsageModeScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.MyAccountScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.NotificationSettingsScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.ReviewCapturedPhotoScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.SwitchAccountScreen
 import com.example.mmra_medicationmanager.ui.screens.profile.VoiceGuidanceSettingsScreen
 import com.example.mmra_medicationmanager.ui.screens.setup.SetupDisplayPreferenceScreen
 import com.example.mmra_medicationmanager.ui.screens.setup.SetupTargetUserScreen
@@ -77,6 +79,8 @@ enum class AuthDestination {
     ACCESSIBILITY_SETTINGS,
     VOICE_GUIDANCE_SETTINGS,
     MANAGE_USAGE_MODE,
+    SWITCH_ACCOUNT,
+    LOGOUT_CONFIRMATION,
 }
 
 class MainActivity : ComponentActivity() {
@@ -392,9 +396,11 @@ fun AppNavigation(
                 onUsageModeClick = {
                     currentDestination = AuthDestination.MANAGE_USAGE_MODE
                 },
+                onSwitchAccountClick = {
+                    currentDestination = AuthDestination.SWITCH_ACCOUNT
+                },
                 onLogoutClick = {
-                    isAuthenticated = false
-                    currentDestination = AuthDestination.WELCOME
+                    currentDestination = AuthDestination.LOGOUT_CONFIRMATION
                 }
             )
         }
@@ -570,6 +576,29 @@ fun AppNavigation(
                 onConfirmSave = { updatedRoles ->
                     setupPreferences = setupPreferences.copy(selectedRoles = updatedRoles)
                     currentDestination = AuthDestination.MY_ACCOUNT
+                }
+            )
+        }
+
+        AuthDestination.SWITCH_ACCOUNT -> {
+            SwitchAccountScreen(
+                modifier = modifier,
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                onBackClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onAddAccountClick = { currentDestination = AuthDestination.LOGIN },
+                onCancelClick = { currentDestination = AuthDestination.MY_ACCOUNT }
+            )
+        }
+
+        AuthDestination.LOGOUT_CONFIRMATION -> {
+            LogoutConfirmationScreen(
+                modifier = modifier,
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                onBackClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onCancelClick = { currentDestination = AuthDestination.MY_ACCOUNT },
+                onConfirmLogout = {
+                    isAuthenticated = false
+                    currentDestination = AuthDestination.WELCOME
                 }
             )
         }
