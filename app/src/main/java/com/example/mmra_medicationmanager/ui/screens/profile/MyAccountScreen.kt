@@ -53,6 +53,7 @@ fun MyAccountScreen(
     onAccessibilityClick: () -> Unit = {},
     onVoiceGuidanceClick: () -> Unit = {},
     onUsageModeClick: () -> Unit = {},
+    onSwitchAccountClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
 ) {
     val primaryColor = Color(0xFF0F5B51)
@@ -339,6 +340,7 @@ fun MyAccountScreen(
                     AccountSettingRow(
                         iconRes = R.drawable.ic_caregiver,
                         title = stringResource(id = R.string.account_switch_account),
+                        onClick = onSwitchAccountClick,
                     )
                     Divider(color = borderColor, thickness = 0.8.dp)
                     AccountSettingRow(
