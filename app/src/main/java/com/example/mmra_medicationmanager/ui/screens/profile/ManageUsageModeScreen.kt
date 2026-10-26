@@ -24,7 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,11 +40,34 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mmra_medicationmanager.R
 import com.example.mmra_medicationmanager.model.TargetRole
+import com.example.mmra_medicationmanager.model.UserProfileManager
+
+enum class UsageModeType {
+    PATIENT_ONLY,
+    CAREGIVER_ONLY,
+    COMBINED,
+}
+
+private fun Set<TargetRole>.toUsageModeType(): UsageModeType {
+    return when {
+        contains(TargetRole.PATIENT) && contains(TargetRole.CAREGIVER) -> UsageModeType.COMBINED
+        contains(TargetRole.CAREGIVER) -> UsageModeType.CAREGIVER_ONLY
+        else -> UsageModeType.PATIENT_ONLY
+    }
+}
+
+private fun UsageModeType.toTargetRoleSet(): Set<TargetRole> {
+    return when (this) {
+        UsageModeType.PATIENT_ONLY -> setOf(TargetRole.PATIENT)
+        UsageModeType.CAREGIVER_ONLY -> setOf(TargetRole.CAREGIVER)
+        UsageModeType.COMBINED -> setOf(TargetRole.PATIENT, TargetRole.CAREGIVER)
+    }
+}
 
 @Composable
 fun ManageUsageModeScreen(
     modifier: Modifier = Modifier,
-    initialSelectedRoles: Set<TargetRole> = setOf(TargetRole.PATIENT),
+    initialSelectedRoles: Set<TargetRole> = setOf(TargetRole.PATIENT, TargetRole.CAREGIVER),
     onBackClick: () -> Unit = {},
     onCancelClick: () -> Unit = {},
     onConfirmSave: (Set<TargetRole>) -> Unit = {},
@@ -56,10 +78,11 @@ fun ManageUsageModeScreen(
     val subTextColor = Color(0xFF5A6E6A)
     val borderColor = Color(0xFFE2E8E6)
     val infoBgColor = Color(0xFFEFF6F4)
-    val unselectedCheckboxBorder = Color(0xFFCDE0DC)
+    val unselectedRadioBorder = Color(0xFF5A6E6A)
 
-    var localSelectedRoles by remember { mutableStateOf(initialSelectedRoles) }
-    var showConfirmDialog by remember { mutableStateOf(false) }
+    val savedMode = initialSelectedRoles.toUsageModeType()
+    var tempSelectedMode by remember { mutableStateOf(savedMode) }
+    var pendingDialogMode by remember { mutableStateOf<UsageModeType?>(null) }
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -105,48 +128,13 @@ fun ManageUsageModeScreen(
                         fontWeight = FontWeight.Bold,
                         color = darkTextColor,
                     )
-                    Text(
-                        text = stringResource(id = R.string.account_section_manage),
-                        fontSize = 13.sp,
-                        color = subTextColor,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Icon Badge
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = lightBgColor,
-                modifier = Modifier.size(56.dp),
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_user),
-                        contentDescription = null,
-                        tint = primaryColor,
-                        modifier = Modifier.size(28.dp),
-                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "Thay đổi chế độ sử dụng",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = darkTextColor,
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Chọn vai trò phù hợp để MMRA tối ưu hóa giao diện và thông báo cho bạn.",
+                text = "Chọn một chế độ phù hợp với cách bạn sử dụng MMRA.",
                 fontSize = 14.sp,
                 color = subTextColor,
                 lineHeight = 20.sp,
@@ -154,24 +142,18 @@ fun ManageUsageModeScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Card 1: Người uống thuốc (Patient)
-            val isPatientSelected = localSelectedRoles.contains(TargetRole.PATIENT)
+            // Option 1: Chỉ Người uống thuốc
+            val isPatientOnlySelected = tempSelectedMode == UsageModeType.PATIENT_ONLY
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = if (isPatientSelected) lightBgColor else Color.White,
+                color = if (isPatientOnlySelected) lightBgColor else Color.White,
                 border = BorderStroke(
-                    if (isPatientSelected) 1.5.dp else 1.dp,
-                    if (isPatientSelected) primaryColor else borderColor,
+                    if (isPatientOnlySelected) 1.5.dp else 1.dp,
+                    if (isPatientOnlySelected) primaryColor else borderColor,
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        localSelectedRoles = if (isPatientSelected) {
-                            localSelectedRoles - TargetRole.PATIENT
-                        } else {
-                            localSelectedRoles + TargetRole.PATIENT
-                        }
-                    },
+                    .clickable { tempSelectedMode = UsageModeType.PATIENT_ONLY },
             ) {
                 Row(
                     modifier = Modifier.padding(18.dp),
@@ -192,14 +174,23 @@ fun ManageUsageModeScreen(
                         modifier = Modifier.weight(1f),
                     ) {
                         Text(
-                            text = stringResource(id = R.string.setup_target_option_user_title),
+                            text = "Chỉ Người uống thuốc",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = darkTextColor,
                         )
+                        if (savedMode == UsageModeType.PATIENT_ONLY) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Chế độ hiện tại",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = primaryColor,
+                            )
+                        }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = stringResource(id = R.string.setup_target_option_user_desc),
+                            text = "Quản lý thuốc của mình và nhận nhắc nhở uống thuốc đúng giờ.",
                             fontSize = 13.sp,
                             color = subTextColor,
                             lineHeight = 18.sp,
@@ -208,55 +199,25 @@ fun ManageUsageModeScreen(
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    if (isPatientSelected) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = primaryColor,
-                            modifier = Modifier.size(24.dp),
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize(),
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_check_circle),
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                        }
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.5.dp, unselectedCheckboxBorder),
-                            modifier = Modifier.size(24.dp),
-                        ) {}
-                    }
+                    // Radio indicator
+                    RadioButtonIndicator(isSelected = isPatientOnlySelected, primaryColor = primaryColor, unselectedBorder = unselectedRadioBorder)
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Card 2: Người chăm sóc (Caregiver)
-            val isCaregiverSelected = localSelectedRoles.contains(TargetRole.CAREGIVER)
+            // Option 2: Chỉ Người chăm sóc
+            val isCaregiverOnlySelected = tempSelectedMode == UsageModeType.CAREGIVER_ONLY
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = if (isCaregiverSelected) lightBgColor else Color.White,
+                color = if (isCaregiverOnlySelected) lightBgColor else Color.White,
                 border = BorderStroke(
-                    if (isCaregiverSelected) 1.5.dp else 1.dp,
-                    if (isCaregiverSelected) primaryColor else borderColor,
+                    if (isCaregiverOnlySelected) 1.5.dp else 1.dp,
+                    if (isCaregiverOnlySelected) primaryColor else borderColor,
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        localSelectedRoles = if (isCaregiverSelected) {
-                            localSelectedRoles - TargetRole.CAREGIVER
-                        } else {
-                            localSelectedRoles + TargetRole.CAREGIVER
-                        }
-                    },
+                    .clickable { tempSelectedMode = UsageModeType.CAREGIVER_ONLY },
             ) {
                 Row(
                     modifier = Modifier.padding(18.dp),
@@ -277,14 +238,23 @@ fun ManageUsageModeScreen(
                         modifier = Modifier.weight(1f),
                     ) {
                         Text(
-                            text = stringResource(id = R.string.setup_target_option_caregiver_title),
+                            text = "Chỉ Người chăm sóc",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = darkTextColor,
                         )
+                        if (savedMode == UsageModeType.CAREGIVER_ONLY) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Chế độ hiện tại",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = primaryColor,
+                            )
+                        }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = stringResource(id = R.string.setup_target_option_caregiver_desc),
+                            text = "Theo dõi các thành viên gia đình đã liên kết trong phạm vi quyền được cấp.",
                             fontSize = 13.sp,
                             color = subTextColor,
                             lineHeight = 18.sp,
@@ -293,92 +263,74 @@ fun ManageUsageModeScreen(
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    if (isCaregiverSelected) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = primaryColor,
-                            modifier = Modifier.size(24.dp),
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize(),
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_check_circle),
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                        }
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.5.dp, unselectedCheckboxBorder),
-                            modifier = Modifier.size(24.dp),
-                        ) {}
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            // Primary Button: Lưu thay đổi
-            Button(
-                onClick = {
-                    if (localSelectedRoles.isNotEmpty()) {
-                        if (localSelectedRoles != initialSelectedRoles) {
-                            showConfirmDialog = true
-                        } else {
-                            onConfirmSave(localSelectedRoles)
-                        }
-                    }
-                },
-                enabled = localSelectedRoles.isNotEmpty(),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = primaryColor,
-                    disabledContainerColor = Color(0xFFA2C0BB),
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_check_circle),
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Lưu thay đổi",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                    )
+                    RadioButtonIndicator(isSelected = isCaregiverOnlySelected, primaryColor = primaryColor, unselectedBorder = unselectedRadioBorder)
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Secondary Action: Hủy -> Quay về MyAccountScreen không lưu thay đổi
-            Text(
-                text = stringResource(id = R.string.avatar_action_cancel),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = subTextColor,
+            // Option 3: Kết hợp cả hai
+            val isCombinedSelected = tempSelectedMode == UsageModeType.COMBINED
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = if (isCombinedSelected) lightBgColor else Color.White,
+                border = BorderStroke(
+                    if (isCombinedSelected) 1.5.dp else 1.dp,
+                    if (isCombinedSelected) primaryColor else borderColor,
+                ),
                 modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .clickable { onCancelClick() },
-            )
+                    .fillMaxWidth()
+                    .clickable { tempSelectedMode = UsageModeType.COMBINED },
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_caregiver),
+                        contentDescription = null,
+                        tint = primaryColor,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .padding(top = 2.dp),
+                    )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text = "Kết hợp cả hai",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = darkTextColor,
+                        )
+                        if (savedMode == UsageModeType.COMBINED) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Chế độ hiện tại",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = primaryColor,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Quản lý thuốc của mình và chăm sóc người thân trong cùng một tài khoản.",
+                            fontSize = 13.sp,
+                            color = subTextColor,
+                            lineHeight = 18.sp,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    RadioButtonIndicator(isSelected = isCombinedSelected, primaryColor = primaryColor, unselectedBorder = unselectedRadioBorder)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Info Box
             Surface(
@@ -400,7 +352,7 @@ fun ManageUsageModeScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Thay đổi chế độ sử dụng sẽ cập nhật giao diện và các thông báo tương ứng trên ứng dụng.",
+                        text = "Thay đổi chế độ không tự động xóa dữ liệu thuốc, hủy liên kết gia đình hoặc thu hồi quyền chia sẻ.",
                         fontSize = 13.sp,
                         color = subTextColor,
                         lineHeight = 18.sp,
@@ -408,60 +360,307 @@ fun ManageUsageModeScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Primary Button: Lưu thay đổi
+            Button(
+                onClick = {
+                    if (tempSelectedMode != savedMode) {
+                        pendingDialogMode = tempSelectedMode
+                    } else {
+                        onConfirmSave(tempSelectedMode.toTargetRoleSet())
+                    }
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+            ) {
+                Text(
+                    text = "Lưu thay đổi",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Secondary Outlined Button: Hủy
+            OutlinedButton(
+                onClick = { onCancelClick() },
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.5.dp, primaryColor),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+            ) {
+                Text(
+                    text = "Hủy",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = primaryColor,
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Confirmation Dialog
-        if (showConfirmDialog) {
-            AlertDialog(
-                onDismissRequest = { showConfirmDialog = false },
-                title = {
-                    Text(
-                        text = "Xác nhận thay đổi chế độ sử dụng?",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = darkTextColor,
-                    )
-                },
-                text = {
-                    Text(
-                        text = "Giao diện và thông báo của ứng dụng sẽ thay đổi theo vai trò bạn đã chọn.",
-                        fontSize = 14.sp,
-                        color = subTextColor,
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showConfirmDialog = false
-                            onConfirmSave(localSelectedRoles)
+        // Dialogs A, B, C
+        if (pendingDialogMode != null) {
+            when (pendingDialogMode) {
+                UsageModeType.PATIENT_ONLY -> {
+                    // Dialog A: Chuyển sang chỉ Người uống thuốc?
+                    AlertDialog(
+                        onDismissRequest = { pendingDialogMode = null },
+                        title = {
+                            Text(
+                                text = "Chuyển sang chỉ Người uống thuốc?",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = darkTextColor,
+                            )
                         },
-                    ) {
-                        Text(
-                            text = "Đồng ý",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = primaryColor,
-                        )
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            // Dialog 'Quay lại' button closes dialog, remains on screen, keeps unsaved changes
-                            showConfirmDialog = false
+                        text = {
+                            Column {
+                                Text(
+                                    text = "Các tính năng chăm sóc người thân sẽ được ẩn. Bạn vẫn có thể quản lý thuốc của mình và nhận nhắc nhở uống thuốc.",
+                                    fontSize = 14.sp,
+                                    color = subTextColor,
+                                    lineHeight = 20.sp,
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "Dữ liệu cá nhân, liên kết gia đình và các quyền hiện có đều được giữ nguyên.",
+                                    fontSize = 14.sp,
+                                    color = subTextColor,
+                                    lineHeight = 20.sp,
+                                )
+                            }
                         },
-                    ) {
-                        Text(
-                            text = "Quay lại",
-                            fontSize = 15.sp,
-                            color = subTextColor,
-                        )
-                    }
-                },
-                containerColor = Color.White,
-                shape = RoundedCornerShape(16.dp),
-            )
+                        confirmButton = {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Button(
+                                    onClick = {
+                                        val newRoles = UsageModeType.PATIENT_ONLY.toTargetRoleSet()
+                                        UserProfileManager.role = "Người uống thuốc"
+                                        pendingDialogMode = null
+                                        onConfirmSave(newRoles)
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp),
+                                ) {
+                                    Text(
+                                        text = "Chuyển sang Người uống thuốc",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedButton(
+                                    onClick = { pendingDialogMode = null },
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.5.dp, borderColor),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp),
+                                ) {
+                                    Text(
+                                        text = "Quay lại",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = darkTextColor,
+                                    )
+                                }
+                            }
+                        },
+                        containerColor = Color.White,
+                        shape = RoundedCornerShape(20.dp),
+                    )
+                }
+
+                UsageModeType.CAREGIVER_ONLY -> {
+                    // Dialog B: Chuyển sang chỉ Người chăm sóc?
+                    AlertDialog(
+                        onDismissRequest = { pendingDialogMode = null },
+                        title = {
+                            Text(
+                                text = "Chuyển sang chỉ Người chăm sóc?",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = darkTextColor,
+                            )
+                        },
+                        text = {
+                            Column {
+                                Text(
+                                    text = "Các tính năng quản lý thuốc cá nhân sẽ được ẩn. Bạn vẫn có thể chăm sóc người thân trong phạm vi quyền đã được cấp.",
+                                    fontSize = 14.sp,
+                                    color = subTextColor,
+                                    lineHeight = 20.sp,
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "Dữ liệu cá nhân và liên kết gia đình vẫn được lưu. Các quyền hiện có không thay đổi.",
+                                    fontSize = 14.sp,
+                                    color = subTextColor,
+                                    lineHeight = 20.sp,
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Button(
+                                    onClick = {
+                                        val newRoles = UsageModeType.CAREGIVER_ONLY.toTargetRoleSet()
+                                        UserProfileManager.role = "Người chăm sóc"
+                                        pendingDialogMode = null
+                                        onConfirmSave(newRoles)
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp),
+                                ) {
+                                    Text(
+                                        text = "Chuyển sang Người chăm sóc",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedButton(
+                                    onClick = { pendingDialogMode = null },
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.5.dp, borderColor),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp),
+                                ) {
+                                    Text(
+                                        text = "Quay lại",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = darkTextColor,
+                                    )
+                                }
+                            }
+                        },
+                        containerColor = Color.White,
+                        shape = RoundedCornerShape(20.dp),
+                    )
+                }
+
+                UsageModeType.COMBINED -> {
+                    // Dialog C: Bật chế độ kết hợp cả hai?
+                    AlertDialog(
+                        onDismissRequest = { pendingDialogMode = null },
+                        title = {
+                            Text(
+                                text = "Bật chế độ kết hợp cả hai?",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = darkTextColor,
+                            )
+                        },
+                        text = {
+                            Column {
+                                Text(
+                                    text = "Bạn sẽ có thể sử dụng cả tính năng quản lý thuốc cá nhân và tính năng chăm sóc người thân.",
+                                    fontSize = 14.sp,
+                                    color = subTextColor,
+                                    lineHeight = 20.sp,
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "Chế độ này không tự động tạo liên kết gia đình hoặc cấp quyền chia sẻ. Bạn chỉ có thể xem thông tin người thân trong phạm vi quyền đã được cấp.",
+                                    fontSize = 14.sp,
+                                    color = subTextColor,
+                                    lineHeight = 20.sp,
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Button(
+                                    onClick = {
+                                        val newRoles = UsageModeType.COMBINED.toTargetRoleSet()
+                                        UserProfileManager.role = "Cả bản thân và người thân"
+                                        pendingDialogMode = null
+                                        onConfirmSave(newRoles)
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp),
+                                ) {
+                                    Text(
+                                        text = "Bật chế độ kết hợp",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedButton(
+                                    onClick = { pendingDialogMode = null },
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.5.dp, borderColor),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp),
+                                ) {
+                                    Text(
+                                        text = "Quay lại",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = darkTextColor,
+                                    )
+                                }
+                            }
+                        },
+                        containerColor = Color.White,
+                        shape = RoundedCornerShape(20.dp),
+                    )
+                }
+
+                null -> {}
+            }
+        }
+    }
+}
+
+@Composable
+private fun RadioButtonIndicator(
+    isSelected: Boolean,
+    primaryColor: Color,
+    unselectedBorder: Color,
+) {
+    Surface(
+        shape = CircleShape,
+        color = Color.White,
+        border = BorderStroke(2.dp, if (isSelected) primaryColor else unselectedBorder),
+        modifier = Modifier.size(24.dp),
+    ) {
+        if (isSelected) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = primaryColor,
+                    modifier = Modifier.size(12.dp),
+                ) {}
+            }
         }
     }
 }
