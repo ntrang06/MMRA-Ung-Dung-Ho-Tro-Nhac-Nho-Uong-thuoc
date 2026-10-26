@@ -42,7 +42,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.project_lttbd.R
+import com.example.mmra_medicationmanager.R
 
 @Composable
 fun FamilyPermissionsScreen(

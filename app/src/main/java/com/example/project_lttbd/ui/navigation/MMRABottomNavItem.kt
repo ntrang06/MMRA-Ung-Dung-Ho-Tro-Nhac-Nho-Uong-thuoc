@@ -1,7 +1,7 @@
 package com.example.project_lttbd.ui.navigation
 
 import androidx.annotation.DrawableRes
-import com.example.project_lttbd.R
+import com.example.mmra_medicationmanager.R
 
 data class MMRABottomNavItem(
     val route: String,
