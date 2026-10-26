@@ -1,59 +1,54 @@
+
 package com.example.project_lttbd.ui.screens.scan
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mmra_medicationmanager.R
-import com.example.project_lttbd.ui.components.MMRAButton
+import java.io.File
 
 @Composable
 fun ScanCameraScreen(
-    onCaptureClick: () -> Unit,
+    onCaptureClick: (Uri) -> Unit,
     onPickImageClick: () -> Unit,
     onManualInputClick: () -> Unit,
     onCloseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var hasCameraPermission by remember {
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
                 context,
@@ -62,313 +57,323 @@ fun ScanCameraScreen(
         )
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasCameraPermission = isGranted
-        if (isGranted) {
-            onCaptureClick()
+    var flashEnabled by remember { mutableStateOf(false) }
+    var isCapturing by remember { mutableStateOf(false) }
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var cameraReady by remember { mutableStateOf(false) }
+
+    val previewView = remember {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         }
     }
 
-    var isFlashOn by remember { mutableStateOf(false) }
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .build()
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasPermission = granted
+        if (!granted) {
+            Toast.makeText(
+                context,
+                "Cần cấp quyền camera để chụp ảnh thuốc.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    LaunchedEffect(hasPermission, lifecycleOwner) {
+        if (!hasPermission) return@LaunchedEffect
+
+        cameraReady = false
+
+        val providerFuture = ProcessCameraProvider.getInstance(context)
+
+        providerFuture.addListener({
+            try {
+                val provider = providerFuture.get()
+
+                val preview = Preview.Builder().build().also {
+                    it.surfaceProvider = previewView.surfaceProvider
+                }
+
+                imageCapture.flashMode = ImageCapture.FLASH_MODE_OFF
+
+                provider.unbindAll()
+
+                camera = provider.bindToLifecycle(
+                    lifecycleOwner,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    preview,
+                    imageCapture
+                )
+
+                cameraReady = true
+            } catch (e: Exception) {
+                Toast.makeText(
+                    context,
+                    "Không thể mở camera: ${e.localizedMessage ?: "Lỗi thiết bị"}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }, ContextCompat.getMainExecutor(context))
+    }
+
+    fun capturePhoto() {
+        if (!hasPermission) {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+            return
+        }
+
+        if (!cameraReady || isCapturing) return
+
+        if (flashEnabled && camera?.cameraInfo?.hasFlashUnit() != true) {
+            Toast.makeText(
+                context,
+                "Thiết bị không hỗ trợ đèn flash.",
+                Toast.LENGTH_SHORT
+            ).show()
+            flashEnabled = false
+        }
+
+        imageCapture.flashMode =
+            if (flashEnabled) ImageCapture.FLASH_MODE_ON
+            else ImageCapture.FLASH_MODE_OFF
+
+        val photoFile = File(
+            context.cacheDir,
+            "medicine_${System.currentTimeMillis()}.jpg"
+        )
+
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(
+            photoFile
+        ).build()
+
+        isCapturing = true
+
+        imageCapture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(
+                    outputFileResults: ImageCapture.OutputFileResults
+                ) {
+                    isCapturing = false
+                    onCaptureClick(Uri.fromFile(photoFile))
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    isCapturing = false
+                    Toast.makeText(
+                        context,
+                        "Chụp ảnh thất bại: ${exception.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        )
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFF0F201C))
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Header Bar
+        Column(Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Nút đóng
                 Box(
-                    modifier = Modifier
+                    Modifier
                         .size(44.dp)
                         .clip(CircleShape)
                         .background(Color(0x33FFFFFF))
                         .clickable { onCloseClick() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_close),
-                        contentDescription = "Đóng",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                    Text("✕", color = Color.White, fontSize = 22.sp)
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Quét vỏ hộp thuốc",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Bước 1 / 3 • Nhận diện thuốc",
+                        color = Color(0xFF9FBDB6),
+                        fontSize = 12.sp
                     )
                 }
 
-                // Tiêu đề & Bước
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Quét vỏ hộp thuốc",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                    )
-                    Text(
-                        text = "Bước 1 / 3 • Nhận diện thuốc",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = Color(0xFF9FBDB6),
-                            fontSize = 12.sp
-                        )
-                    )
-                }
-
-                // Nút bật/tắt Flash
                 Box(
-                    modifier = Modifier
+                    Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(if (isFlashOn) Color(0xFF126B62) else Color(0x33FFFFFF))
-                        .clickable { isFlashOn = !isFlashOn },
+                        .background(
+                            if (flashEnabled) Color(0xFF126B62)
+                            else Color(0x33FFFFFF)
+                        )
+                        .clickable {
+                            if (camera?.cameraInfo?.hasFlashUnit() == false) {
+                                Toast.makeText(
+                                    context,
+                                    "Camera không có đèn flash.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                flashEnabled = !flashEnabled
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_zap),
-                        contentDescription = "Bật/Tắt Flash",
-                        tint = if (isFlashOn) Color(0xFFFACC15) else Color.White,
-                        modifier = Modifier.size(20.dp)
+                    Text(
+                        "⚡",
+                        color = if (flashEnabled) Color(0xFFFACC15)
+                        else Color.White,
+                        fontSize = 22.sp
                     )
                 }
             }
 
-            // Viewfinder Area
             Box(
-                modifier = Modifier
+                Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // Badge nhắc nhở
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color(0xFF1D3B34)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_scan),
-                                contentDescription = null,
-                                tint = Color(0xFF85D5C7),
-                                modifier = Modifier.size(13.dp)
+                if (hasPermission) {
+                    AndroidView(
+                        factory = { previewView },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(20.dp))
+                    )
+
+                    // Khung hướng dẫn căn chỉnh nằm trên camera thật
+                    Box(
+                        Modifier
+                            .fillMaxWidth(0.88f)
+                            .height(220.dp)
+                            .border(
+                                2.dp,
+                                Color.White.copy(alpha = 0.85f),
+                                RoundedCornerShape(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "GIỮ MÁY ỔN ĐỊNH",
-                                color = Color(0xFF85D5C7),
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
-                            )
-                        }
+                    )
+
+                    if (!cameraReady) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center),
+                            color = Color.White
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = "Đặt toàn bộ mặt trước vỏ hộp vào khung",
-                        style = MaterialTheme.typography.bodyMedium.copy(
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            "Cần quyền camera để quét thuốc",
                             color = Color.White,
                             textAlign = TextAlign.Center
                         )
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Khung căn chỉnh vỏ hộp thuốc
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .height(220.dp)
-                            .border(
-                                width = 2.dp,
-                                color = Color(0x80FFFFFF),
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            .background(Color(0x1A000000), shape = RoundedCornerShape(20.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Đường kẻ ngang dẫn hướng căn giữa
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.85f)
-                                .height(1.dp)
-                                .background(Color(0x66FFFFFF))
-                        )
-
-                        // Các góc định vị
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(12.dp)
-                                .size(width = 24.dp, height = 4.dp)
-                                .background(Color.White, RoundedCornerShape(2.dp))
-                        )
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(12.dp)
-                                .size(width = 24.dp, height = 4.dp)
-                                .background(Color.White, RoundedCornerShape(2.dp))
-                        )
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(12.dp)
-                                .size(width = 24.dp, height = 4.dp)
-                                .background(Color.White, RoundedCornerShape(2.dp))
-                        )
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(12.dp)
-                                .size(width = 24.dp, height = 4.dp)
-                                .background(Color.White, RoundedCornerShape(2.dp))
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Gợi ý ánh sáng
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = Color(0xFF1D3B34)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                permissionLauncher.launch(
+                                    Manifest.permission.CAMERA
+                                )
+                            }
                         ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_sun),
-                                contentDescription = null,
-                                tint = Color(0xFFB1CCC4),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Đủ sáng • Không bị lóa",
-                                color = Color(0xFFB1CCC4),
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp)
-                            )
+                            Text("Cấp quyền camera")
                         }
                     }
                 }
             }
 
-            // Bottom Action Sheet
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                shape = RoundedCornerShape(
+                    topStart = 28.dp,
+                    topEnd = 28.dp
+                ),
                 color = Color.White
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                        .padding(horizontal = 24.dp, vertical = 18.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Nút chụp to ở giữa
+                    Text(
+                        "Đặt mặt trước vỏ hộp vào khung",
+                        color = Color(0xFF31534A),
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+
                     Box(
-                        modifier = Modifier
+                        Modifier
                             .size(76.dp)
                             .clip(CircleShape)
-                            .border(4.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                            .clickable {
-                                if (hasCameraPermission) {
-                                    onCaptureClick()
-                                } else {
-                                    permissionLauncher.launch(Manifest.permission.CAMERA)
-                                }
+                            .border(
+                                4.dp,
+                                MaterialTheme.colorScheme.primary,
+                                CircleShape
+                            )
+                            .clickable(
+                                enabled = cameraReady && !isCapturing
+                            ) {
+                                capturePhoto()
                             },
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
-                            modifier = Modifier
+                            Modifier
                                 .size(60.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primary),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_camera),
-                                contentDescription = "Chụp ảnh",
-                                tint = Color.White,
-                                modifier = Modifier.size(28.dp)
-                            )
+                            if (isCapturing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(28.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    painter = androidx.compose.ui.res
+                                        .painterResource(R.drawable.ic_camera),
+                                    contentDescription = "Chụp ảnh",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
                         }
                     }
 
-                    // Nút nhập thông tin thủ công
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onManualInputClick() }
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_keyboard),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Nhập thông tin thủ công",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        )
+                    TextButton(onClick = onManualInputClick) {
+                        Text("Nhập thông tin thủ công")
                     }
 
-                    // Nút chọn ảnh từ thư viện
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onPickImageClick() }
-                            .padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_image),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Hoặc chọn ảnh từ thư viện",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                        )
+                    TextButton(onClick = onPickImageClick) {
+                        Text("Hoặc chọn ảnh từ thư viện")
                     }
                 }
             }

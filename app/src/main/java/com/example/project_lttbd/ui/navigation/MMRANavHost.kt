@@ -91,11 +91,7 @@ fun MMRANavHost(
     val isLoggedIn = UserProfileManager.isLoggedIn(context)
     val isSetupCompleted = UserProfileManager.isSetupCompleted(context)
 
-    val startDest = when {
-        !isLoggedIn -> MMRADestinations.WELCOME
-        !isSetupCompleted -> MMRADestinations.INITIAL_SETUP_TARGET
-        else -> MMRADestinations.HOME
-    }
+    val startDest = MMRADestinations.WELCOME
 
     var setupPreferences by remember {
         mutableStateOf(InitialSetupPreferences())
@@ -712,6 +708,9 @@ fun MMRANavHost(
                 },
                 onAlertsClick = {
                     navController.navigate(MMRADestinations.FAMILY_ALERTS)
+                },
+                onAccountClick = {
+                    navController.navigate(MMRADestinations.MY_ACCOUNT)
                 }
             )
         }

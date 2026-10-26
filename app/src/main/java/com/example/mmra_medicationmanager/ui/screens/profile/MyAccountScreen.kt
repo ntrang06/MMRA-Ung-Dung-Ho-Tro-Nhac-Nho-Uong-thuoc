@@ -152,7 +152,7 @@ fun MyAccountScreen(
                                 modifier = Modifier.fillMaxSize(),
                             ) {
                                 Text(
-                                    text = "NL",
+                                    text = UserProfileManager.getInitials(),
                                     fontSize = 26.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = primaryColor,

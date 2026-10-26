@@ -161,10 +161,18 @@ object UserProfileManager {
     }
 
     fun getInitials(): String {
-        val parts = name.trim().split("\\s+".toRegex())
+        val parts = name.trim()
+            .split("\\s+".toRegex())
+            .filter { it.isNotBlank() }
+
         return when {
-            parts.size >= 2 -> "${parts.first().take(1)}${parts.last().take(1)}".uppercase()
-            parts.size == 1 -> parts[0].take(2).uppercase()
+            parts.size >= 2 ->
+                "${parts.first().first()}${parts.last().first()}"
+                    .uppercase()
+
+            parts.size == 1 ->
+                parts[0].take(2).uppercase()
+
             else -> "NL"
         }
     }

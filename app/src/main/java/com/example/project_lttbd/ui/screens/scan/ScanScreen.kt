@@ -58,9 +58,9 @@ fun ScanScreen(
         when (flowState) {
             ScanFlowState.CAMERA -> {
                 ScanCameraScreen(
-                    onCaptureClick = {
+                    onCaptureClick = { capturedUri ->
+                        selectedImageUri = capturedUri
                         isFromGallery = false
-                        selectedImageUri = null
                         flowState = ScanFlowState.PREVIEW
                     },
                     onPickImageClick = {
