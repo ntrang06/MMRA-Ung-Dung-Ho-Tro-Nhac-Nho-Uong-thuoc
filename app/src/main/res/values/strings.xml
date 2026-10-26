@@ -1,5 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">MMRA_MedicationManager</string>
+    <string name="app_name">MMRA</string>
     <string name="welcome_app_name">MMRA</string>
     <string name="welcome_app_subtitle">MEDICATION REMINDER ASSISTANT</string>
     <string name="welcome_headline">Uống thuốc đúng giờ,\nnhẹ lòng mỗi ngày</string>

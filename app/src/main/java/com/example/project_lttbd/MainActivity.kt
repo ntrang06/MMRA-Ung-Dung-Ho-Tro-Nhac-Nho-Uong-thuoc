@@ -5,43 +5,67 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.project_lttbd.ui.theme.Project_LTTBDĐTheme
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.example.project_lttbd.ui.components.MMRABottomBar
+import com.example.project_lttbd.ui.navigation.MMRADestinations
+import com.example.project_lttbd.ui.navigation.MMRANavHost
+import com.example.project_lttbd.ui.navigation.mmraBottomNavItems
+import com.example.project_lttbd.ui.theme.MMRATheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
-            Project_LTTBDĐTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
+            MMRATheme {
+                val navController = rememberNavController()
+                val backStackEntry by
+                navController.currentBackStackEntryAsState()
+                val currentRoute = backStackEntry?.destination?.route
+
+                val showBottomBar = mmraBottomNavItems.any {
+                    it.route == currentRoute
+                } && currentRoute != MMRADestinations.SCAN
+
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomBar = {
+                        if (showBottomBar) {
+                            MMRABottomBar(
+                                currentRoute = currentRoute,
+                                onItemClick = { route ->
+                                    navController.navigate(route) {
+                                        popUpTo(
+                                            navController.graph
+                                                .findStartDestination().id
+                                        ) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                modifier = Modifier.navigationBarsPadding()
+                            )
+                        }
+                    }
+                ) { innerPadding ->
+                    MMRANavHost(
+                        navController = navController,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
                     )
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    Project_LTTBDĐTheme {
-        Greeting("Android")
     }
 }
