@@ -129,4 +129,76 @@
     <string name="setup_display_preview_text">Chào cô Lan, MMRA luôn ở đây.</string>
     <string name="setup_btn_save_continue">Lưu và tiếp tục</string>
     <string name="setup_display_info_note">Các lựa chọn được lưu. Thiết lập sẽ không lặp lại, trừ khi bạn đặt lại trong Cài đặt trợ năng.</string>
+
+    <!-- Account & Profile Avatar Screens -->
+    <string name="account_title">Tài khoản của tôi</string>
+    <string name="account_subtitle">Thông tin và lựa chọn của bạn</string>
+    <string name="account_user_name">Nguyễn Thị Lan</string>
+    <string name="account_user_role">Người uống thuốc</string>
+    <string name="account_verified">Tài khoản đã xác minh</string>
+    <string name="account_section_personal">Thông tin cá nhân</string>
+    <string name="account_change_avatar">Thay đổi ảnh đại diện</string>
+    <string name="account_edit_name">Sửa tên</string>
+    <string name="account_edit_email">Sửa email</string>
+    <string name="account_edit_phone">Sửa số điện thoại</string>
+    <string name="account_section_security">Bảo mật</string>
+    <string name="account_change_password">Đổi mật khẩu</string>
+    <string name="account_change_password_sub">Bảo vệ tài khoản của bạn</string>
+    <string name="account_section_reminders">Nhắc nhở và trợ năng</string>
+    <string name="account_notifications">Cài đặt thông báo</string>
+    <string name="account_notifications_sub">Nhắc uống thuốc và cảnh báo gia đình</string>
+    <string name="account_accessibility">Cài đặt trợ năng</string>
+    <string name="account_accessibility_sub">Chữ lớn đang bật</string>
+    <string name="account_voice_guidance">Hướng dẫn bằng giọng nói</string>
+    <string name="account_voice_guidance_sub">Đang bật</string>
+    <string name="account_section_manage">Quản lý tài khoản</string>
+    <string name="account_usage_mode">Chế độ sử dụng</string>
+    <string name="account_usage_mode_sub">Người uống thuốc, Người chăm sóc hoặc cả hai</string>
+    <string name="account_switch_account">Chuyển tài khoản</string>
+    <string name="account_logout">Đăng xuất</string>
+    <string name="account_footer_note">MMRA • Đồng hành cùng cô Lan mỗi ngày</string>
+
+    <string name="avatar_option_default_sub">Bạn đang dùng ảnh đại diện mặc định.</string>
+    <string name="avatar_option_current_sub">Ảnh đại diện hiện tại.</string>
+    <string name="avatar_action_take_photo">Chụp ảnh</string>
+    <string name="avatar_action_pick_gallery">Chọn từ thư viện</string>
+    <string name="avatar_action_delete_photo">Xóa ảnh</string>
+    <string name="avatar_action_cancel">Hủy</string>
+
+    <string name="avatar_capture_title">Chụp ảnh đại diện</string>
+    <string name="avatar_capture_step">Bước 1 / 3 • Chụp ảnh</string>
+    <string name="avatar_capture_banner">Đặt khuôn mặt vào giữa khung</string>
+    <string name="avatar_illustrative_note">Ảnh minh họa • Không phải ảnh thật</string>
+    <string name="avatar_capture_guide">Nhìn thẳng • Chọn nơi đủ sáng</string>
+
+    <string name="avatar_review_title">Xem lại ảnh</string>
+    <string name="avatar_review_step">Bước 2 / 3 • Kiểm tra ảnh</string>
+    <string name="avatar_review_heading">Cô Lan thấy ảnh này rõ chưa?</string>
+    <string name="avatar_review_desc">Nếu đã ưng ý, cô có thể tiếp tục để căn chỉnh ảnh đại diện.</string>
+    <string name="avatar_btn_continue_crop">Tiếp tục cắt ảnh</string>
+    <string name="avatar_btn_retake">Chụp lại</string>
+
+    <string name="avatar_gallery_title">Chọn ảnh đại diện</string>
+    <string name="avatar_gallery_step">Bước 1 / 2 • Chọn từ thư viện</string>
+    <string name="avatar_gallery_filter">Ảnh gần đây</string>
+    <string name="avatar_gallery_instruction">Chọn 1 ảnh có khuôn mặt rõ nét.</string>
+    <string name="avatar_gallery_selected_count">Đã chọn 1 ảnh</string>
+    <string name="avatar_gallery_selected_sub">Ảnh minh họa của cô Lan</string>
+
+    <string name="avatar_crop_title">Căn chỉnh ảnh</string>
+    <string name="avatar_crop_step">Bước cuối • Cắt ảnh đại diện</string>
+    <string name="avatar_crop_instruction">Kéo ảnh để căn giữa khuôn mặt. Chụm hai ngón tay để phóng to hoặc thu nhỏ.</string>
+    <string name="avatar_crop_rotate">Xoay</string>
+    <string name="avatar_crop_preview_title">Ảnh đại diện sẽ hiển thị</string>
+    <string name="avatar_crop_use_photo">Sử dụng ảnh</string>
+
+    <string name="avatar_updated_title">Ảnh đại diện</string>
+    <string name="avatar_updated_step">Hoàn tất cập nhật</string>
+    <string name="avatar_updated_heading">Đã cập nhật ảnh đại diện</string>
+    <string name="avatar_updated_desc">Ảnh mới đã được lưu. Người thân sẽ dễ nhận ra tài khoản của cô hơn.</string>
+    <string name="avatar_btn_back_to_account">Về tài khoản của tôi</string>
+
+    <string name="avatar_deleted_heading">Đã xóa ảnh đại diện</string>
+    <string name="avatar_deleted_desc">Tài khoản của cô đã trở về ảnh mặc định. Các thông tin khác vẫn được giữ nguyên.</string>
+    <string name="avatar_deleted_status">Đang dùng ảnh đại diện mặc định</string>
 </resources>

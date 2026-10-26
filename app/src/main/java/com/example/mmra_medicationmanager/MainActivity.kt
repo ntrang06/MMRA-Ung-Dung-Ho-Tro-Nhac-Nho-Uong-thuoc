@@ -7,12 +7,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.example.mmra_medicationmanager.model.InitialSetupPreferences
+import com.example.mmra_medicationmanager.model.UserProfileManager
 import com.example.mmra_medicationmanager.ui.screens.auth.CompletionScreen
 import com.example.mmra_medicationmanager.ui.screens.auth.CreateNewPasswordScreen
 import com.example.mmra_medicationmanager.ui.screens.auth.EmailLoginScreen
@@ -24,6 +28,14 @@ import com.example.mmra_medicationmanager.ui.screens.auth.VerifyEmailScreen
 import com.example.mmra_medicationmanager.ui.screens.auth.VerifyPhoneScreen
 import com.example.mmra_medicationmanager.ui.screens.auth.WelcomeScreen
 import com.example.mmra_medicationmanager.ui.screens.home.HomeScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.AvatarDeletedScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.AvatarOptionsScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.AvatarUpdatedScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.CaptureAvatarScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.CropAvatarScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.GalleryPickerScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.MyAccountScreen
+import com.example.mmra_medicationmanager.ui.screens.profile.ReviewCapturedPhotoScreen
 import com.example.mmra_medicationmanager.ui.screens.setup.SetupDisplayPreferenceScreen
 import com.example.mmra_medicationmanager.ui.screens.setup.SetupTargetUserScreen
 
@@ -41,14 +53,26 @@ enum class AuthDestination {
     INITIAL_SETUP_TARGET,
     INITIAL_SETUP_DISPLAY,
     HOME,
+    MY_ACCOUNT,
+    MY_ACCOUNT_AVATAR_OPTIONS,
+    CAPTURE_AVATAR,
+    REVIEW_CAPTURED_PHOTO,
+    GALLERY_PICKER,
+    CROP_AVATAR,
+    AVATAR_UPDATED_SUCCESS,
+    AVATAR_DELETED_SUCCESS,
 }
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+                Surface(
+                    modifier = Modifier.fillMaxSize()
+                ) {
                     AppNavigation()
                 }
             }
@@ -58,124 +82,213 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppNavigation(
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
-    var currentDestination by rememberSaveable { mutableStateOf(AuthDestination.WELCOME) }
-    var isAuthenticated by rememberSaveable { mutableStateOf(false) }
-    var isInitialSetupCompleted by rememberSaveable { mutableStateOf(false) }
-    var setupPreferences by rememberSaveable { mutableStateOf(InitialSetupPreferences()) }
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        UserProfileManager.init(context)
+    }
+
+    var currentDestination by rememberSaveable {
+        mutableStateOf(AuthDestination.WELCOME)
+    }
+
+    var isAuthenticated by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var isInitialSetupCompleted by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var setupPreferences by remember {
+        mutableStateOf(InitialSetupPreferences())
+    }
 
     fun onAuthenticationSuccess() {
         isAuthenticated = true
-        if (isInitialSetupCompleted) {
-            currentDestination = AuthDestination.HOME
+
+        currentDestination = if (isInitialSetupCompleted) {
+            AuthDestination.HOME
         } else {
-            currentDestination = AuthDestination.INITIAL_SETUP_TARGET
+            AuthDestination.INITIAL_SETUP_TARGET
         }
     }
 
     when (currentDestination) {
+
         AuthDestination.WELCOME -> {
             WelcomeScreen(
                 modifier = modifier,
-                onLoginClick = { currentDestination = AuthDestination.LOGIN },
-                onRegisterClick = { currentDestination = AuthDestination.REGISTER },
+                onLoginClick = {
+                    currentDestination = AuthDestination.LOGIN
+                },
+                onRegisterClick = {
+                    currentDestination = AuthDestination.REGISTER
+                }
             )
         }
+
         AuthDestination.LOGIN -> {
             LoginScreen(
                 modifier = modifier,
-                onBackClick = { currentDestination = AuthDestination.WELCOME },
-                onGoogleSignInClick = { onAuthenticationSuccess() },
-                onPhoneSignInClick = { currentDestination = AuthDestination.PHONE_LOGIN },
-                onEmailSignInClick = { currentDestination = AuthDestination.EMAIL_LOGIN },
-                onRegisterClick = { currentDestination = AuthDestination.REGISTER },
+                onBackClick = {
+                    currentDestination = AuthDestination.WELCOME
+                },
+                onGoogleSignInClick = {
+                    onAuthenticationSuccess()
+                },
+                onPhoneSignInClick = {
+                    currentDestination = AuthDestination.PHONE_LOGIN
+                },
+                onEmailSignInClick = {
+                    currentDestination = AuthDestination.EMAIL_LOGIN
+                },
+                onRegisterClick = {
+                    currentDestination = AuthDestination.REGISTER
+                }
             )
         }
 
         AuthDestination.PHONE_LOGIN -> {
             PhoneLoginScreen(
                 modifier = modifier,
-                onBackClick = { currentDestination = AuthDestination.LOGIN },
-                onLoginClick = { onAuthenticationSuccess() },
-                onOtpLoginClick = { onAuthenticationSuccess() },
-                onForgotPasswordClick = { currentDestination = AuthDestination.FORGOT_PASSWORD },
-                onRegisterClick = { currentDestination = AuthDestination.REGISTER },
+                onBackClick = {
+                    currentDestination = AuthDestination.LOGIN
+                },
+                onLoginClick = {
+                    onAuthenticationSuccess()
+                },
+                onOtpLoginClick = {
+                    onAuthenticationSuccess()
+                },
+                onForgotPasswordClick = {
+                    currentDestination = AuthDestination.FORGOT_PASSWORD
+                },
+                onRegisterClick = {
+                    currentDestination = AuthDestination.REGISTER
+                }
             )
         }
 
         AuthDestination.EMAIL_LOGIN -> {
             EmailLoginScreen(
                 modifier = modifier,
-                onBackClick = { currentDestination = AuthDestination.LOGIN },
-                onLoginClick = { onAuthenticationSuccess() },
-                onOtpLoginClick = { onAuthenticationSuccess() },
-                onGoogleLoginClick = { onAuthenticationSuccess() },
-                onForgotPasswordClick = { currentDestination = AuthDestination.FORGOT_PASSWORD },
-                onRegisterClick = { currentDestination = AuthDestination.REGISTER },
+                onBackClick = {
+                    currentDestination = AuthDestination.LOGIN
+                },
+                onLoginClick = {
+                    onAuthenticationSuccess()
+                },
+                onOtpLoginClick = {
+                    onAuthenticationSuccess()
+                },
+                onGoogleLoginClick = {
+                    onAuthenticationSuccess()
+                },
+                onForgotPasswordClick = {
+                    currentDestination = AuthDestination.FORGOT_PASSWORD
+                },
+                onRegisterClick = {
+                    currentDestination = AuthDestination.REGISTER
+                }
             )
         }
 
         AuthDestination.REGISTER -> {
             RegisterScreen(
                 modifier = modifier,
-                onBackClick = { currentDestination = AuthDestination.LOGIN },
-                onRegisterClick = { currentDestination = AuthDestination.VERIFY_PHONE },
-                onGoogleClick = { onAuthenticationSuccess() },
-                onLoginClick = { currentDestination = AuthDestination.LOGIN },
+                onBackClick = {
+                    currentDestination = AuthDestination.LOGIN
+                },
+                onRegisterClick = {
+                    currentDestination = AuthDestination.VERIFY_PHONE
+                },
+                onGoogleClick = {
+                    onAuthenticationSuccess()
+                },
+                onLoginClick = {
+                    currentDestination = AuthDestination.LOGIN
+                }
             )
         }
 
         AuthDestination.VERIFY_PHONE -> {
             VerifyPhoneScreen(
                 modifier = modifier,
-                onBackClick = { currentDestination = AuthDestination.REGISTER },
-                onVerifyClick = { currentDestination = AuthDestination.VERIFY_EMAIL },
-                onChangePhoneClick = { currentDestination = AuthDestination.REGISTER },
+                onBackClick = {
+                    currentDestination = AuthDestination.REGISTER
+                },
+                onVerifyClick = {
+                    currentDestination = AuthDestination.VERIFY_EMAIL
+                },
+                onChangePhoneClick = {
+                    currentDestination = AuthDestination.REGISTER
+                }
             )
         }
 
         AuthDestination.VERIFY_EMAIL -> {
             VerifyEmailScreen(
                 modifier = modifier,
-                onBackClick = { currentDestination = AuthDestination.VERIFY_PHONE },
-                onVerifyClick = { currentDestination = AuthDestination.COMPLETION },
-                onChangeEmailClick = { currentDestination = AuthDestination.REGISTER },
+                onBackClick = {
+                    currentDestination = AuthDestination.VERIFY_PHONE
+                },
+                onVerifyClick = {
+                    currentDestination = AuthDestination.COMPLETION
+                },
+                onChangeEmailClick = {
+                    currentDestination = AuthDestination.REGISTER
+                }
             )
         }
 
         AuthDestination.FORGOT_PASSWORD -> {
             ForgotPasswordScreen(
                 modifier = modifier,
-                onBackClick = { currentDestination = AuthDestination.LOGIN },
-                onSendCodeClick = { currentDestination = AuthDestination.CREATE_NEW_PASSWORD },
-                onBackToLoginClick = { currentDestination = AuthDestination.LOGIN },
+                onBackClick = {
+                    currentDestination = AuthDestination.LOGIN
+                },
+                onSendCodeClick = {
+                    currentDestination = AuthDestination.CREATE_NEW_PASSWORD
+                },
+                onBackToLoginClick = {
+                    currentDestination = AuthDestination.LOGIN
+                }
             )
         }
 
         AuthDestination.CREATE_NEW_PASSWORD -> {
             CreateNewPasswordScreen(
                 modifier = modifier,
-                onBackClick = { currentDestination = AuthDestination.FORGOT_PASSWORD },
-                onSavePasswordClick = { currentDestination = AuthDestination.COMPLETION },
+                onBackClick = {
+                    currentDestination = AuthDestination.FORGOT_PASSWORD
+                },
+                onSavePasswordClick = {
+                    currentDestination = AuthDestination.COMPLETION
+                }
             )
         }
 
         AuthDestination.COMPLETION -> {
             CompletionScreen(
                 modifier = modifier,
-                onBackClick = { currentDestination = AuthDestination.LOGIN },
+                onBackClick = {
+                    currentDestination = AuthDestination.LOGIN
+                },
                 onContinueClick = {
                     if (isAuthenticated) {
-                        if (isInitialSetupCompleted) {
-                            currentDestination = AuthDestination.HOME
-                        } else {
-                            currentDestination = AuthDestination.INITIAL_SETUP_TARGET
-                        }
+                        currentDestination =
+                            if (isInitialSetupCompleted) {
+                                AuthDestination.HOME
+                            } else {
+                                AuthDestination.INITIAL_SETUP_TARGET
+                            }
                     } else {
                         onAuthenticationSuccess()
                     }
-                },
+                }
             )
         }
 
@@ -184,37 +297,165 @@ fun AppNavigation(
                 modifier = modifier,
                 initialSelectedRoles = setupPreferences.selectedRoles,
                 onBackClick = {
-                    // Do not allow returning to Login/Register screens once authenticated
+                    // Không quay lại Login/Register sau khi đăng nhập.
                 },
                 onContinueClick = { roles ->
-                    setupPreferences = setupPreferences.copy(selectedRoles = roles)
-                    currentDestination = AuthDestination.INITIAL_SETUP_DISPLAY
-                },
+                    setupPreferences = setupPreferences.copy(
+                        selectedRoles = roles
+                    )
+
+                    currentDestination =
+                        AuthDestination.INITIAL_SETUP_DISPLAY
+                }
             )
         }
 
         AuthDestination.INITIAL_SETUP_DISPLAY -> {
             SetupDisplayPreferenceScreen(
                 modifier = modifier,
-                initialLargeText = setupPreferences.isLargeTextEnabled,
-                initialVoiceGuidance = setupPreferences.isVoiceGuidanceEnabled,
+                initialLargeText =
+                    setupPreferences.isLargeTextEnabled,
+                initialVoiceGuidance =
+                    setupPreferences.isVoiceGuidanceEnabled,
                 onBackClick = {
-                    currentDestination = AuthDestination.INITIAL_SETUP_TARGET
+                    currentDestination =
+                        AuthDestination.INITIAL_SETUP_TARGET
                 },
                 onCompleteClick = { isLargeText, isVoiceGuidance ->
                     setupPreferences = setupPreferences.copy(
                         isLargeTextEnabled = isLargeText,
                         isVoiceGuidanceEnabled = isVoiceGuidance
                     )
+
                     isInitialSetupCompleted = true
                     currentDestination = AuthDestination.HOME
-                },
+                }
             )
         }
 
         AuthDestination.HOME -> {
             HomeScreen(
                 modifier = modifier,
+                onProfileClick = {
+                    currentDestination = AuthDestination.MY_ACCOUNT
+                }
+            )
+        }
+
+        AuthDestination.MY_ACCOUNT -> {
+            MyAccountScreen(
+                modifier = modifier,
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                onBackClick = {
+                    currentDestination = AuthDestination.HOME
+                },
+                onAvatarOptionsClick = {
+                    currentDestination = AuthDestination.MY_ACCOUNT_AVATAR_OPTIONS
+                },
+                onLogoutClick = {
+                    isAuthenticated = false
+                    currentDestination = AuthDestination.WELCOME
+                }
+            )
+        }
+
+        AuthDestination.MY_ACCOUNT_AVATAR_OPTIONS -> {
+            AvatarOptionsScreen(
+                modifier = modifier,
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                onTakePhotoClick = {
+                    currentDestination = AuthDestination.CAPTURE_AVATAR
+                },
+                onPickGalleryClick = {
+                    currentDestination = AuthDestination.GALLERY_PICKER
+                },
+                onDeletePhotoClick = {
+                    UserProfileManager.deleteAvatar(context)
+                    currentDestination = AuthDestination.AVATAR_DELETED_SUCCESS
+                },
+                onCancelClick = {
+                    currentDestination = AuthDestination.MY_ACCOUNT
+                }
+            )
+        }
+
+        AuthDestination.CAPTURE_AVATAR -> {
+            CaptureAvatarScreen(
+                modifier = modifier,
+                onBackClick = {
+                    currentDestination = AuthDestination.MY_ACCOUNT_AVATAR_OPTIONS
+                },
+                onPhotoCaptured = { bitmap ->
+                    UserProfileManager.tempCapturedBitmap = bitmap
+                    currentDestination = AuthDestination.REVIEW_CAPTURED_PHOTO
+                },
+                onCancelClick = {
+                    currentDestination = AuthDestination.MY_ACCOUNT_AVATAR_OPTIONS
+                }
+            )
+        }
+
+        AuthDestination.REVIEW_CAPTURED_PHOTO -> {
+            ReviewCapturedPhotoScreen(
+                modifier = modifier,
+                capturedBitmap = UserProfileManager.tempCapturedBitmap,
+                onBackClick = {
+                    currentDestination = AuthDestination.CAPTURE_AVATAR
+                },
+                onContinueCropClick = {
+                    currentDestination = AuthDestination.CROP_AVATAR
+                },
+                onRetakeClick = {
+                    currentDestination = AuthDestination.CAPTURE_AVATAR
+                }
+            )
+        }
+
+        AuthDestination.GALLERY_PICKER -> {
+            GalleryPickerScreen(
+                modifier = modifier,
+                onBackClick = {
+                    currentDestination = AuthDestination.MY_ACCOUNT_AVATAR_OPTIONS
+                },
+                onPhotoSelected = { bitmap ->
+                    UserProfileManager.tempCapturedBitmap = bitmap
+                    currentDestination = AuthDestination.CROP_AVATAR
+                },
+                onCancelClick = {
+                    currentDestination = AuthDestination.MY_ACCOUNT_AVATAR_OPTIONS
+                }
+            )
+        }
+
+        AuthDestination.CROP_AVATAR -> {
+            CropAvatarScreen(
+                modifier = modifier,
+                inputBitmap = UserProfileManager.tempCapturedBitmap,
+                onBackClick = {
+                    currentDestination = AuthDestination.REVIEW_CAPTURED_PHOTO
+                },
+                onConfirmCrop = { croppedBitmap ->
+                    currentDestination = AuthDestination.AVATAR_UPDATED_SUCCESS
+                }
+            )
+        }
+
+        AuthDestination.AVATAR_UPDATED_SUCCESS -> {
+            AvatarUpdatedScreen(
+                modifier = modifier,
+                updatedBitmap = UserProfileManager.currentAvatarBitmap,
+                onBackToAccountClick = {
+                    currentDestination = AuthDestination.MY_ACCOUNT
+                }
+            )
+        }
+
+        AuthDestination.AVATAR_DELETED_SUCCESS -> {
+            AvatarDeletedScreen(
+                modifier = modifier,
+                onBackToAccountClick = {
+                    currentDestination = AuthDestination.MY_ACCOUNT
+                }
             )
         }
     }
