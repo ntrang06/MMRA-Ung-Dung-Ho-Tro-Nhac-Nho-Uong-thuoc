@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -56,6 +57,7 @@ fun NotificationSettingsScreen(
     val infoBgColor = Color(0xFFEFF6F4)
     val iconBoxBgColor = Color(0xFFEFF7F4)
 
+    var notificationsEnabled by remember { mutableStateOf(UserProfileManager.isNotificationsEnabled) }
     var medReminders by remember { mutableStateOf(UserProfileManager.isMedicationReminderEnabled) }
     var familyAlerts by remember { mutableStateOf(UserProfileManager.isFamilyAlertEnabled) }
 
@@ -151,12 +153,90 @@ fun NotificationSettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // Master Toggle: Bật tất cả thông báo
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = if (notificationsEnabled) lightBgColor else Color.White,
+                border = BorderStroke(if (notificationsEnabled) 1.5.dp else 1.dp, if (notificationsEnabled) primaryColor else borderColor),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (notificationsEnabled) primaryColor else iconBoxBgColor,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_bell),
+                                contentDescription = null,
+                                tint = if (notificationsEnabled) Color.White else primaryColor,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text = "Bật thông báo ứng dụng",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = darkTextColor,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (notificationsEnabled) "Đang bật tất cả thông báo" else "Đang tắt toàn bộ thông báo",
+                            fontSize = 13.sp,
+                            color = subTextColor,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Switch(
+                        checked = notificationsEnabled,
+                        onCheckedChange = { notificationsEnabled = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = primaryColor,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = Color(0xFFD0DDD8),
+                            uncheckedBorderColor = Color.Transparent,
+                        ),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Categories Header
+            Text(
+                text = "Danh mục thông báo",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = darkTextColor,
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             // Setting 1: Nhắc uống thuốc
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = Color.White,
                 border = BorderStroke(1.dp, borderColor),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(if (notificationsEnabled) 1f else 0.5f),
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -199,7 +279,7 @@ fun NotificationSettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (medReminders) stringResource(id = R.string.setup_display_status_on) else stringResource(id = R.string.setup_display_status_off),
+                            text = if (medReminders && notificationsEnabled) stringResource(id = R.string.setup_display_status_on) else stringResource(id = R.string.setup_display_status_off),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = primaryColor,
@@ -210,13 +290,16 @@ fun NotificationSettingsScreen(
 
                     Switch(
                         checked = medReminders,
-                        onCheckedChange = { medReminders = it },
+                        onCheckedChange = { if (notificationsEnabled) medReminders = it },
+                        enabled = notificationsEnabled,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = primaryColor,
                             uncheckedThumbColor = Color.White,
                             uncheckedTrackColor = Color(0xFFD0DDD8),
                             uncheckedBorderColor = Color.Transparent,
+                            disabledCheckedThumbColor = Color.LightGray,
+                            disabledCheckedTrackColor = Color(0xFFB0C4BF),
                         ),
                     )
                 }
@@ -229,7 +312,9 @@ fun NotificationSettingsScreen(
                 shape = RoundedCornerShape(16.dp),
                 color = Color.White,
                 border = BorderStroke(1.dp, borderColor),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(if (notificationsEnabled) 1f else 0.5f),
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -272,7 +357,7 @@ fun NotificationSettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (familyAlerts) stringResource(id = R.string.setup_display_status_on) else stringResource(id = R.string.setup_display_status_off),
+                            text = if (familyAlerts && notificationsEnabled) stringResource(id = R.string.setup_display_status_on) else stringResource(id = R.string.setup_display_status_off),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = primaryColor,
@@ -283,13 +368,16 @@ fun NotificationSettingsScreen(
 
                     Switch(
                         checked = familyAlerts,
-                        onCheckedChange = { familyAlerts = it },
+                        onCheckedChange = { if (notificationsEnabled) familyAlerts = it },
+                        enabled = notificationsEnabled,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = primaryColor,
                             uncheckedThumbColor = Color.White,
                             uncheckedTrackColor = Color(0xFFD0DDD8),
                             uncheckedBorderColor = Color.Transparent,
+                            disabledCheckedThumbColor = Color.LightGray,
+                            disabledCheckedTrackColor = Color(0xFFB0C4BF),
                         ),
                     )
                 }
@@ -300,6 +388,7 @@ fun NotificationSettingsScreen(
             // Primary Button: Lưu cài đặt
             Button(
                 onClick = {
+                    UserProfileManager.isNotificationsEnabled = notificationsEnabled
                     UserProfileManager.isMedicationReminderEnabled = medReminders
                     UserProfileManager.isFamilyAlertEnabled = familyAlerts
                     UserProfileManager.saveProfileInfo(context)

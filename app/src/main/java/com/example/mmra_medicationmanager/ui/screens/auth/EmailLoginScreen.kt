@@ -55,8 +55,9 @@ fun EmailLoginScreen(
     onRegisterClick: () -> Unit = {},
 ) {
     var email by remember { mutableStateOf("lan.nguyen@gmail.com") }
-    var password by remember { mutableStateOf("•••••••••") }
+    var password by remember { mutableStateOf("Password123") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val primaryColor = Color(0xFF0F5B51)
     val lightBgColor = Color(0xFFE0F0EC)
@@ -147,7 +148,10 @@ fun EmailLoginScreen(
 
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = {
+                            email = it
+                            errorMessage = null
+                        },
                         placeholder = {
                             Text(
                                 text = stringResource(id = R.string.hint_email),
@@ -176,7 +180,10 @@ fun EmailLoginScreen(
 
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = {
+                            password = it
+                            errorMessage = null
+                        },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -197,6 +204,16 @@ fun EmailLoginScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
+                    if (errorMessage != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = errorMessage!!,
+                            fontSize = 13.sp,
+                            color = Color(0xFFD32F2F),
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Text(
@@ -214,7 +231,18 @@ fun EmailLoginScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = onLoginClick,
+                onClick = {
+                    val cleanEmail = email.trim()
+                    if (cleanEmail.isEmpty() || !cleanEmail.contains("@")) {
+                        errorMessage = "Vui lòng nhập địa chỉ email hợp lệ."
+                    } else if (password.length < 8) {
+                        errorMessage = "Mật khẩu phải có ít nhất 8 ký tự."
+                    } else if (cleanEmail.lowercase() == "lan.nguyen@gmail.com" && password == "Password123") {
+                        onLoginClick()
+                    } else {
+                        errorMessage = "Email hoặc mật khẩu không đúng.\n(Gợi ý test: lan.nguyen@gmail.com / Password123)"
+                    }
+                },
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                 modifier = Modifier

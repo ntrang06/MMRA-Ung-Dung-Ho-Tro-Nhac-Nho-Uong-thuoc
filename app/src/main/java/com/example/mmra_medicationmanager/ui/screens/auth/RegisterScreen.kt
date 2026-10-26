@@ -54,10 +54,11 @@ fun RegisterScreen(
     onLoginClick: () -> Unit = {},
 ) {
     var fullName by remember { mutableStateOf("Nguyễn Thị Lan") }
-    var phoneNumber by remember { mutableStateOf("0912 345 678") }
+    var phoneNumber by remember { mutableStateOf("0912345678") }
     var email by remember { mutableStateOf("lan.nguyen@gmail.com") }
-    var password by remember { mutableStateOf("•••••••••") }
+    var password by remember { mutableStateOf("Password123") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val primaryColor = Color(0xFF0F5B51)
     val lightBgColor = Color(0xFFE0F0EC)
@@ -148,7 +149,10 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = fullName,
-                        onValueChange = { fullName = it },
+                        onValueChange = {
+                            fullName = it
+                            errorMessage = null
+                        },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = borderColor,
@@ -169,7 +173,10 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = phoneNumber,
-                        onValueChange = { phoneNumber = it },
+                        onValueChange = {
+                            phoneNumber = it
+                            errorMessage = null
+                        },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = borderColor,
@@ -190,7 +197,10 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = {
+                            email = it
+                            errorMessage = null
+                        },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = borderColor,
@@ -211,7 +221,10 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = {
+                            password = it
+                            errorMessage = null
+                        },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -231,6 +244,16 @@ fun RegisterScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
+
+                    if (errorMessage != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = errorMessage!!,
+                            fontSize = 13.sp,
+                            color = Color(0xFFD32F2F),
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
                 }
             }
 
@@ -266,7 +289,25 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             Button(
-                onClick = onRegisterClick,
+                onClick = {
+                    val cleanName = fullName.trim()
+                    val cleanPhone = phoneNumber.replace(" ", "").trim()
+                    val cleanEmail = email.trim()
+
+                    if (cleanName.isEmpty()) {
+                        errorMessage = "Vui lòng nhập họ và tên."
+                    } else if (cleanPhone.isEmpty() || cleanPhone.length < 9) {
+                        errorMessage = "Vui lòng nhập số điện thoại hợp lệ."
+                    } else if (cleanEmail.isEmpty() || !cleanEmail.contains("@")) {
+                        errorMessage = "Vui lòng nhập địa chỉ email hợp lệ."
+                    } else if (cleanEmail.lowercase() == "taken@gmail.com") {
+                        errorMessage = "Email này đã được đăng ký trong hệ thống."
+                    } else if (password.length < 8) {
+                        errorMessage = "Mật khẩu phải có ít nhất 8 ký tự."
+                    } else {
+                        onRegisterClick()
+                    }
+                },
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                 modifier = Modifier

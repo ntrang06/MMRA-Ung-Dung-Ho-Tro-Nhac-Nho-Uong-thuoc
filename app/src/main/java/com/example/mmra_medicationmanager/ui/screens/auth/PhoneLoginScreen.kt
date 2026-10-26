@@ -53,9 +53,10 @@ fun PhoneLoginScreen(
     onForgotPasswordClick: () -> Unit = {},
     onRegisterClick: () -> Unit = {},
 ) {
-    var phoneNumber by remember { mutableStateOf("0912 345 678") }
-    var password by remember { mutableStateOf("•••••••••") }
+    var phoneNumber by remember { mutableStateOf("0912345678") }
+    var password by remember { mutableStateOf("Password123") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val primaryColor = Color(0xFF0F5B51)
     val lightBgColor = Color(0xFFE0F0EC)
@@ -176,7 +177,10 @@ fun PhoneLoginScreen(
 
                     OutlinedTextField(
                         value = phoneNumber,
-                        onValueChange = { phoneNumber = it },
+                        onValueChange = {
+                            phoneNumber = it
+                            errorMessage = null
+                        },
                         placeholder = {
                             Text(
                                 text = stringResource(id = R.string.hint_phone),
@@ -213,7 +217,10 @@ fun PhoneLoginScreen(
 
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = {
+                            password = it
+                            errorMessage = null
+                        },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -234,6 +241,16 @@ fun PhoneLoginScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
+                    if (errorMessage != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = errorMessage!!,
+                            fontSize = 13.sp,
+                            color = Color(0xFFD32F2F),
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Text(
@@ -251,7 +268,18 @@ fun PhoneLoginScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = onLoginClick,
+                onClick = {
+                    val cleanPhone = phoneNumber.replace(" ", "").trim()
+                    if (cleanPhone.isEmpty() || cleanPhone.length < 9) {
+                        errorMessage = "Vui lòng nhập số điện thoại hợp lệ."
+                    } else if (password.length < 8) {
+                        errorMessage = "Mật khẩu phải có ít nhất 8 ký tự."
+                    } else if ((cleanPhone == "0912345678" || cleanPhone == "+84912345678") && password == "Password123") {
+                        onLoginClick()
+                    } else {
+                        errorMessage = "Số điện thoại hoặc mật khẩu không đúng.\n(Gợi ý test: 0912345678 / Password123)"
+                    }
+                },
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                 modifier = Modifier

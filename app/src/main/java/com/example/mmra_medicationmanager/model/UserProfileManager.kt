@@ -22,6 +22,9 @@ object UserProfileManager {
     private const val KEY_VOICE_VOLUME = "voice_volume"
     private const val KEY_MED_REMINDERS = "is_med_reminders"
     private const val KEY_FAMILY_ALERTS = "is_family_alerts"
+    private const val KEY_NOTIFICATIONS_ENABLED = "is_notifications_enabled"
+    private const val KEY_IS_LOGGED_IN = "is_logged_in"
+    private const val KEY_SETUP_COMPLETED = "is_setup_completed"
 
     private const val AVATAR_FILENAME = "user_avatar.jpg"
 
@@ -35,6 +38,7 @@ object UserProfileManager {
     var voiceVolume by mutableFloatStateOf(0.7f)
     var isMedicationReminderEnabled by mutableStateOf(true)
     var isFamilyAlertEnabled by mutableStateOf(true)
+    var isNotificationsEnabled by mutableStateOf(true)
 
     // In-memory state for current avatar Bitmap (reloaded on launch/save/delete)
     var currentAvatarBitmap by mutableStateOf<Bitmap?>(null)
@@ -54,8 +58,29 @@ object UserProfileManager {
         voiceVolume = prefs.getFloat(KEY_VOICE_VOLUME, 0.7f)
         isMedicationReminderEnabled = prefs.getBoolean(KEY_MED_REMINDERS, true)
         isFamilyAlertEnabled = prefs.getBoolean(KEY_FAMILY_ALERTS, true)
+        isNotificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)
 
         currentAvatarBitmap = getAvatarBitmap(context)
+    }
+
+    fun isLoggedIn(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_IS_LOGGED_IN, false)
+    }
+
+    fun setLoggedIn(context: Context, loggedIn: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_IS_LOGGED_IN, loggedIn).apply()
+    }
+
+    fun isSetupCompleted(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_SETUP_COMPLETED, false)
+    }
+
+    fun setSetupCompleted(context: Context, completed: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_SETUP_COMPLETED, completed).apply()
     }
 
     fun saveProfileInfo(context: Context) {
@@ -69,6 +94,7 @@ object UserProfileManager {
             .putFloat(KEY_VOICE_VOLUME, voiceVolume)
             .putBoolean(KEY_MED_REMINDERS, isMedicationReminderEnabled)
             .putBoolean(KEY_FAMILY_ALERTS, isFamilyAlertEnabled)
+            .putBoolean(KEY_NOTIFICATIONS_ENABLED, isNotificationsEnabled)
             .apply()
     }
 

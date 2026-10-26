@@ -106,10 +106,6 @@ fun AppNavigation(
 ) {
     val context = LocalContext.current
 
-    LaunchedEffect(Unit) {
-        UserProfileManager.init(context)
-    }
-
     var currentDestination by rememberSaveable {
         mutableStateOf(AuthDestination.WELCOME)
     }
@@ -126,8 +122,23 @@ fun AppNavigation(
         mutableStateOf(InitialSetupPreferences())
     }
 
+    LaunchedEffect(Unit) {
+        UserProfileManager.init(context)
+        val loggedIn = UserProfileManager.isLoggedIn(context)
+        val setupDone = UserProfileManager.isSetupCompleted(context)
+        isAuthenticated = loggedIn
+        isInitialSetupCompleted = setupDone
+
+        currentDestination = if (loggedIn) {
+            if (setupDone) AuthDestination.HOME else AuthDestination.INITIAL_SETUP_TARGET
+        } else {
+            AuthDestination.WELCOME
+        }
+    }
+
     fun onAuthenticationSuccess() {
         isAuthenticated = true
+        UserProfileManager.setLoggedIn(context, true)
 
         currentDestination = if (isInitialSetupCompleted) {
             AuthDestination.HOME
@@ -348,6 +359,8 @@ fun AppNavigation(
                     )
 
                     isInitialSetupCompleted = true
+                    UserProfileManager.setSetupCompleted(context, true)
+                    UserProfileManager.setLoggedIn(context, true)
                     currentDestination = AuthDestination.HOME
                 }
             )
@@ -598,6 +611,7 @@ fun AppNavigation(
                 onCancelClick = { currentDestination = AuthDestination.MY_ACCOUNT },
                 onConfirmLogout = {
                     isAuthenticated = false
+                    UserProfileManager.setLoggedIn(context, false)
                     currentDestination = AuthDestination.WELCOME
                 }
             )
