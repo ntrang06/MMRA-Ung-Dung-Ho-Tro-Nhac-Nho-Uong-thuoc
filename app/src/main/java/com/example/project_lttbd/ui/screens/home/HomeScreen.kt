@@ -16,10 +16,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.mmra_medicationmanager.model.UserProfileManager
 import com.example.project_lttbd.data.mock.MockDoseAction
 import com.example.project_lttbd.data.mock.MockDoseActions
 import com.example.project_lttbd.data.mock.MockReminderDoses
+import com.example.project_lttbd.data.model.UserProfileManager
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -103,6 +103,7 @@ fun HomeScreen(
             greeting = "Chào buổi sáng, cô Lan",
             dateText = todayText,
             initials = UserProfileManager.getInitials(),
+            avatarBitmap = UserProfileManager.currentAvatarBitmap,
             onNotificationsClick = {
                 // Chờ ghép phần thông báo của nhóm.
             },

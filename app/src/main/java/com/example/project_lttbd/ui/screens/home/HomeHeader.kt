@@ -1,9 +1,13 @@
 package com.example.project_lttbd.ui.screens.home
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -20,7 +24,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,7 +38,8 @@ fun HomeHeader(
     initials: String,
     onNotificationsClick: () -> Unit,
     onAccountClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    avatarBitmap: Bitmap? = null
 ) {
     Row(
         modifier = modifier
@@ -101,19 +108,29 @@ fun HomeHeader(
                         shape = CircleShape,
                         color = Color(0xFFD9EEEA)
                     ) {
-                        androidx.compose.foundation.layout.Box(
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = initials,
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontSize = 18.sp,
-                                    lineHeight = 22.sp,
-                                    letterSpacing = 0.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = Color(0xFF126B62)
+                        if (avatarBitmap != null) {
+                            Image(
+                                bitmap = avatarBitmap.asImageBitmap(),
+                                contentDescription = "Ảnh đại diện",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
                             )
+                        } else {
+                            Box(
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = initials,
+                                    style = MaterialTheme.typography
+                                        .titleMedium.copy(
+                                            fontSize = 18.sp,
+                                            lineHeight = 22.sp,
+                                            letterSpacing = 0.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                    color = Color(0xFF126B62)
+                                )
+                            }
                         }
                     }
 
@@ -134,35 +151,61 @@ fun HomeHeader(
 }
 
 @Composable
-private fun NotificationBell(modifier: Modifier = Modifier) {
+private fun NotificationBell(
+    modifier: Modifier = Modifier
+) {
     Canvas(modifier = modifier) {
         val scaleX = size.width / 24f
         val scaleY = size.height / 24f
         val bellColor = Color(0xFF102A2A)
 
         val outline = Path().apply {
-            moveTo(18 * scaleX, 8 * scaleY)
-            cubicTo(
-                18 * scaleX, 4.7f * scaleY,
-                15.3f * scaleX, 2 * scaleY,
-                12 * scaleX, 2 * scaleY
+            moveTo(
+                18 * scaleX,
+                8 * scaleY
             )
+
             cubicTo(
-                8.7f * scaleX, 2 * scaleY,
-                6 * scaleX, 4.7f * scaleY,
-                6 * scaleX, 8 * scaleY
+                18 * scaleX,
+                4.7f * scaleY,
+                15.3f * scaleX,
+                2 * scaleY,
+                12 * scaleX,
+                2 * scaleY
             )
+
             cubicTo(
-                6 * scaleX, 15 * scaleY,
-                3 * scaleX, 15 * scaleY,
-                3 * scaleX, 17 * scaleY
+                8.7f * scaleX,
+                2 * scaleY,
+                6 * scaleX,
+                4.7f * scaleY,
+                6 * scaleX,
+                8 * scaleY
             )
-            lineTo(21 * scaleX, 17 * scaleY)
+
             cubicTo(
-                21 * scaleX, 15 * scaleY,
-                18 * scaleX, 15 * scaleY,
-                18 * scaleX, 8 * scaleY
+                6 * scaleX,
+                15 * scaleY,
+                3 * scaleX,
+                15 * scaleY,
+                3 * scaleX,
+                17 * scaleY
             )
+
+            lineTo(
+                21 * scaleX,
+                17 * scaleY
+            )
+
+            cubicTo(
+                21 * scaleX,
+                15 * scaleY,
+                18 * scaleX,
+                15 * scaleY,
+                18 * scaleX,
+                8 * scaleY
+            )
+
             close()
         }
 
@@ -177,8 +220,14 @@ private fun NotificationBell(modifier: Modifier = Modifier) {
 
         drawLine(
             color = bellColor,
-            start = Offset(10 * scaleX, 21 * scaleY),
-            end = Offset(14 * scaleX, 21 * scaleY),
+            start = Offset(
+                10 * scaleX,
+                21 * scaleY
+            ),
+            end = Offset(
+                14 * scaleX,
+                21 * scaleY
+            ),
             strokeWidth = 1.8.dp.toPx(),
             cap = StrokeCap.Round
         )

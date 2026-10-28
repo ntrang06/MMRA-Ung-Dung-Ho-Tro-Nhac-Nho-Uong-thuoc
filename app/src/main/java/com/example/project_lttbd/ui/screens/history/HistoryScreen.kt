@@ -24,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.mmra_medicationmanager.model.UserProfileManager
+import com.example.project_lttbd.data.model.UserProfileManager
 import com.example.project_lttbd.data.mock.*
 import com.example.project_lttbd.ui.components.MMRATextField
 import com.example.project_lttbd.ui.components.rememberUiNow
