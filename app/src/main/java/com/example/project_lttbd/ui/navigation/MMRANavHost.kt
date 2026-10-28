@@ -670,17 +670,38 @@ fun MMRANavHost(
             )
         }
 
-        composable(MMRADestinations.SCAN) {
+        composable(MMRADestinations.SCAN) { scanEntry ->
             ScanScreen(
-                onNavigateToAddMedicine = { _, _ ->
-                    navController.navigate(MMRADestinations.MANUAL_MEDICINE)
+                onNavigateToSchedule = { draft ->
+                    scanEntry.savedStateHandle[
+                        MANUAL_MEDICINE_DRAFT_KEY
+                    ] = Bundle().apply {
+                        putString("medicineName", draft.medicineName)
+                        putString("strength", draft.strength)
+                        putString("strengthUnit", draft.strengthUnit)
+                        putString("dosageForm", draft.dosageForm)
+                        putString("note", draft.note)
+                        putString("imageUri", draft.imageUri)
+                    }
+
+                    navController.navigate(
+                        MMRADestinations.SCHEDULE_SETUP
+                    ) {
+                        launchSingleTop = true
+                    }
                 },
                 onNavigateToManualInput = {
-                    navController.navigate(MMRADestinations.MANUAL_MEDICINE)
+                    navController.navigate(
+                        MMRADestinations.MANUAL_MEDICINE
+                    )
                 },
                 onClose = {
                     if (!navController.popBackStack()) {
-                        navController.navigate(MMRADestinations.HOME)
+                        navController.navigate(
+                            MMRADestinations.HOME
+                        ) {
+                            launchSingleTop = true
+                        }
                     }
                 }
             )

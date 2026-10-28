@@ -84,10 +84,9 @@ fun ScanProcessingScreen(
                     )
                 )
                 Text(
-                    text = "Bước 1 / 3 • Đang phân tích ảnh",
+                    text = "Vui lòng chờ trong giây lát.",
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = MaterialTheme.colorScheme.secondary,
-                        fontSize = 11.sp
+                        color = Color(0xFF6B7280)
                     )
                 )
             }
