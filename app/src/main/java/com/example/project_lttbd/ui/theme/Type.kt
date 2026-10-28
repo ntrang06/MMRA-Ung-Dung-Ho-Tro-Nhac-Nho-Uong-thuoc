@@ -5,7 +5,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.Font
-import com.example.mmra_medicationmanager.R
+import com.example.project_lttbd.R
 import androidx.compose.ui.unit.sp
 
 val InterFontFamily = FontFamily(

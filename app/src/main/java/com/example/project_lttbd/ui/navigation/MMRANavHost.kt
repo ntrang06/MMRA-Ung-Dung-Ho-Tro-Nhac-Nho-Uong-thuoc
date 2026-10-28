@@ -21,38 +21,38 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.mmra_medicationmanager.model.InitialSetupPreferences
-import com.example.mmra_medicationmanager.model.UserProfileManager
-import com.example.mmra_medicationmanager.ui.screens.auth.CompletionScreen
-import com.example.mmra_medicationmanager.ui.screens.auth.CreateNewPasswordScreen
-import com.example.mmra_medicationmanager.ui.screens.auth.EmailLoginScreen
-import com.example.mmra_medicationmanager.ui.screens.auth.ForgotPasswordScreen
-import com.example.mmra_medicationmanager.ui.screens.auth.LoginScreen
-import com.example.mmra_medicationmanager.ui.screens.auth.PhoneLoginScreen
-import com.example.mmra_medicationmanager.ui.screens.auth.RegisterScreen
-import com.example.mmra_medicationmanager.ui.screens.auth.VerifyEmailScreen
-import com.example.mmra_medicationmanager.ui.screens.auth.VerifyPhoneScreen
-import com.example.mmra_medicationmanager.ui.screens.auth.WelcomeScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.AccessibilitySettingsScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.AvatarDeletedScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.AvatarOptionsScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.AvatarUpdatedScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.CaptureAvatarScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.ChangePasswordScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.CropAvatarScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.EditEmailScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.EditNameScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.EditPhoneScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.GalleryPickerScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.LogoutConfirmationScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.ManageUsageModeScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.MyAccountScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.NotificationSettingsScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.ReviewCapturedPhotoScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.SwitchAccountScreen
-import com.example.mmra_medicationmanager.ui.screens.profile.VoiceGuidanceSettingsScreen
-import com.example.mmra_medicationmanager.ui.screens.setup.SetupDisplayPreferenceScreen
-import com.example.mmra_medicationmanager.ui.screens.setup.SetupTargetUserScreen
+import com.example.project_lttbd.data.model.InitialSetupPreferences
+import com.example.project_lttbd.data.model.UserProfileManager
+import com.example.project_lttbd.ui.screens.auth.CompletionScreen
+import com.example.project_lttbd.ui.screens.auth.CreateNewPasswordScreen
+import com.example.project_lttbd.ui.screens.auth.EmailLoginScreen
+import com.example.project_lttbd.ui.screens.auth.ForgotPasswordScreen
+import com.example.project_lttbd.ui.screens.auth.LoginScreen
+import com.example.project_lttbd.ui.screens.auth.PhoneLoginScreen
+import com.example.project_lttbd.ui.screens.auth.RegisterScreen
+import com.example.project_lttbd.ui.screens.auth.VerifyEmailScreen
+import com.example.project_lttbd.ui.screens.auth.VerifyPhoneScreen
+import com.example.project_lttbd.ui.screens.auth.WelcomeScreen
+import com.example.project_lttbd.ui.screens.account.AccessibilitySettingsScreen
+import com.example.project_lttbd.ui.screens.account.AvatarDeletedScreen
+import com.example.project_lttbd.ui.screens.account.AvatarOptionsScreen
+import com.example.project_lttbd.ui.screens.account.AvatarUpdatedScreen
+import com.example.project_lttbd.ui.screens.account.CaptureAvatarScreen
+import com.example.project_lttbd.ui.screens.account.ChangePasswordScreen
+import com.example.project_lttbd.ui.screens.account.CropAvatarScreen
+import com.example.project_lttbd.ui.screens.account.EditEmailScreen
+import com.example.project_lttbd.ui.screens.account.EditNameScreen
+import com.example.project_lttbd.ui.screens.account.EditPhoneScreen
+import com.example.project_lttbd.ui.screens.account.GalleryPickerScreen
+import com.example.project_lttbd.ui.screens.account.LogoutConfirmationScreen
+import com.example.project_lttbd.ui.screens.account.ManageUsageModeScreen
+import com.example.project_lttbd.ui.screens.account.MyAccountScreen
+import com.example.project_lttbd.ui.screens.account.NotificationSettingsScreen
+import com.example.project_lttbd.ui.screens.account.ReviewCapturedPhotoScreen
+import com.example.project_lttbd.ui.screens.account.SwitchAccountScreen
+import com.example.project_lttbd.ui.screens.account.VoiceGuidanceSettingsScreen
+import com.example.project_lttbd.ui.screens.setup.SetupDisplayPreferenceScreen
+import com.example.project_lttbd.ui.screens.setup.SetupTargetUserScreen
 import com.example.project_lttbd.data.mock.MockCalendar
 import com.example.project_lttbd.data.mock.MockDoseAction
 import com.example.project_lttbd.data.mock.MockDoseActions
@@ -549,6 +549,11 @@ fun MMRANavHost(
                 },
                 onViewDoseClick = {
                     navController.openReminder(it)
+                },
+                onAccountClick = {
+                    navController.navigate(MMRADestinations.MY_ACCOUNT) {
+                        launchSingleTop = true
+                    }
                 }
             )
         }

@@ -22,7 +22,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.mmra_medicationmanager.R
+import com.example.project_lttbd.R
 
 @Composable
 fun ScheduleHeader(
