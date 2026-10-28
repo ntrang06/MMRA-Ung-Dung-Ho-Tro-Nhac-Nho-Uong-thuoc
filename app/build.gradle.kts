@@ -4,13 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.mmra_medicationmanager"
+    namespace = "com.example.project_lttbd"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.mmra_medicationmanager"
+        applicationId = "com.example.project_lttbd"
         minSdk = 24
         targetSdk = 37
         versionCode = 1
