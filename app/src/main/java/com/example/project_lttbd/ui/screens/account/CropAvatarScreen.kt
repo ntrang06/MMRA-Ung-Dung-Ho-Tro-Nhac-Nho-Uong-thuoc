@@ -1,53 +1,33 @@
 package com.example.project_lttbd.ui.screens.account
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
+import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.Path
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -55,358 +35,562 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.project_lttbd.R
 import com.example.project_lttbd.data.model.UserProfileManager
+import kotlin.math.min
+
+private const val AVATAR_CROP_FRACTION = 0.84f
 
 @Composable
 fun CropAvatarScreen(
     modifier: Modifier = Modifier,
     inputBitmap: Bitmap? = UserProfileManager.tempCapturedBitmap,
     onBackClick: () -> Unit = {},
-    onConfirmCrop: (Bitmap) -> Unit = {},
+    onConfirmCrop: (Bitmap) -> Unit = {}
 ) {
-    val context = LocalContext.current
     val primaryColor = Color(0xFF0F5B51)
     val lightBgColor = Color(0xFFE0F0EC)
     val darkTextColor = Color(0xFF0A3C35)
     val subTextColor = Color(0xFF5A6E6A)
     val borderColor = Color(0xFFE2E8E6)
 
-    var zoomScale by remember { mutableFloatStateOf(1.0f) }
-    var rotationAngle by remember { mutableFloatStateOf(0f) }
+    var rotation by remember(inputBitmap) {
+        mutableIntStateOf(0)
+    }
+    var zoomScale by remember(inputBitmap) {
+        mutableFloatStateOf(1f)
+    }
+    var cropOffset by remember(inputBitmap) {
+        mutableStateOf(Offset.Zero)
+    }
+    var editorSide by remember {
+        mutableFloatStateOf(0f)
+    }
+    var isSaving by remember(inputBitmap) {
+        mutableStateOf(false)
+    }
+    var errorMessage by remember(inputBitmap) {
+        mutableStateOf<String?>(null)
+    }
+
+    val rotatedBitmap = remember(inputBitmap, rotation) {
+        inputBitmap?.let { source ->
+            if (rotation == 0) {
+                source
+            } else {
+                Bitmap.createBitmap(
+                    source,
+                    0,
+                    0,
+                    source.width,
+                    source.height,
+                    Matrix().apply {
+                        postRotate(rotation.toFloat())
+                    },
+                    true
+                )
+            }
+        }
+    }
+
+    fun boundedOffset(
+        proposed: Offset,
+        zoom: Float
+    ): Offset {
+        val bitmap = rotatedBitmap ?: return Offset.Zero
+        val shortest = min(bitmap.width, bitmap.height).toFloat()
+
+        val maxX = (
+                bitmap.width / shortest * zoom - 1f
+                ).coerceAtLeast(0f) / 2f
+
+        val maxY = (
+                bitmap.height / shortest * zoom - 1f
+                ).coerceAtLeast(0f) / 2f
+
+        return Offset(
+            x = proposed.x.coerceIn(-maxX, maxX),
+            y = proposed.y.coerceIn(-maxY, maxY)
+        )
+    }
+
+    fun changeZoom(newZoom: Float) {
+        zoomScale = newZoom.coerceIn(1f, 3f)
+        cropOffset = boundedOffset(cropOffset, zoomScale)
+    }
 
     Surface(
         modifier = modifier.fillMaxSize(),
-        color = Color(0xFFFAFDFB),
+        color = Color(0xFFFAFDFB)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
-            // Header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Surface(
+                    onClick = onBackClick,
                     shape = CircleShape,
                     color = lightBgColor,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clickable { onBackClick() },
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize()
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_back),
-                            contentDescription = stringResource(id = R.string.cd_back_button),
+                            painter = painterResource(R.drawable.ic_back),
+                            contentDescription = "Quay lại",
                             tint = primaryColor,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(Modifier.width(16.dp))
 
                 Column {
                     Text(
-                        text = stringResource(id = R.string.avatar_crop_title),
+                        text = "Cắt ảnh đại diện",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = darkTextColor,
+                        color = darkTextColor
                     )
                     Text(
-                        text = stringResource(id = R.string.avatar_crop_step),
+                        text = "Căn chỉnh trước khi lưu",
                         fontSize = 13.sp,
-                        color = subTextColor,
+                        color = subTextColor
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(Modifier.height(20.dp))
 
             Text(
-                text = stringResource(id = R.string.avatar_crop_instruction),
+                text = "Kéo để căn ảnh, dùng hai ngón tay " +
+                        "để phóng to hoặc dùng thanh bên dưới.",
                 fontSize = 14.sp,
                 color = subTextColor,
-                lineHeight = 20.sp,
+                lineHeight = 20.sp
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(Modifier.height(20.dp))
 
-            // Crop Box Area
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = Color(0xFF38524B),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f),
+                    .aspectRatio(1f)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    // Image with transform gestures
-                    if (inputBitmap != null) {
-                        Image(
-                            bitmap = inputBitmap.asImageBitmap(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer(
-                                    scaleX = zoomScale,
-                                    scaleY = zoomScale,
-                                    rotationZ = rotationAngle,
-                                )
-                                .pointerInput(Unit) {
-                                    detectTransformGestures { _, _, zoom, _ ->
-                                        zoomScale = (zoomScale * zoom).coerceIn(0.8f, 3.0f)
-                                    }
-                                },
-                        )
-                    } else {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFFB5D4CC),
-                            modifier = Modifier.size(200.dp),
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize(),
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_user),
-                                    contentDescription = null,
-                                    tint = primaryColor,
-                                    modifier = Modifier.size(100.dp),
-                                )
-                            }
-                        }
-                    }
+                val bitmap = rotatedBitmap
 
-                    // Circle Crop Guide Overlay
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.Transparent,
-                        border = BorderStroke(2.dp, Color.White),
-                        modifier = Modifier.size(240.dp),
-                    ) {}
+                if (bitmap != null) {
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clipToBounds()
+                            .onSizeChanged {
+                                editorSide = it.width.toFloat()
+                            }
+                            .pointerInput(bitmap, editorSide) {
+                                detectTransformGestures {
+                                        _, pan, zoom, _ ->
+                                    val newZoom =
+                                        (zoomScale * zoom)
+                                            .coerceIn(1f, 3f)
+
+                                    val relativePan =
+                                        if (editorSide > 0f) {
+                                            Offset(
+                                                pan.x / editorSide,
+                                                pan.y / editorSide
+                                            )
+                                        } else {
+                                            Offset.Zero
+                                        }
+
+                                    zoomScale = newZoom
+                                    cropOffset = boundedOffset(
+                                        cropOffset + relativePan,
+                                        newZoom
+                                    )
+                                }
+                            }
+                    ) {
+                        val side = size.minDimension
+
+                        drawIntoCanvas { canvas ->
+                            drawAvatarSource(
+                                canvas = canvas.nativeCanvas,
+                                source = bitmap,
+                                viewportSide = side,
+                                zoom = zoomScale,
+                                offset = cropOffset
+                            )
+                        }
+
+                        val radius =
+                            side * AVATAR_CROP_FRACTION / 2f
+
+                        val center = Offset(side / 2f, side / 2f)
+
+                        val overlay = Path().apply {
+                            fillType = PathFillType.EvenOdd
+
+                            addRect(
+                                Rect(0f, 0f, side, side)
+                            )
+
+                            addOval(
+                                Rect(
+                                    center.x - radius,
+                                    center.y - radius,
+                                    center.x + radius,
+                                    center.y + radius
+                                )
+                            )
+                        }
+
+                        drawPath(
+                            path = overlay,
+                            color = Color.Black.copy(alpha = 0.45f)
+                        )
+
+                        drawCircle(
+                            color = Color.White,
+                            radius = radius,
+                            center = center,
+                            style = Stroke(width = 2.dp.toPx())
+                        )
+                    }
+                } else {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp)
+                    ) {
+                        Text(
+                            text = "Chưa có ảnh để cắt. " +
+                                    "Hãy quay lại chụp hoặc chọn ảnh.",
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // Zoom & Rotate Controls
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "—",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = darkTextColor,
-                    modifier = Modifier
-                        .clickable { zoomScale = (zoomScale - 0.2f).coerceAtLeast(0.8f) }
-                        .padding(horizontal = 8.dp),
-                )
+                IconButton(
+                    onClick = {
+                        changeZoom(zoomScale - 0.2f)
+                    },
+                    enabled = rotatedBitmap != null && !isSaving
+                ) {
+                    Text(
+                        text = "−",
+                        fontSize = 24.sp,
+                        color = primaryColor
+                    )
+                }
 
                 Slider(
                     value = zoomScale,
-                    onValueChange = { zoomScale = it },
-                    valueRange = 0.8f..3.0f,
+                    onValueChange = { changeZoom(it) },
+                    valueRange = 1f..3f,
+                    enabled = rotatedBitmap != null && !isSaving,
                     colors = SliderDefaults.colors(
                         thumbColor = primaryColor,
                         activeTrackColor = primaryColor,
-                        inactiveTrackColor = Color(0xFFE2E8E6),
+                        inactiveTrackColor = Color(0xFFE2E8E6)
                     ),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f)
                 )
 
-                Text(
-                    text = "+",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = darkTextColor,
-                    modifier = Modifier
-                        .clickable { zoomScale = (zoomScale + 0.2f).coerceAtMost(3.0f) }
-                        .padding(horizontal = 8.dp),
-                )
+                IconButton(
+                    onClick = {
+                        changeZoom(zoomScale + 0.2f)
+                    },
+                    enabled = rotatedBitmap != null && !isSaving
+                ) {
+                    Text(
+                        text = "+",
+                        fontSize = 24.sp,
+                        color = primaryColor
+                    )
+                }
 
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // Rotate Button
                 Surface(
+                    onClick = {
+                        rotation = (rotation + 90) % 360
+                        zoomScale = 1f
+                        cropOffset = Offset.Zero
+                    },
+                    enabled = rotatedBitmap != null && !isSaving,
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFEFF7F4),
-                    modifier = Modifier
-                        .clickable { rotationAngle = (rotationAngle + 90f) % 360f },
+                    color = Color(0xFFEFF7F4)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(
+                            horizontal = 12.dp,
+                            vertical = 10.dp
+                        )
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_rotate),
+                            painter = painterResource(R.drawable.ic_rotate),
                             contentDescription = null,
                             tint = primaryColor,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(Modifier.width(6.dp))
                         Text(
-                            text = stringResource(id = R.string.avatar_crop_rotate),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = "Xoay",
                             color = primaryColor,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            errorMessage?.let { message ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = message,
+                    color = Color(0xFFD32F2F),
+                    fontSize = 13.sp
+                )
+            }
 
-            // Avatar Preview Card
+            Spacer(Modifier.height(20.dp))
+
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = Color.White,
                 border = BorderStroke(1.dp, borderColor),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(16.dp)
                 ) {
-                    if (inputBitmap != null) {
-                        Image(
-                            bitmap = inputBitmap.asImageBitmap(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape),
-                        )
+                    val bitmap = rotatedBitmap
+
+                    if (bitmap != null) {
+                        Canvas(Modifier.size(52.dp)) {
+                            drawIntoCanvas { canvas ->
+                                drawAvatarCircle(
+                                    canvas = canvas.nativeCanvas,
+                                    source = bitmap,
+                                    outputSide = size.minDimension,
+                                    zoom = zoomScale,
+                                    offset = cropOffset
+                                )
+                            }
+                        }
                     } else {
                         Surface(
                             shape = CircleShape,
                             color = lightBgColor,
-                            modifier = Modifier.size(52.dp),
+                            modifier = Modifier.size(52.dp)
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.fillMaxSize()
                             ) {
                                 Text(
-                                    text = "NL",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    text = UserProfileManager.getInitials(),
                                     color = primaryColor,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(Modifier.width(14.dp))
 
                     Column {
                         Text(
-                            text = stringResource(id = R.string.avatar_crop_preview_title),
+                            text = "Xem trước ảnh đại diện",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = darkTextColor,
+                            color = darkTextColor
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(Modifier.height(2.dp))
                         Text(
                             text = UserProfileManager.name,
                             fontSize = 13.sp,
-                            color = subTextColor,
+                            color = subTextColor
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Primary Button: Sử dụng ảnh
             Button(
                 onClick = {
-                    val finalBitmap = inputBitmap ?: createCircleSampleBitmap()
-                    val croppedCircularBitmap = cropToCircle(finalBitmap, zoomScale, rotationAngle)
-                    UserProfileManager.saveAvatarBitmap(context, croppedCircularBitmap)
-                    onConfirmCrop(croppedCircularBitmap)
+                    val bitmap = rotatedBitmap
+
+                    if (bitmap != null && !isSaving) {
+                        isSaving = true
+                        errorMessage = null
+
+                        try {
+                            val output = Bitmap.createBitmap(
+                                512,
+                                512,
+                                Bitmap.Config.ARGB_8888
+                            )
+
+                            drawAvatarCircle(
+                                canvas = AndroidCanvas(output),
+                                source = bitmap,
+                                outputSide = 512f,
+                                zoom = zoomScale,
+                                offset = cropOffset
+                            )
+
+                            // MMRANavHost đang chịu trách nhiệm lưu ảnh.
+                            onConfirmCrop(output)
+                        } catch (_: Exception) {
+                            isSaving = false
+                            errorMessage =
+                                "Không xử lý được ảnh. Hãy thử lại."
+                        }
+                    }
                 },
+                enabled = rotatedBitmap != null && !isSaving,
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = primaryColor
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(52.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_check_circle),
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(id = R.string.avatar_crop_use_photo),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
+                if (isSaving) {
+                    CircularProgressIndicator(
                         color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(
+                            R.drawable.ic_check_circle
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
+
+                Spacer(Modifier.width(8.dp))
+
+                Text(
+                    text = if (isSaving) {
+                        "Đang xử lý…"
+                    } else {
+                        "Sử dụng ảnh"
+                    },
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
 
             Text(
-                text = stringResource(id = R.string.avatar_illustrative_note),
+                text = "Ảnh đại diện sẽ lấy phần bên trong khung tròn.",
                 fontSize = 12.sp,
                 color = subTextColor,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
 
-private fun createCircleSampleBitmap(): Bitmap {
-    val bitmap = Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val paint = Paint().apply {
-        color = android.graphics.Color.parseColor("#0F5B51")
-        isAntiAlias = true
+/**
+ * Vẽ ảnh vào khung vuông.
+ * Offset được lưu theo tỷ lệ cạnh khung để dùng chung cho
+ * màn chỉnh sửa, ảnh xem trước và ảnh xuất ra.
+ */
+private fun drawAvatarSource(
+    canvas: AndroidCanvas,
+    source: Bitmap,
+    viewportSide: Float,
+    zoom: Float,
+    offset: Offset
+) {
+    val scale = viewportSide /
+            min(source.width, source.height).toFloat() * zoom
+
+    val left = (viewportSide - source.width * scale) / 2f +
+            offset.x * viewportSide
+
+    val top = (viewportSide - source.height * scale) / 2f +
+            offset.y * viewportSide
+
+    val matrix = Matrix().apply {
+        setScale(scale, scale)
+        postTranslate(left, top)
     }
-    canvas.drawCircle(150f, 150f, 150f, paint)
-    return bitmap
+
+    canvas.drawBitmap(
+        source,
+        matrix,
+        Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    )
 }
 
-private fun cropToCircle(source: Bitmap, scale: Float, rotation: Float): Bitmap {
-    val size = Math.min(source.width, source.height)
-    val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(output)
-
-    val paint = Paint().apply {
-        isAntiAlias = true
+/**
+ * Xuất đúng vùng tròn ở giữa khung chỉnh sửa.
+ */
+private fun drawAvatarCircle(
+    canvas: AndroidCanvas,
+    source: Bitmap,
+    outputSide: Float,
+    zoom: Float,
+    offset: Offset
+) {
+    val circle = android.graphics.Path().apply {
+        addCircle(
+            outputSide / 2f,
+            outputSide / 2f,
+            outputSide / 2f,
+            android.graphics.Path.Direction.CW
+        )
     }
-    val path = Path()
-    path.addCircle(size / 2f, size / 2f, size / 2f, Path.Direction.CW)
-    canvas.clipPath(path)
 
-    val matrix = Matrix()
-    matrix.postRotate(rotation, source.width / 2f, source.height / 2f)
-    matrix.postScale(scale, scale, source.width / 2f, source.height / 2f)
-    canvas.drawBitmap(source, matrix, paint)
+    val viewportSide = outputSide / AVATAR_CROP_FRACTION
+    val translation = (outputSide - viewportSide) / 2f
 
-    return output
+    canvas.save()
+    canvas.clipPath(circle)
+    canvas.translate(translation, translation)
+
+    drawAvatarSource(
+        canvas = canvas,
+        source = source,
+        viewportSide = viewportSide,
+        zoom = zoom,
+        offset = offset
+    )
+
+    canvas.restore()
 }
 
 @Preview(showBackground = true)

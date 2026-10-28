@@ -2,39 +2,21 @@ package com.example.project_lttbd.ui.screens.account
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,7 +30,7 @@ fun ChangePasswordScreen(
     onBackClick: () -> Unit = {},
     onSaveSuccess: () -> Unit = {},
     onForgotPasswordClick: () -> Unit = {},
-    onCancelClick: () -> Unit = {},
+    onCancelClick: () -> Unit = {}
 ) {
     val primaryColor = Color(0xFF0F5B51)
     val lightBgColor = Color(0xFFE0F0EC)
@@ -57,271 +39,233 @@ fun ChangePasswordScreen(
     val borderColor = Color(0xFFE2E8E6)
     val infoBgColor = Color(0xFFEFF6F4)
 
-    var currentPassword by remember { mutableStateOf("•••••••••") }
-    var newPassword by remember { mutableStateOf("•••••••••") }
-    var confirmPassword by remember { mutableStateOf("•••••••••") }
+    // Giá trị thật bắt đầu trống, không điền sẵn ký tự dấu chấm.
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
 
+    // Mỗi ô có trạng thái ẩn/hiện riêng.
     var currentVisible by remember { mutableStateOf(false) }
     var newVisible by remember { mutableStateOf(false) }
     var confirmVisible by remember { mutableStateOf(false) }
 
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember {
+        mutableStateOf<String?>(null)
+    }
 
     Surface(
         modifier = modifier.fillMaxSize(),
-        color = Color(0xFFFAFDFB),
+        color = Color(0xFFFAFDFB)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
-            // Header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Surface(
+                    onClick = onBackClick,
                     shape = CircleShape,
                     color = lightBgColor,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clickable { onBackClick() },
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize()
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_back),
-                            contentDescription = stringResource(id = R.string.cd_back_button),
+                            painter = painterResource(R.drawable.ic_back),
+                            contentDescription = stringResource(
+                                R.string.cd_back_button
+                            ),
                             tint = primaryColor,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(Modifier.width(16.dp))
 
                 Column {
                     Text(
-                        text = stringResource(id = R.string.account_change_password),
+                        text = stringResource(
+                            R.string.account_change_password
+                        ),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = darkTextColor,
+                        color = darkTextColor
                     )
                     Text(
-                        text = stringResource(id = R.string.account_change_password_sub),
+                        text = stringResource(
+                            R.string.account_change_password_sub
+                        ),
                         fontSize = 13.sp,
-                        color = subTextColor,
+                        color = subTextColor
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
             Text(
                 text = "Nhập mật khẩu hiện tại để bảo vệ tài khoản của cô Lan.",
                 fontSize = 14.sp,
                 color = subTextColor,
-                lineHeight = 20.sp,
+                lineHeight = 20.sp
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(Modifier.height(20.dp))
 
-            // Form Card
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = Color.White,
                 border = BorderStroke(1.dp, borderColor),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(16.dp)
                 ) {
-                    Text(
-                        text = "Mật khẩu hiện tại",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = darkTextColor,
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    OutlinedTextField(
+                    ChangePasswordInput(
+                        label = "Mật khẩu hiện tại",
+                        placeholder = "Nhập mật khẩu hiện tại",
                         value = currentPassword,
                         onValueChange = {
                             currentPassword = it
                             errorMessage = null
                         },
-                        visualTransformation = if (currentVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { currentVisible = !currentVisible }) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_eye),
-                                    contentDescription = null,
-                                    tint = subTextColor,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = borderColor,
-                            focusedBorderColor = primaryColor,
+                        visible = currentVisible,
+                        onToggleVisibility = {
+                            currentVisible = !currentVisible
+                        }
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    ChangePasswordInput(
+                        label = stringResource(
+                            R.string.label_new_password
                         ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = stringResource(id = R.string.label_new_password),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = darkTextColor,
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    OutlinedTextField(
+                        placeholder = "Nhập mật khẩu mới",
                         value = newPassword,
                         onValueChange = {
                             newPassword = it
                             errorMessage = null
                         },
-                        visualTransformation = if (newVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { newVisible = !newVisible }) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_eye),
-                                    contentDescription = null,
-                                    tint = subTextColor,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = borderColor,
-                            focusedBorderColor = primaryColor,
+                        visible = newVisible,
+                        onToggleVisibility = {
+                            newVisible = !newVisible
+                        }
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    ChangePasswordInput(
+                        label = stringResource(
+                            R.string.label_confirm_password
                         ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = stringResource(id = R.string.label_confirm_password),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = darkTextColor,
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    OutlinedTextField(
+                        placeholder = "Nhập lại mật khẩu mới",
                         value = confirmPassword,
                         onValueChange = {
                             confirmPassword = it
                             errorMessage = null
                         },
-                        visualTransformation = if (confirmVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { confirmVisible = !confirmVisible }) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_eye),
-                                    contentDescription = null,
-                                    tint = subTextColor,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = borderColor,
-                            focusedBorderColor = primaryColor,
-                        ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        visible = confirmVisible,
+                        onToggleVisibility = {
+                            confirmVisible = !confirmVisible
+                        }
                     )
 
-                    if (errorMessage != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                    errorMessage?.let { message ->
+                        Spacer(Modifier.height(8.dp))
                         Text(
-                            text = errorMessage!!,
+                            text = message,
                             fontSize = 12.sp,
-                            color = Color(0xFFD32F2F),
+                            color = Color(0xFFD32F2F)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // Info Box
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = infoBgColor,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.Top,
+                    verticalAlignment = Alignment.Top
                 ) {
                     Icon(
-                        painter = painterResource(id = R.drawable.ic_lock),
+                        painter = painterResource(R.drawable.ic_lock),
                         contentDescription = null,
                         tint = primaryColor,
                         modifier = Modifier
                             .size(18.dp)
-                            .padding(top = 2.dp),
+                            .padding(top = 2.dp)
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(Modifier.width(10.dp))
                     Text(
-                        text = stringResource(id = R.string.register_password_note),
+                        text = stringResource(
+                            R.string.register_password_note
+                        ),
                         fontSize = 12.sp,
                         color = subTextColor,
-                        lineHeight = 18.sp,
+                        lineHeight = 18.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Primary Button: Lưu mật khẩu
             Button(
                 onClick = {
-                    if (currentPassword.isEmpty()) {
-                        errorMessage = "Vui lòng nhập mật khẩu hiện tại."
-                    } else if (newPassword.length < 8) {
-                        errorMessage = "Mật khẩu mới phải có ít nhất 8 ký tự."
-                    } else if (newPassword != confirmPassword) {
-                        errorMessage = "Mật khẩu xác nhận không khớp."
-                    } else {
-                        onSaveSuccess()
+                    when {
+                        currentPassword.isBlank() -> {
+                            errorMessage =
+                                "Vui lòng nhập mật khẩu hiện tại."
+                        }
+
+                        newPassword.length < 8 -> {
+                            errorMessage =
+                                "Mật khẩu mới phải có ít nhất 8 ký tự."
+                        }
+
+                        newPassword != confirmPassword -> {
+                            errorMessage =
+                                "Mật khẩu xác nhận không khớp."
+                        }
+
+                        else -> {
+                            errorMessage = null
+                            onSaveSuccess()
+                        }
                     }
                 },
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = primaryColor
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(52.dp)
             ) {
                 Text(
                     text = "Lưu mật khẩu",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = Color.White
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(Modifier.height(20.dp))
 
             Text(
                 text = "Quên mật khẩu hiện tại?",
@@ -330,24 +274,91 @@ fun ChangePasswordScreen(
                 color = primaryColor,
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .clickable { onForgotPasswordClick() },
+                    .clickable { onForgotPasswordClick() }
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(Modifier.height(20.dp))
 
             Text(
-                text = stringResource(id = R.string.avatar_action_cancel),
+                text = stringResource(R.string.avatar_action_cancel),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = subTextColor,
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .clickable { onCancelClick() },
+                    .clickable { onCancelClick() }
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
         }
     }
+}
+
+@Composable
+private fun ChangePasswordInput(
+    label: String,
+    placeholder: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    visible: Boolean,
+    onToggleVisibility: () -> Unit
+) {
+    val primaryColor = Color(0xFF0F5B51)
+    val darkTextColor = Color(0xFF0A3C35)
+    val subTextColor = Color(0xFF5A6E6A)
+    val borderColor = Color(0xFFE2E8E6)
+
+    Text(
+        text = label,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Bold,
+        color = darkTextColor
+    )
+
+    Spacer(Modifier.height(8.dp))
+
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = {
+            Text(
+                text = placeholder,
+                color = subTextColor,
+                fontSize = 14.sp
+            )
+        },
+        visualTransformation = if (visible) {
+            VisualTransformation.None
+        } else {
+            PasswordVisualTransformation()
+        },
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password
+        ),
+        trailingIcon = {
+            IconButton(
+                onClick = onToggleVisibility
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_eye),
+                    contentDescription = if (visible) {
+                        "Ẩn $label"
+                    } else {
+                        "Hiện $label"
+                    },
+                    tint = if (visible) primaryColor else subTextColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        },
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedBorderColor = borderColor,
+            focusedBorderColor = primaryColor
+        ),
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Preview(showBackground = true)

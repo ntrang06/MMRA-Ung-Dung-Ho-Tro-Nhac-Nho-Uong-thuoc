@@ -211,11 +211,7 @@ fun ScanCameraScreen(
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        "Bước 1 / 3 • Nhận diện thuốc",
-                        color = Color(0xFF9FBDB6),
-                        fontSize = 12.sp
-                    )
+
                 }
 
                 Box(

@@ -87,13 +87,7 @@ fun ScanPreviewScreen(
                         fontSize = 20.sp
                     )
                 )
-                Text(
-                    text = "Bước 1 / 3 • Kiểm tra ảnh đã chọn",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = MaterialTheme.colorScheme.secondary,
-                        fontSize = 11.sp
-                    )
-                )
+
             }
         }
 
