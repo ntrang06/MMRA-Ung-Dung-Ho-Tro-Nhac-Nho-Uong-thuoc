@@ -80,4 +80,5 @@ dependencies {
 
     // Thông báo đẩy Firebase Cloud Messaging
     implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.firebase:firebase-analytics")
 }
