@@ -1,10 +1,13 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+
+    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.example.project_lttbd"
+
     compileSdk {
         version = release(37)
     }
@@ -27,10 +30,12 @@ android {
             }
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
     }
@@ -46,16 +51,33 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.compose.ui.tooling)
+
     testImplementation(libs.junit)
+
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
-    implementation(libs.androidx.compose.ui.tooling)
+
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    // CameraX
     val cameraxVersion = "1.4.2"
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // Firebase: quản lý phiên bản chung cho các thư viện Firebase
+    implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
+
+    // Đăng ký, đăng nhập và quản lý phiên đăng nhập
+    implementation("com.google.firebase:firebase-auth")
+
+    // Cơ sở dữ liệu Cloud Firestore
+    implementation("com.google.firebase:firebase-firestore")
+
+    // Thông báo đẩy Firebase Cloud Messaging
+    implementation("com.google.firebase:firebase-messaging")
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "572045438815",
+    "project_id": "mmra-dev",
+    "storage_bucket": "mmra-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:572045438815:android:821bd843d15f3228f0d0ea",
+        "android_client_info": {
+          "package_name": "com.example.project_lttbd"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdfTDG5s8HVDPu1rhLrSL7_3j_wJlviK4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
