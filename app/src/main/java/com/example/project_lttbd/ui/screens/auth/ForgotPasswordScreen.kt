@@ -47,7 +47,7 @@ fun ForgotPasswordScreen(
     onSendCodeClick: () -> Unit = {},
     onBackToLoginClick: () -> Unit = {},
 ) {
-    var emailOrPhone by remember { mutableStateOf("lan.nguyen@gmail.com") }
+    var emailOrPhone by remember { mutableStateOf("") }
 
     val primaryColor = Color(0xFF0F5B51)
     val lightBgColor = Color(0xFFE0F0EC)
@@ -184,7 +184,6 @@ fun ForgotPasswordScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
-
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(

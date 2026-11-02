@@ -49,8 +49,8 @@ fun CreateNewPasswordScreen(
     onBackClick: () -> Unit = {},
     onSavePasswordClick: () -> Unit = {},
 ) {
-    var newPassword by remember { mutableStateOf("•••••••••") }
-    var confirmPassword by remember { mutableStateOf("•••••••••") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var newPasswordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
 
@@ -172,15 +172,88 @@ fun CreateNewPasswordScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+
                     OutlinedTextField(
                         value = newPassword,
                         onValueChange = { newPassword = it },
-                        visualTransformation = if (newPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        placeholder = {
+                            Text(
+                                text = "Nhập mật khẩu mới",
+                                color = Color.Gray,
+                            )
+                        },
+                        visualTransformation = if (newPasswordVisible)
+                            VisualTransformation.None
+                        else
+                            PasswordVisualTransformation(),
                         trailingIcon = {
-                            IconButton(onClick = { newPasswordVisible = !newPasswordVisible }) {
+                            IconButton(onClick = {
+                                newPasswordVisible = !newPasswordVisible
+                            }) {
                                 Icon(
-                                    painter = painterResource(id = R.drawable.ic_eye),
-                                    contentDescription = stringResource(id = R.string.cd_password_visibility),
+                                    painter = painterResource(
+                                        id = if (newPasswordVisible)
+                                            R.drawable.ic_eye_off
+                                        else
+                                            R.drawable.ic_eye
+                                    ),
+                                    contentDescription = if (newPasswordVisible)
+                                        "Ẩn mật khẩu"
+                                    else
+                                        "Hiện mật khẩu",
+                                    tint = subTextColor,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = borderColor,
+                            focusedBorderColor = primaryColor,
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = stringResource(id = R.string.label_confirm_password),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = darkTextColor,
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = { confirmPassword = it },
+                        placeholder = {
+                            Text(
+                                text = "Nhập lại mật khẩu mới",
+                                color = Color.Gray,
+                            )
+                        },
+                        visualTransformation = if (confirmPasswordVisible)
+                            VisualTransformation.None
+                        else
+                            PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                confirmPasswordVisible = !confirmPasswordVisible
+                            }) {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (confirmPasswordVisible)
+                                            R.drawable.ic_eye_off
+                                        else
+                                            R.drawable.ic_eye
+                                    ),
+                                    contentDescription = if (confirmPasswordVisible)
+                                        "Ẩn mật khẩu"
+                                    else
+                                        "Hiện mật khẩu",
                                     tint = subTextColor,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -197,102 +270,67 @@ fun CreateNewPasswordScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = stringResource(id = R.string.label_confirm_password),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = darkTextColor,
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    OutlinedTextField(
-                        value = confirmPassword,
-                        onValueChange = { confirmPassword = it },
-                        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_eye),
-                                    contentDescription = stringResource(id = R.string.cd_password_visibility),
-                                    tint = subTextColor,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        },
+                    Surface(
                         shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = borderColor,
-                            focusedBorderColor = primaryColor,
-                        ),
-                        singleLine = true,
+                        color = infoBgColor,
                         modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_lock),
+                                contentDescription = null,
+                                tint = primaryColor,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .padding(top = 2.dp),
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = stringResource(id = R.string.register_password_note),
+                                fontSize = 12.sp,
+                                color = subTextColor,
+                                lineHeight = 18.sp,
+                            )
+                        }
+                    }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = infoBgColor,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_lock),
-                        contentDescription = null,
-                        tint = primaryColor,
+                    Button(
+                        onClick = onSavePasswordClick,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                         modifier = Modifier
-                            .size(18.dp)
-                            .padding(top = 2.dp),
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
+                            .fillMaxWidth()
+                            .height(52.dp),
+                    ) {
+                        Text(
+                            text = stringResource(id = R.string.btn_save_new_password),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     Text(
-                        text = stringResource(id = R.string.register_password_note),
+                        text = stringResource(id = R.string.save_password_note),
                         fontSize = 12.sp,
                         color = subTextColor,
-                        lineHeight = 18.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = onSavePasswordClick,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-            ) {
-                Text(
-                    text = stringResource(id = R.string.btn_save_new_password),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = stringResource(id = R.string.save_password_note),
-                fontSize = 12.sp,
-                color = subTextColor,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
-
 @Preview(showBackground = true)
 @Composable
 fun CreateNewPasswordScreenPreview() {
