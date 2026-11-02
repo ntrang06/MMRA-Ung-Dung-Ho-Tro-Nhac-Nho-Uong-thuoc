@@ -8,6 +8,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.project_lttbd.data.remote.AuthRepository
+import com.example.project_lttbd.data.remote.UserProfileRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 
@@ -61,11 +66,35 @@ object UserProfileManager {
         isNotificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)
 
         currentAvatarBitmap = getAvatarBitmap(context)
+
+        // If Firebase user is logged in, attempt to sync profile from Firestore in background
+        val currentUser = AuthRepository.currentUser
+        if (currentUser != null) {
+            email = currentUser.email ?: email
+            if (!currentUser.displayName.isNullOrBlank()) {
+                name = currentUser.displayName!!
+            }
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val profile = UserProfileRepository.getProfile(currentUser.uid)
+                    if (profile != null) {
+                        if (profile.displayName.isNotBlank()) {
+                            name = profile.displayName
+                        }
+                        if (profile.email.isNotBlank()) {
+                            email = profile.email
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
     }
 
     fun isLoggedIn(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(KEY_IS_LOGGED_IN, false)
+        // FirebaseAuth is primary source of truth, fallback to preference if needed
+        return AuthRepository.currentUser != null
     }
 
     fun setLoggedIn(context: Context, loggedIn: Boolean) {
@@ -96,6 +125,24 @@ object UserProfileManager {
             .putBoolean(KEY_FAMILY_ALERTS, isFamilyAlertEnabled)
             .putBoolean(KEY_NOTIFICATIONS_ENABLED, isNotificationsEnabled)
             .apply()
+
+        // Also update Firestore if logged in
+        val uid = AuthRepository.currentUid
+        if (uid != null) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    UserProfileRepository.updateProfile(
+                        uid,
+                        mapOf(
+                            "displayName" to name,
+                            "email" to email
+                        )
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
     }
 
     fun hasCustomAvatar(context: Context): Boolean {
@@ -161,7 +208,8 @@ object UserProfileManager {
     }
 
     fun getInitials(): String {
-        val parts = name.trim()
+        val targetName = name.ifBlank { "User" }
+        val parts = targetName.trim()
             .split("\\s+".toRegex())
             .filter { it.isNotBlank() }
 
@@ -180,8 +228,8 @@ object UserProfileManager {
     fun resetForTesting(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit()
-            .putBoolean(KEY_IS_LOGGED_IN, false)
-            .putBoolean(KEY_SETUP_COMPLETED, false)
+            .remove(KEY_IS_LOGGED_IN)
+            .remove(KEY_SETUP_COMPLETED)
             .apply()
     }
 }
