@@ -14,18 +14,15 @@ data class MedicineRecord(
 )
 
 class MedicineRepository {
-
     fun getMedicines(): Task<List<MedicineRecord>> {
         return withCurrentUser { collection ->
-            collection
-                .orderBy("createdAt", Query.Direction.DESCENDING)
+            collection.orderBy("createdAt", Query.Direction.DESCENDING)
                 .get()
                 .continueWith { task ->
                     if (!task.isSuccessful) {
-                        throw task.exception
-                            ?: IllegalStateException(
-                                "Không thể tải danh sách thuốc."
-                            )
+                        throw task.exception ?: IllegalStateException(
+                            "Không thể tải danh sách thuốc."
+                        )
                     }
 
                     task.result.documents.map { document ->
@@ -44,12 +41,44 @@ class MedicineRepository {
         }
     }
 
-    fun addMedicine(
-        medicine: MedicineDto
-    ): Task<String> {
+    fun getMedicine(medicineId: String): Task<MedicineRecord> {
+        return withCurrentUser { collection ->
+            validateMedicineId(medicineId)
+
+            collection.document(medicineId)
+                .get()
+                .continueWith { task ->
+                    if (!task.isSuccessful) {
+                        throw task.exception ?: IllegalStateException(
+                            "Không thể tải thông tin thuốc."
+                        )
+                    }
+
+                    val document = task.result
+
+                    if (!document.exists()) {
+                        throw IllegalStateException(
+                            "Không tìm thấy thuốc cần sửa."
+                        )
+                    }
+
+                    val medicine = document.toObject(
+                        MedicineDto::class.java
+                    ) ?: throw IllegalStateException(
+                        "Dữ liệu thuốc không hợp lệ."
+                    )
+
+                    MedicineRecord(
+                        id = document.id,
+                        data = medicine
+                    )
+                }
+        }
+    }
+
+    fun addMedicine(medicine: MedicineDto): Task<String> {
         return withCurrentUser { collection ->
             val fields = medicineFields(medicine).toMutableMap()
-
             fields["createdAt"] = FieldValue.serverTimestamp()
             fields["updatedAt"] = FieldValue.serverTimestamp()
 
@@ -57,10 +86,9 @@ class MedicineRepository {
 
             document.set(fields).continueWith { task ->
                 if (!task.isSuccessful) {
-                    throw task.exception
-                        ?: IllegalStateException(
-                            "Không thể thêm thuốc."
-                        )
+                    throw task.exception ?: IllegalStateException(
+                        "Không thể thêm thuốc."
+                    )
                 }
 
                 document.id
@@ -76,24 +104,16 @@ class MedicineRepository {
             validateMedicineId(medicineId)
 
             val fields = medicineFields(medicine).toMutableMap()
-
             fields["updatedAt"] = FieldValue.serverTimestamp()
 
-            collection
-                .document(medicineId)
-                .update(fields)
+            collection.document(medicineId).update(fields)
         }
     }
 
-    fun deleteMedicine(
-        medicineId: String
-    ): Task<Void> {
+    fun deleteMedicine(medicineId: String): Task<Void> {
         return withCurrentUser { collection ->
             validateMedicineId(medicineId)
-
-            collection
-                .document(medicineId)
-                .delete()
+            collection.document(medicineId).delete()
         }
     }
 
@@ -106,10 +126,7 @@ class MedicineRepository {
 
         val imageUrl = medicine.imageUrl
 
-        require(
-            imageUrl == null ||
-                    imageUrl.startsWith("https://")
-        ) {
+        require(imageUrl == null || imageUrl.startsWith("https://")) {
             "Ảnh thuốc phải là URL HTTPS đã tải lên máy chủ."
         }
 
@@ -123,13 +140,8 @@ class MedicineRepository {
         )
     }
 
-    private fun validateMedicineId(
-        medicineId: String
-    ) {
-        require(
-            medicineId.isNotBlank() &&
-                    '/' !in medicineId
-        ) {
+    private fun validateMedicineId(medicineId: String) {
+        require(medicineId.isNotBlank() && '/' !in medicineId) {
             "Mã thuốc không hợp lệ."
         }
     }
@@ -143,10 +155,7 @@ class MedicineRepository {
                     "Vui lòng đăng nhập để quản lý thuốc."
                 )
 
-            val collection =
-                FirebaseProvider.medicinesCollection(uid)
-
-            action(collection)
+            action(FirebaseProvider.medicinesCollection(uid))
         } catch (exception: Exception) {
             Tasks.forException(exception)
         }
