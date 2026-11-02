@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -49,16 +50,20 @@ import com.example.project_lttbd.R
 fun RegisterScreen(
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit = {},
-    onRegisterClick: () -> Unit = {},
+    onRegisterClick: (String, String, String) -> Unit = { _, _, _ -> },
     onGoogleClick: () -> Unit = {},
     onLoginClick: () -> Unit = {},
+    isLoading: Boolean = false,
+    externalError: String? = null
 ) {
-    var fullName by remember { mutableStateOf("Nguyễn Thị Lan") }
-    var phoneNumber by remember { mutableStateOf("0912345678") }
-    var email by remember { mutableStateOf("lan.nguyen@gmail.com") }
-    var password by remember { mutableStateOf("Password123") }
+    var fullName by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var localError by remember { mutableStateOf<String?>(null) }
+
+    val displayError = externalError ?: localError
 
     val primaryColor = Color(0xFF0F5B51)
     val lightBgColor = Color(0xFFE0F0EC)
@@ -151,7 +156,7 @@ fun RegisterScreen(
                         value = fullName,
                         onValueChange = {
                             fullName = it
-                            errorMessage = null
+                            localError = null
                         },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -175,7 +180,7 @@ fun RegisterScreen(
                         value = phoneNumber,
                         onValueChange = {
                             phoneNumber = it
-                            errorMessage = null
+                            localError = null
                         },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -199,7 +204,7 @@ fun RegisterScreen(
                         value = email,
                         onValueChange = {
                             email = it
-                            errorMessage = null
+                            localError = null
                         },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -223,7 +228,7 @@ fun RegisterScreen(
                         value = password,
                         onValueChange = {
                             password = it
-                            errorMessage = null
+                            localError = null
                         },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
@@ -245,10 +250,10 @@ fun RegisterScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    if (errorMessage != null) {
+                    if (displayError != null) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = errorMessage!!,
+                            text = displayError,
                             fontSize = 13.sp,
                             color = Color(0xFFD32F2F),
                             fontWeight = FontWeight.Medium,
@@ -291,35 +296,38 @@ fun RegisterScreen(
             Button(
                 onClick = {
                     val cleanName = fullName.trim()
-                    val cleanPhone = phoneNumber.replace(" ", "").trim()
                     val cleanEmail = email.trim()
 
                     if (cleanName.isEmpty()) {
-                        errorMessage = "Vui lòng nhập họ và tên."
-                    } else if (cleanPhone.isEmpty() || cleanPhone.length < 9) {
-                        errorMessage = "Vui lòng nhập số điện thoại hợp lệ."
+                        localError = "Vui lòng nhập họ và tên."
                     } else if (cleanEmail.isEmpty() || !cleanEmail.contains("@")) {
-                        errorMessage = "Vui lòng nhập địa chỉ email hợp lệ."
-                    } else if (cleanEmail.lowercase() == "taken@gmail.com") {
-                        errorMessage = "Email này đã được đăng ký trong hệ thống."
-                    } else if (password.length < 8) {
-                        errorMessage = "Mật khẩu phải có ít nhất 8 ký tự."
+                        localError = "Vui lòng nhập địa chỉ email hợp lệ."
+                    } else if (password.length < 6) {
+                        localError = "Mật khẩu phải có ít nhất 6 ký tự."
                     } else {
-                        onRegisterClick()
+                        onRegisterClick(cleanName, cleanEmail, password)
                     }
                 },
+                enabled = !isLoading,
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
             ) {
-                Text(
-                    text = stringResource(id = R.string.welcome_btn_register),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Text(
+                        text = stringResource(id = R.string.welcome_btn_register),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))

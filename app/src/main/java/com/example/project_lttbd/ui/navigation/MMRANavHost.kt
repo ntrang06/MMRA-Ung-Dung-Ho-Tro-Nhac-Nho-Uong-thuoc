@@ -77,6 +77,14 @@ import com.example.project_lttbd.ui.screens.reminder.rememberReminderSpeech
 import com.example.project_lttbd.ui.screens.scan.ScanScreen
 import com.example.project_lttbd.ui.screens.schedule.ScheduleScreen
 import com.example.project_lttbd.ui.screens.schedule.ScheduleSetupEditor
+import com.example.project_lttbd.data.remote.AuthRepository
+import com.example.project_lttbd.data.remote.UserProfileRepository
+import com.example.project_lttbd.data.device.DeviceManager
+import com.example.project_lttbd.ui.viewmodel.AuthViewModel
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 private const val MANUAL_MEDICINE_DRAFT_KEY = "manual_medicine_draft"
 
@@ -88,10 +96,20 @@ fun MMRANavHost(
     val context = LocalContext.current
 
     UserProfileManager.init(context)
-    val isLoggedIn = UserProfileManager.isLoggedIn(context)
+    val currentUser = AuthRepository.currentUser
     val isSetupCompleted = UserProfileManager.isSetupCompleted(context)
 
-    val startDest = MMRADestinations.WELCOME
+    val startDest = when {
+        currentUser == null -> MMRADestinations.WELCOME
+        !isSetupCompleted -> MMRADestinations.INITIAL_SETUP_TARGET
+        else -> MMRADestinations.HOME
+    }
+
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
+            DeviceManager.syncCurrentDevice(context, currentUser.uid)
+        }
+    }
 
     var setupPreferences by remember {
         mutableStateOf(InitialSetupPreferences())
@@ -155,12 +173,17 @@ fun MMRANavHost(
         }
 
         composable(MMRADestinations.EMAIL_LOGIN) {
+            val authViewModel: AuthViewModel = remember { AuthViewModel() }
             EmailLoginScreen(
                 onBackClick = {
                     navController.popBackStack()
                 },
-                onLoginClick = {
-                    authenticateAndProceed(navController, context)
+                onLoginClick = { email, pass ->
+                    authViewModel.signIn(email, pass, context) { success ->
+                        if (success) {
+                            authenticateAndProceed(navController, context)
+                        }
+                    }
                 },
                 onOtpLoginClick = {
                     authenticateAndProceed(navController, context)
@@ -173,24 +196,35 @@ fun MMRANavHost(
                 },
                 onRegisterClick = {
                     navController.navigate(MMRADestinations.REGISTER)
-                }
+                },
+                isLoading = authViewModel.isLoading,
+                externalError = authViewModel.errorMessage
             )
         }
 
         composable(MMRADestinations.REGISTER) {
+            val authViewModel: AuthViewModel = remember { AuthViewModel() }
             RegisterScreen(
                 onBackClick = {
                     navController.popBackStack()
                 },
-                onRegisterClick = {
-                    navController.navigate(MMRADestinations.VERIFY_PHONE)
+                onRegisterClick = { name, email, pass ->
+                    authViewModel.signUp(name, email, pass, context) { success ->
+                        if (success) {
+                            navController.navigate(MMRADestinations.INITIAL_SETUP_TARGET) {
+                                popUpTo(MMRADestinations.WELCOME) { inclusive = true }
+                            }
+                        }
+                    }
                 },
                 onGoogleClick = {
                     authenticateAndProceed(navController, context)
                 },
                 onLoginClick = {
                     navController.navigate(MMRADestinations.LOGIN)
-                }
+                },
+                isLoading = authViewModel.isLoading,
+                externalError = authViewModel.errorMessage
             )
         }
 
@@ -287,6 +321,19 @@ fun MMRANavHost(
                     )
                     UserProfileManager.setSetupCompleted(context, true)
                     UserProfileManager.setLoggedIn(context, true)
+
+                    val uid = AuthRepository.currentUid
+                    if (uid != null) {
+                        val roleStr = setupPreferences.selectedRoles.joinToString(",") { it.name }
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                UserProfileRepository.updateProfile(uid, mapOf("usageMode" to roleStr))
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+
                     navController.navigate(MMRADestinations.HOME) {
                         popUpTo(MMRADestinations.WELCOME) { inclusive = true }
                     }
@@ -508,15 +555,18 @@ fun MMRANavHost(
         }
 
         composable(MMRADestinations.LOGOUT_CONFIRMATION) {
+            val authViewModel = remember { AuthViewModel() }
             LogoutConfirmationScreen(
                 avatarBitmap = UserProfileManager.currentAvatarBitmap,
                 onBackClick = { navController.popBackStack() },
                 onCancelClick = { navController.popBackStack() },
                 onConfirmLogout = {
-                    UserProfileManager.setLoggedIn(context, false)
-                    UserProfileManager.setSetupCompleted(context, false)
-                    navController.navigate(MMRADestinations.WELCOME) {
-                        popUpTo(0) { inclusive = true }
+                    authViewModel.signOut(context) {
+                        UserProfileManager.setLoggedIn(context, false)
+                        UserProfileManager.setSetupCompleted(context, false)
+                        navController.navigate(MMRADestinations.WELCOME) {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
                 }
             )
@@ -524,13 +574,17 @@ fun MMRANavHost(
 
         // --- Main Feature Destinations ---
         composable(MMRADestinations.ACCOUNT) {
+            val authViewModel = remember { AuthViewModel() }
             MyAccountScreen(
                 avatarBitmap = UserProfileManager.currentAvatarBitmap,
                 onBackClick = { navController.popBackStack() },
                 onLogoutClick = {
-                    UserProfileManager.setLoggedIn(context, false)
-                    navController.navigate(MMRADestinations.WELCOME) {
-                        popUpTo(0) { inclusive = true }
+                    authViewModel.signOut(context) {
+                        UserProfileManager.setLoggedIn(context, false)
+                        UserProfileManager.setSetupCompleted(context, false)
+                        navController.navigate(MMRADestinations.WELCOME) {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
                 }
             )
