@@ -1,5 +1,13 @@
 package com.example.project_lttbd.ui.navigation
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
+import com.example.project_lttbd.data.remote.FirebaseProvider
+import com.example.project_lttbd.data.remote.dto.MedicineDto
+import com.example.project_lttbd.data.repository.MedicineRepository
+import com.google.firebase.auth.FirebaseAuth
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -57,7 +65,6 @@ import com.example.project_lttbd.data.mock.MockCalendar
 import com.example.project_lttbd.data.mock.MockDoseAction
 import com.example.project_lttbd.data.mock.MockDoseActions
 import com.example.project_lttbd.data.mock.MockFamilyData
-import com.example.project_lttbd.data.mock.MockMedicines
 import com.example.project_lttbd.data.mock.MockReminderDoses
 import com.example.project_lttbd.ui.components.rememberUiNow
 import com.example.project_lttbd.ui.screens.history.HistoryScreen
@@ -918,47 +925,274 @@ private fun MedicineEntryDestination(
     entry: NavBackStackEntry,
     medicineId: String? = null
 ) {
-    val previous = MockMedicines.findById(medicineId)
+    val context = LocalContext.current
+    val repository = remember { MedicineRepository() }
+    val auth = FirebaseProvider.auth
 
-    if (medicineId != null && previous == null) {
-        Column {
-            Text("Không tìm thấy thuốc cần sửa.")
+    var userId by remember(entry) { mutableStateOf<String?>(null) }
+    var initialDraft by remember(entry) {
+        mutableStateOf<ManualMedicineDraft?>(null)
+    }
+    var savedImageUrl by remember(entry) { mutableStateOf<String?>(null) }
+    var loading by remember(entry) { mutableStateOf(true) }
+    var signedIn by remember(entry) { mutableStateOf(false) }
+    var loadError by remember(entry) { mutableStateOf<String?>(null) }
+    var saveError by remember(entry) { mutableStateOf<String?>(null) }
+    var saving by remember(entry) { mutableStateOf(false) }
+    var pendingDraft by remember(entry) {
+        mutableStateOf<ManualMedicineDraft?>(null)
+    }
+    var retryVersion by remember(entry) { mutableStateOf(0) }
+    var requestVersion by remember(entry) { mutableStateOf(0) }
+    var listening by remember(entry) { mutableStateOf(false) }
 
-            TextButton(
-                onClick = {
-                    navController.popBackStack()
-                }
-            ) {
-                Text("Quay lại")
+    DisposableEffect(entry, medicineId, retryVersion) {
+        listening = true
+
+        val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            val version = ++requestVersion
+            val uid = firebaseAuth.currentUser?.uid
+
+            userId = uid
+            signedIn = uid != null
+            initialDraft = null
+            savedImageUrl = null
+            loadError = null
+            saveError = null
+            pendingDraft = null
+            saving = false
+            loading = uid != null && medicineId != null
+
+            if (uid != null && medicineId != null) {
+                repository.getMedicine(medicineId)
+                    .addOnSuccessListener { record ->
+                        if (
+                            listening && version == requestVersion &&
+                            auth.currentUser?.uid == uid
+                        ) {
+                            val medicine = record.data
+                            initialDraft = ManualMedicineDraft(
+                                medicineName = medicine.medicineName,
+                                strength = medicine.strength,
+                                strengthUnit = medicine.strengthUnit,
+                                dosageForm = medicine.dosageForm,
+                                note = medicine.note,
+                                imageUri = medicine.imageUrl
+                            )
+                            savedImageUrl = medicine.imageUrl
+                            loading = false
+                        }
+                    }
+                    .addOnFailureListener {
+                        if (
+                            listening && version == requestVersion &&
+                            auth.currentUser?.uid == uid
+                        ) {
+                            loading = false
+                            loadError =
+                                "Không thể mở thuốc. Thuốc có thể đã bị xóa " +
+                                        "hoặc kết nối đang gặp lỗi."
+                        }
+                    }
             }
         }
-        return
+
+        auth.addAuthStateListener(listener)
+
+        onDispose {
+            listening = false
+            requestVersion++
+            auth.removeAuthStateListener(listener)
+        }
     }
 
-    ManualMedicineScreen(
-        initialDraft = previous?.draft(),
-        onBackClick = {
-            navController.popBackStack()
-        },
-        onContinue = { draft ->
-            entry.savedStateHandle[MANUAL_MEDICINE_DRAFT_KEY] =
-                Bundle().apply {
-                    putString("medicineId", medicineId)
-                    putString("medicineName", draft.medicineName)
-                    putString("strength", draft.strength)
-                    putString("strengthUnit", draft.strengthUnit)
-                    putString("dosageForm", draft.dosageForm)
-                    putString("note", draft.note)
-                    putString("imageUri", draft.imageUri)
-                }
+    BackHandler(enabled = saving) {
+        // Chờ kết quả lưu trước khi rời màn hình.
+    }
 
-            navController.navigate(
-                MMRADestinations.SCHEDULE_SETUP
-            ) {
-                launchSingleTop = true
+    when {
+        loading -> {
+            Column {
+                CircularProgressIndicator()
+                Text("Đang tải thông tin thuốc…")
             }
         }
-    )
+        !signedIn -> {
+            Column {
+                Text("Vui lòng đăng nhập để quản lý thuốc.")
+                TextButton(
+                    onClick = {
+                        navController.navigate(MMRADestinations.LOGIN) {
+                            launchSingleTop = true
+                        }
+                    }
+                ) { Text("Đăng nhập") }
+                TextButton(onClick = { navController.popBackStack() }) {
+                    Text("Quay lại")
+                }
+            }
+        }
+        loadError != null -> {
+            Column {
+                Text(loadError.orEmpty())
+                TextButton(onClick = { retryVersion++ }) {
+                    Text("Thử lại")
+                }
+                TextButton(onClick = { navController.popBackStack() }) {
+                    Text("Quay lại")
+                }
+            }
+        }
+        else -> {
+            key(userId, medicineId) {
+                ManualMedicineScreen(
+                    initialDraft = initialDraft,
+                    isEditing = medicineId != null,
+                    saveMedicineOnly = true,
+                    onBackClick = {
+                        if (!saving) navController.popBackStack()
+                    },
+                    onContinue = { draft ->
+                        if (!saving) pendingDraft = draft
+                    }
+                )
+            }
+        }
+    }
+
+    pendingDraft?.let { draft ->
+        val hasLocalImage = draft.imageUri?.let {
+            !it.startsWith("https://")
+        } == true
+
+        AlertDialog(
+            onDismissRequest = { pendingDraft = null },
+            title = {
+                Text(if (medicineId == null) "Lưu thuốc?" else "Lưu thay đổi?")
+            },
+            text = {
+                Column {
+                    Text(
+                        "Lưu thông tin ${draft.medicineName}. " +
+                                "Bước này chưa thiết lập lịch uống."
+                    )
+                    if (hasLocalImage) {
+                        Text(
+                            "Ảnh vừa chọn chưa được tải lên nên " +
+                                    "sẽ chưa được lưu cùng thuốc."
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val uid = auth.currentUser?.uid
+                        if (uid == null || uid != userId || !listening) {
+                            pendingDraft = null
+                            saveError =
+                                "Tài khoản đã thay đổi. " +
+                                        "Vui lòng mở lại màn hình thuốc."
+                        } else if (!saving) {
+                            pendingDraft = null
+                            saving = true
+                            saveError = null
+                            val version = ++requestVersion
+
+                            val medicine = MedicineDto(
+                                medicineName = draft.medicineName,
+                                strength = draft.strength,
+                                strengthUnit = if (draft.strength.isBlank()) {
+                                    ""
+                                } else {
+                                    draft.strengthUnit
+                                },
+                                dosageForm = draft.dosageForm,
+                                note = draft.note,
+                                imageUrl = draft.imageUri
+                                    ?.takeIf { it.startsWith("https://") }
+                                    ?: savedImageUrl
+                            )
+
+                            val task: com.google.android.gms.tasks.Task<*> =
+                                if (medicineId == null) {
+                                    repository.addMedicine(medicine)
+                                } else {
+                                    repository.updateMedicine(medicineId, medicine)
+                                }
+
+                            task.addOnSuccessListener {
+                                if (
+                                    listening && version == requestVersion &&
+                                    auth.currentUser?.uid == uid
+                                ) {
+                                    Toast.makeText(
+                                        context,
+                                        "Đã lưu thông tin thuốc",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+
+                                    if (!navController.popBackStack(
+                                            MMRADestinations.MEDICINE, false
+                                        )
+                                    ) {
+                                        navController.navigate(
+                                            MMRADestinations.MEDICINE
+                                        ) {
+                                            popUpTo(MMRADestinations.HOME)
+                                            launchSingleTop = true
+                                        }
+                                    }
+                                }
+                            }.addOnFailureListener {
+                                if (
+                                    listening && version == requestVersion &&
+                                    auth.currentUser?.uid == uid
+                                ) {
+                                    saving = false
+                                    saveError =
+                                        "Chưa lưu được thuốc. " +
+                                                "Vui lòng kiểm tra kết nối và thử lại."
+                                }
+                            }
+                        }
+                    }
+                ) { Text("Lưu") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDraft = null }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
+    if (saving) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Đang lưu thuốc") },
+            text = {
+                Column {
+                    CircularProgressIndicator()
+                    Text("Vui lòng chờ…")
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    saveError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { saveError = null },
+            title = { Text("Chưa lưu được") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { saveError = null }) {
+                    Text("Đã hiểu")
+                }
+            }
+        )
+    }
 }
 
 @Composable
