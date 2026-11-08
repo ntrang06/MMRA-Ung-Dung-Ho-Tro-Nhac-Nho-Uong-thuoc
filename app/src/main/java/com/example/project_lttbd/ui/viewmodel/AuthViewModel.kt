@@ -36,6 +36,13 @@ class AuthViewModel : ViewModel() {
     var isSuccess by mutableStateOf(false)
         private set
 
+    private data class PendingRegistration(
+        val uid: String,
+        val email: String
+    )
+
+    private var pendingRegistration: PendingRegistration? = null
+
     fun clearError() {
         errorMessage = null
     }
@@ -121,13 +128,45 @@ class AuthViewModel : ViewModel() {
     ) {
         if (isLoading) return
 
+        val address = email.trim()
+        val displayName = name.trim()
+
         if (
-            name.isBlank() ||
-            email.isBlank() ||
+            displayName.isBlank() ||
+            address.isBlank() ||
             pass.isBlank()
         ) {
+            errorMessage = "Vui lòng nhập đầy đủ thông tin đăng ký."
+            onComplete(false)
+            return
+        }
+
+        val pending = pendingRegistration
+        val currentUid = AuthRepository.currentUid
+
+        if (pending != null) {
+            if (!address.equals(pending.email, ignoreCase = true)) {
+                errorMessage =
+                    "Tài khoản đã được tạo bằng email ${pending.email}. " +
+                            "Vui lòng giữ nguyên email này để thử lưu lại hồ sơ."
+
+                onComplete(false)
+                return
+            }
+
+            if (currentUid != null && currentUid != pending.uid) {
+                errorMessage =
+                    "Tài khoản đang đăng nhập đã thay đổi. " +
+                            "Vui lòng đăng xuất trước khi thử lại."
+
+                onComplete(false)
+                return
+            }
+        } else if (currentUid != null) {
             errorMessage =
-                "Vui lòng nhập đầy đủ thông tin đăng ký."
+                "Bạn đang đăng nhập một tài khoản. " +
+                        "Vui lòng đăng xuất trước khi tạo tài khoản mới."
+
             onComplete(false)
             return
         }
@@ -138,44 +177,95 @@ class AuthViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                val result = AuthRepository.signUp(email, pass)
-                val uid = result.user?.uid
-
-                if (uid != null) {
-                    try {
-                        UserProfileRepository.createProfile(
-                            uid,
-                            name,
-                            email
-                        )
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        errorMessage =
-                            "Đã tạo tài khoản nhưng chưa lưu được hồ sơ. " +
-                                    "Vui lòng kiểm tra kết nối và thử lại."
-
-                        onComplete(false)
-                        return@launch
+                val uid = if (pending != null) {
+                    // Nếu mất phiên thì đăng nhập lại tài khoản đã tạo.
+                    if (AuthRepository.currentUid == null) {
+                        AuthRepository.signIn(address, pass)
                     }
 
-                    UserProfileManager.name = name
-                    UserProfileManager.email = email
+                    check(AuthRepository.currentUid == pending.uid)
 
-                    UserProfileManager.setLoggedIn(context, true)
-                    UserProfileManager.setSetupCompleted(
-                        context,
-                        false
-                    )
-
-                    DeviceManager.syncCurrentDevice(context, uid)
-
-                    isSuccess = true
-                    onComplete(true)
+                    pending.uid
                 } else {
-                    errorMessage = "Không thể tạo tài khoản."
-                    onComplete(false)
+                    // Ghi nhớ UID ngay khi Firebase tạo tài khoản thành công.
+                    withContext(NonCancellable) {
+                        val user = AuthRepository
+                            .signUp(address, pass)
+                            .user
+                            ?: error(
+                                "Không thể xác định tài khoản vừa tạo."
+                            )
+
+                        pendingRegistration = PendingRegistration(
+                            uid = user.uid,
+                            email = address
+                        )
+
+                        user.uid
+                    }
                 }
+
+                if (AuthRepository.currentUid != uid) {
+                    errorMessage =
+                        "Phiên đăng nhập đã thay đổi. Vui lòng thử lại."
+
+                    onComplete(false)
+                    return@launch
+                }
+
+                val profile = try {
+                    // Repository chỉ tạo hồ sơ nếu chưa tồn tại.
+                    UserProfileRepository.createProfile(
+                        uid,
+                        displayName,
+                        address
+                    )
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    errorMessage =
+                        "Tài khoản đã được tạo nhưng chưa lưu được hồ sơ. " +
+                                "Vui lòng kiểm tra kết nối, giữ nguyên email " +
+                                "và bấm Đăng ký để thử lại."
+
+                    onComplete(false)
+                    return@launch
+                }
+
+                if (AuthRepository.currentUid != uid) {
+                    errorMessage =
+                        "Phiên đăng nhập đã thay đổi. Vui lòng thử lại."
+
+                    onComplete(false)
+                    return@launch
+                }
+
+                UserProfileManager.name =
+                    profile.displayName.ifBlank { displayName }
+
+                UserProfileManager.email =
+                    profile.email.ifBlank { address }
+
+                UserProfileManager.phone =
+                    AuthRepository.currentUser?.phoneNumber.orEmpty()
+
+                UserProfileManager.saveProfileInfo(context)
+
+                UserProfileManager.setSetupCompleted(
+                    context,
+                    !profile.usageMode.isNullOrBlank()
+                )
+
+                UserProfileManager.setLoggedIn(context, true)
+
+                DeviceManager.syncCurrentDevice(
+                    context.applicationContext,
+                    uid
+                )
+
+                pendingRegistration = null
+                isSuccess = true
+                onComplete(true)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -373,7 +463,7 @@ class AuthViewModel : ViewModel() {
             } catch (error: Exception) {
                 errorMessage = translateFirebaseError(error)
             } finally {
-                // Không giữ phiên đăng nhập chưa chuẩn bị được hồ sơ.
+                // Dọn phiên nếu chưa chuẩn bị được hồ sơ.
                 if (firebaseAuthenticated && !completed) {
                     AuthRepository.signOut()
 

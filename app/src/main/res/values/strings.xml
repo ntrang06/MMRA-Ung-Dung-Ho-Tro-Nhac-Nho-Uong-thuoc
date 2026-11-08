@@ -34,7 +34,7 @@
     <string name="email_login_title">Email</string>
     <string name="email_login_desc">Nhập email đã đăng ký và mật khẩu của bạn.</string>
     <string name="label_email">Email</string>
-    <string name="hint_email">lan.nguyen@gmail.com</string>
+    <string name="hint_email">Nhập email của bạn</string>
 
     <string name="label_password">Mật khẩu</string>
     <string name="action_forgot_password">Quên mật khẩu?</string>
@@ -46,7 +46,7 @@
     <string name="register_subtitle">Tạo tài khoản MMRA của bạn</string>
     <string name="register_desc">Điền thông tin bên dưới. MMRA sẽ gửi mã để xác minh số điện thoại của bạn.</string>
     <string name="label_fullname">Họ và tên</string>
-    <string name="hint_fullname">Nguyễn Thị Lan</string>
+    <string name="hint_fullname">Nhập họ và tên</string>
     <string name="register_password_note">Ít nhất 8 ký tự, gồm chữ và số. Không dùng mật khẩu dễ đoán hoặc chia sẻ với người khác.</string>
     <string name="register_terms_note">Khi đăng ký, bạn đồng ý với Điều khoản sử dụng và Chính sách bảo mật.</string>
     <string name="already_has_account_prefix">Đã có tài khoản?</string>
@@ -67,7 +67,7 @@
     <string name="verify_email_title">Xác minh email</string>
     <string name="verify_email_subtitle">Mã xác minh qua email</string>
     <string name="verify_email_desc">Mã gồm 6 chữ số đã được gửi qua email đến:</string>
-    <string name="sample_email_masked">lan.n•••••@gmail.com</string>
+    <string name="sample_email_masked">Email của bạn</string>
     <string name="btn_change_email">Thay đổi email</string>
     <string name="verify_email_spam_note">Chưa thấy email? Hãy kiểm tra thư mục Thư rác.</string>
 
@@ -83,7 +83,7 @@
 
     <string name="create_password_title">Tạo mật khẩu mới</string>
     <string name="create_password_subtitle">Khôi phục tài khoản • Bước 3 / 3</string>
-    <string name="verified_email_banner">Đã xác minh lan.n•••••@gmail.com. Bạn có thể tạo mật khẩu mới.</string>
+    <string name="verified_email_banner">Đã xác minh email. Bạn có thể tạo mật khẩu mới.</string>
     <string name="create_password_desc">Chọn mật khẩu mới, khác với mật khẩu cũ của bạn.</string>
     <string name="label_new_password">Mật khẩu mới</string>
     <string name="label_confirm_password">Nhập lại mật khẩu mới</string>
@@ -93,7 +93,7 @@
     <string name="completion_title">Hoàn tất</string>
     <string name="completion_subtitle">Khôi phục tài khoản</string>
     <string name="completion_headline">Mật khẩu đã được cập nhật</string>
-    <string name="completion_desc">Cô Lan có thể đăng nhập lại bằng số điện thoại hoặc email và mật khẩu mới.</string>
+    <string name="completion_desc">Bạn có thể đăng nhập lại bằng email và mật khẩu mới.</string>
     <string name="btn_back_to_login">Quay lại Đăng nhập</string>
     <string name="completion_info_note">Lịch uống thuốc và các lựa chọn đã lưu của bạn không thay đổi.</string>
 
@@ -105,7 +105,7 @@
     <string name="cd_shield_icon">Biểu tượng bảo mật</string>
     <string name="cd_password_visibility">Chuyển đổi hiển thị mật khẩu</string>
 
-    <!-- Initial Setup Screens -->
+    <!-- Thiết lập ban đầu -->
     <string name="setup_target_title">Bạn muốn sử dụng MMRA như thế nào?</string>
     <string name="setup_target_subtitle">Thiết lập lần đầu • Bước 1 / 2</string>
     <string name="setup_target_desc">Chọn một hoặc cả hai chế độ để MMRA hỗ trợ bạn phù hợp hơn. Bạn có thể chọn một hoặc cả hai tùy chọn dưới đây.</string>
@@ -127,14 +127,14 @@
     <string name="setup_display_status_on">Đang bật</string>
     <string name="setup_display_status_off">Đang tắt</string>
     <string name="setup_display_preview_label">Xem thử cỡ chữ</string>
-    <string name="setup_display_preview_text">Chào cô Lan, MMRA luôn ở đây.</string>
+    <string name="setup_display_preview_text">Chào bạn, MMRA luôn ở đây.</string>
     <string name="setup_btn_save_continue">Lưu và tiếp tục</string>
     <string name="setup_display_info_note">Các lựa chọn được lưu. Thiết lập sẽ không lặp lại, trừ khi bạn đặt lại trong Cài đặt trợ năng.</string>
 
-    <!-- Account & Profile Avatar Screens -->
+    <!-- Tài khoản và ảnh đại diện -->
     <string name="account_title">Tài khoản của tôi</string>
     <string name="account_subtitle">Thông tin và lựa chọn của bạn</string>
-    <string name="account_user_name">Nguyễn Thị Lan</string>
+    <string name="account_user_name">Người dùng</string>
     <string name="account_user_role">Người uống thuốc</string>
     <string name="account_verified">Tài khoản đã xác minh</string>
     <string name="account_section_personal">Thông tin cá nhân</string>
@@ -174,8 +174,8 @@
 
     <string name="avatar_review_title">Xem lại ảnh</string>
     <string name="avatar_review_step">Bước 2 / 3 • Kiểm tra ảnh</string>
-    <string name="avatar_review_heading">Cô Lan thấy ảnh này rõ chưa?</string>
-    <string name="avatar_review_desc">Nếu đã ưng ý, cô có thể tiếp tục để căn chỉnh ảnh đại diện.</string>
+    <string name="avatar_review_heading">Bạn thấy ảnh này rõ chưa?</string>
+    <string name="avatar_review_desc">Nếu đã ưng ý, bạn có thể tiếp tục để căn chỉnh ảnh đại diện.</string>
     <string name="avatar_btn_continue_crop">Tiếp tục cắt ảnh</string>
     <string name="avatar_btn_retake">Chụp lại</string>
 
@@ -184,7 +184,7 @@
     <string name="avatar_gallery_filter">Ảnh gần đây</string>
     <string name="avatar_gallery_instruction">Chọn 1 ảnh có khuôn mặt rõ nét.</string>
     <string name="avatar_gallery_selected_count">Đã chọn 1 ảnh</string>
-    <string name="avatar_gallery_selected_sub">Ảnh minh họa của cô Lan</string>
+    <string name="avatar_gallery_selected_sub">Ảnh xem trước</string>
 
     <string name="avatar_crop_title">Căn chỉnh ảnh</string>
     <string name="avatar_crop_step">Bước cuối • Cắt ảnh đại diện</string>
@@ -196,10 +196,10 @@
     <string name="avatar_updated_title">Ảnh đại diện</string>
     <string name="avatar_updated_step">Hoàn tất cập nhật</string>
     <string name="avatar_updated_heading">Đã cập nhật ảnh đại diện</string>
-    <string name="avatar_updated_desc">Ảnh mới đã được lưu. Người thân sẽ dễ nhận ra tài khoản của cô hơn.</string>
+    <string name="avatar_updated_desc">Ảnh mới đã được lưu. Người thân sẽ dễ nhận ra tài khoản của bạn hơn.</string>
     <string name="avatar_btn_back_to_account">Về tài khoản của tôi</string>
 
     <string name="avatar_deleted_heading">Đã xóa ảnh đại diện</string>
-    <string name="avatar_deleted_desc">Tài khoản của cô đã trở về ảnh mặc định. Các thông tin khác vẫn được giữ nguyên.</string>
+    <string name="avatar_deleted_desc">Tài khoản của bạn đã trở về ảnh mặc định. Các thông tin khác vẫn được giữ nguyên.</string>
     <string name="avatar_deleted_status">Đang dùng ảnh đại diện mặc định</string>
 </resources>
