@@ -734,55 +734,32 @@ fun MMRANavHost(
         }
 
         composable(MMRADestinations.LOGOUT_CONFIRMATION) {
-            val authViewModel = remember {
-                AuthViewModel()
-            }
-
-            LogoutConfirmationScreen(
-                avatarBitmap = UserProfileManager.currentAvatarBitmap,
-                onBackClick = {
+            LogoutDestination(
+                onBack = {
                     navController.popBackStack()
                 },
-                onCancelClick = {
-                    navController.popBackStack()
-                },
-                onConfirmLogout = {
-                    authViewModel.signOut(context) {
-                        UserProfileManager.setLoggedIn(context, false)
-                        UserProfileManager.setSetupCompleted(context, false)
-
-                        navController.navigate(MMRADestinations.WELCOME) {
-                            popUpTo(0) {
-                                inclusive = true
-                            }
+                onSignedOut = {
+                    navController.navigate(MMRADestinations.WELCOME) {
+                        popUpTo(0) {
+                            inclusive = true
                         }
+                        launchSingleTop = true
                     }
                 }
             )
         }
 
-        // --- Main Feature Destinations ---
-
         composable(MMRADestinations.ACCOUNT) {
-            val authViewModel = remember {
-                AuthViewModel()
-            }
-
             MyAccountScreen(
                 avatarBitmap = UserProfileManager.currentAvatarBitmap,
                 onBackClick = {
                     navController.popBackStack()
                 },
                 onLogoutClick = {
-                    authViewModel.signOut(context) {
-                        UserProfileManager.setLoggedIn(context, false)
-                        UserProfileManager.setSetupCompleted(context, false)
-
-                        navController.navigate(MMRADestinations.WELCOME) {
-                            popUpTo(0) {
-                                inclusive = true
-                            }
-                        }
+                    navController.navigate(
+                        MMRADestinations.LOGOUT_CONFIRMATION
+                    ) {
+                        launchSingleTop = true
                     }
                 }
             )

@@ -24,7 +24,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
 class AuthViewModel : ViewModel() {
 
     var isLoading by mutableStateOf(false)
@@ -320,21 +322,65 @@ class AuthViewModel : ViewModel() {
         isSuccess = false
         errorMessage = null
 
+        val appContext = context.applicationContext
+
         viewModelScope.launch {
+            var completed = false
+
             try {
                 val uid = AuthRepository.currentUid
 
                 if (uid != null) {
-                    DeviceManager.removeDevice(context, uid)
+                    val removed = withTimeoutOrNull(15_000L) {
+                        suspendCancellableCoroutine<Boolean> { continuation ->
+                            DeviceManager.removeDevice(appContext, uid) { success ->
+                                if (continuation.isActive) {
+                                    continuation.resume(success)
+                                }
+                            }
+                        }
+                    }
+
+                    if (removed != true) {
+                        errorMessage =
+                            "Chưa gỡ được liên kết thiết bị. " +
+                                    "Bạn vẫn đang đăng nhập. " +
+                                    "Vui lòng kiểm tra Internet và thử lại."
+
+                        return@launch
+                    }
                 }
 
+                if (AuthRepository.currentUid != uid) {
+                    errorMessage =
+                        "Tài khoản đã thay đổi. " +
+                                "Vui lòng quay lại và mở lại màn Đăng xuất."
+
+                    return@launch
+                }
+
+                // Chỉ kết thúc phiên sau khi đã gỡ thiết bị.
                 AuthRepository.signOut()
-                UserProfileManager.setLoggedIn(context, false)
+
+                UserProfileManager.setLoggedIn(appContext, false)
+                UserProfileManager.setSetupCompleted(appContext, false)
+
+                pendingRegistration = null
+                isSuccess = true
+                completed = true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                errorMessage =
+                    "Chưa đăng xuất được. " +
+                            "Vui lòng kiểm tra kết nối và thử lại."
             } finally {
                 isLoading = false
             }
 
-            onComplete()
+            if (completed) {
+                onComplete()
+            }
         }
     }
 
