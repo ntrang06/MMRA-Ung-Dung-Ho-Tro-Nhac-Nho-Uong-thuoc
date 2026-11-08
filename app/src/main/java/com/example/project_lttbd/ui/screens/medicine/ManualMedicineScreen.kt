@@ -45,7 +45,8 @@ fun ManualMedicineScreen(
     onContinue: (ManualMedicineDraft) -> Unit = {},
     initialDraft: ManualMedicineDraft? = null,
     isEditing: Boolean = initialDraft != null,
-    saveMedicineOnly: Boolean = false
+    saveMedicineOnly: Boolean = false,
+    deleteAction: (@Composable () -> Unit)? = null
 ) {
     var medicineName by rememberSaveable {
         mutableStateOf(initialDraft?.medicineName.orEmpty())
@@ -350,6 +351,8 @@ fun ManualMedicineScreen(
                 )
             }
         )
+
+        deleteAction?.invoke()
     }
 }
 
