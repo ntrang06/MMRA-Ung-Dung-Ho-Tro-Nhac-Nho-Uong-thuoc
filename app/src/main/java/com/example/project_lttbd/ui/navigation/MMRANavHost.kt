@@ -169,7 +169,7 @@ fun MMRANavHost(
         }
     }
 
-    var setupPreferences by remember {
+    var setupPreferences by remember(currentUser?.uid) {
         mutableStateOf(InitialSetupPreferences())
     }
 

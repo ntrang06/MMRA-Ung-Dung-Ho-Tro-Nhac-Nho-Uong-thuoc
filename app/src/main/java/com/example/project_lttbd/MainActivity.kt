@@ -199,15 +199,53 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun extractNotificationRoute(intent: Intent?) {
-        val destination = intent
-            ?.getStringExtra(NotificationHelper.EXTRA_DESTINATION)
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
+        if (
+            intent == null ||
+            intent.getBooleanExtra(
+                "mmra_notification_route_consumed",
+                false
+            )
+        ) {
+            pendingDestination.value = null
+            return
+        }
 
-        // Không xử lý lại thông báo cũ khi Activity được tạo lại.
-        intent?.removeExtra(NotificationHelper.EXTRA_DESTINATION)
+        val requestedRoute = sequenceOf(
+            intent.getStringExtra(NotificationHelper.EXTRA_DESTINATION),
+            intent.getStringExtra("destination")
+        )
+            .filterNotNull()
+            .map { it.trim() }
+            .firstOrNull { it.isNotEmpty() }
 
-        pendingDestination.value = destination
+        val fromFcm = intent.hasExtra("gcm.n.analytics_data") ||
+                intent.hasExtra("google.message_id") ||
+                intent.hasExtra("message_id")
+
+        if (requestedRoute == null && !fromFcm) {
+            pendingDestination.value = null
+            return
+        }
+
+        val allowedRoutes = setOf(
+            MMRADestinations.HOME,
+            MMRADestinations.MEDICINE,
+            MMRADestinations.SCHEDULE,
+            MMRADestinations.HISTORY,
+            MMRADestinations.FAMILY,
+            MMRADestinations.ACCOUNT,
+            MMRADestinations.MY_ACCOUNT
+        )
+
+        pendingDestination.value = requestedRoute
+            ?.takeIf { it in allowedRoutes }
+            ?: MMRADestinations.HOME
+
+        // Đánh dấu đã nhận đích đến, giữ dữ liệu Firebase cho Analytics.
+        intent.putExtra(
+            "mmra_notification_route_consumed",
+            true
+        )
     }
 
     private fun syncDeviceIfLoggedIn() {

@@ -23,10 +23,11 @@ import com.google.firebase.auth.FirebaseAuthException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
+
 class AuthViewModel : ViewModel() {
 
     var isLoading by mutableStateOf(false)
@@ -57,7 +58,9 @@ class AuthViewModel : ViewModel() {
     ) {
         if (isLoading) return
 
-        if (email.isBlank() || pass.isBlank()) {
+        val address = email.trim()
+
+        if (address.isBlank() || pass.isBlank()) {
             errorMessage = "Vui lòng nhập đầy đủ email và mật khẩu."
             onComplete(false)
             return
@@ -68,56 +71,71 @@ class AuthViewModel : ViewModel() {
         errorMessage = null
 
         viewModelScope.launch {
+            var authenticatedUid: String? = null
+            var completed = false
+
             try {
-                val result = AuthRepository.signIn(email, pass)
-                val uid = result.user?.uid
+                val user = withContext(NonCancellable) {
+                    AuthRepository.signIn(address, pass)
+                        .user
+                        .also {
+                            authenticatedUid = it?.uid
+                        }
+                } ?: error(
+                    "Không thể xác định tài khoản đăng nhập."
+                )
 
-                if (uid != null) {
-                    val profile = UserProfileRepository.getProfile(uid)
+                val profile = UserProfileRepository
+                    .getProfile(user.uid)
+                    ?: UserProfileRepository.createProfile(
+                        user.uid,
+                        user.displayName
+                            ?.takeIf { it.isNotBlank() }
+                            ?: address.substringBefore('@'),
+                        address
+                    )
 
-                    if (profile != null) {
-                        UserProfileManager.name =
-                            profile.displayName.ifBlank { "Người dùng" }
+                UserProfileManager.applyProfile(
+                    context,
+                    user.uid,
+                    profile
+                )
 
-                        UserProfileManager.email =
-                            profile.email.ifBlank { email }
+                UserProfileManager.setLoggedIn(
+                    context,
+                    true
+                )
 
-                        UserProfileManager.setSetupCompleted(
-                            context,
-                            !profile.usageMode.isNullOrBlank()
-                        )
-                    } else {
-                        UserProfileRepository.createProfile(
-                            uid,
-                            email.substringBefore('@'),
-                            email
-                        )
+                DeviceManager.syncCurrentDevice(
+                    context.applicationContext,
+                    user.uid
+                )
 
-                        UserProfileManager.setSetupCompleted(
-                            context,
-                            false
-                        )
-                    }
-
-                    UserProfileManager.setLoggedIn(context, true)
-
-                    DeviceManager.syncCurrentDevice(context, uid)
-
-                    isSuccess = true
-                    onComplete(true)
-                } else {
-                    errorMessage =
-                        "Không thể xác định tài khoản đăng nhập."
-                    onComplete(false)
-                }
+                isSuccess = true
+                completed = true
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 errorMessage = translateFirebaseError(error)
-                onComplete(false)
             } finally {
+                // Chỉ dọn phiên do chính lần đăng nhập này tạo ra.
+                if (
+                    authenticatedUid != null &&
+                    !completed &&
+                    AuthRepository.currentUid == authenticatedUid
+                ) {
+                    AuthRepository.signOut()
+
+                    UserProfileManager.setLoggedIn(
+                        context,
+                        false
+                    )
+                }
+
                 isLoading = false
             }
+
+            onComplete(completed)
         }
     }
 
@@ -156,7 +174,10 @@ class AuthViewModel : ViewModel() {
                 return
             }
 
-            if (currentUid != null && currentUid != pending.uid) {
+            if (
+                currentUid != null &&
+                currentUid != pending.uid
+            ) {
                 errorMessage =
                     "Tài khoản đang đăng nhập đã thay đổi. " +
                             "Vui lòng đăng xuất trước khi thử lại."
@@ -182,10 +203,15 @@ class AuthViewModel : ViewModel() {
                 val uid = if (pending != null) {
                     // Nếu mất phiên thì đăng nhập lại tài khoản đã tạo.
                     if (AuthRepository.currentUid == null) {
-                        AuthRepository.signIn(address, pass)
+                        AuthRepository.signIn(
+                            address,
+                            pass
+                        )
                     }
 
-                    check(AuthRepository.currentUid == pending.uid)
+                    check(
+                        AuthRepository.currentUid == pending.uid
+                    )
 
                     pending.uid
                 } else {
@@ -242,23 +268,16 @@ class AuthViewModel : ViewModel() {
                     return@launch
                 }
 
-                UserProfileManager.name =
-                    profile.displayName.ifBlank { displayName }
-
-                UserProfileManager.email =
-                    profile.email.ifBlank { address }
-
-                UserProfileManager.phone =
-                    AuthRepository.currentUser?.phoneNumber.orEmpty()
-
-                UserProfileManager.saveProfileInfo(context)
-
-                UserProfileManager.setSetupCompleted(
+                UserProfileManager.applyProfile(
                     context,
-                    !profile.usageMode.isNullOrBlank()
+                    uid,
+                    profile
                 )
 
-                UserProfileManager.setLoggedIn(context, true)
+                UserProfileManager.setLoggedIn(
+                    context,
+                    true
+                )
 
                 DeviceManager.syncCurrentDevice(
                     context.applicationContext,
@@ -267,6 +286,7 @@ class AuthViewModel : ViewModel() {
 
                 pendingRegistration = null
                 isSuccess = true
+
                 onComplete(true)
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -297,7 +317,9 @@ class AuthViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                AuthRepository.sendPasswordResetEmail(email)
+                AuthRepository.sendPasswordResetEmail(
+                    email
+                )
 
                 isSuccess = true
                 onComplete(true)
@@ -333,7 +355,10 @@ class AuthViewModel : ViewModel() {
                 if (uid != null) {
                     val removed = withTimeoutOrNull(15_000L) {
                         suspendCancellableCoroutine<Boolean> { continuation ->
-                            DeviceManager.removeDevice(appContext, uid) { success ->
+                            DeviceManager.removeDevice(
+                                appContext,
+                                uid
+                            ) { success ->
                                 if (continuation.isActive) {
                                     continuation.resume(success)
                                 }
@@ -362,8 +387,15 @@ class AuthViewModel : ViewModel() {
                 // Chỉ kết thúc phiên sau khi đã gỡ thiết bị.
                 AuthRepository.signOut()
 
-                UserProfileManager.setLoggedIn(appContext, false)
-                UserProfileManager.setSetupCompleted(appContext, false)
+                UserProfileManager.setLoggedIn(
+                    appContext,
+                    false
+                )
+
+                UserProfileManager.setSetupCompleted(
+                    appContext,
+                    false
+                )
 
                 pendingRegistration = null
                 isSuccess = true
@@ -404,7 +436,7 @@ class AuthViewModel : ViewModel() {
         errorMessage = null
 
         viewModelScope.launch {
-            var firebaseAuthenticated = false
+            var authenticatedUid: String? = null
             var completed = false
 
             try {
@@ -450,7 +482,7 @@ class AuthViewModel : ViewModel() {
                     AuthRepository.signInWithGoogle(idToken)
                         .user
                         .also {
-                            firebaseAuthenticated = it != null
+                            authenticatedUid = it?.uid
                         }
                 } ?: error(
                     "Chưa xác nhận được tài khoản Google."
@@ -472,22 +504,15 @@ class AuthViewModel : ViewModel() {
                         userEmail
                     )
 
-                UserProfileManager.name =
-                    profile.displayName.ifBlank { userName }
-
-                UserProfileManager.email =
-                    profile.email.ifBlank { userEmail }
-
-                UserProfileManager.phone =
-                    user.phoneNumber.orEmpty()
-
-                UserProfileManager.saveProfileInfo(context)
-
-                UserProfileManager.setLoggedIn(context, true)
-
-                UserProfileManager.setSetupCompleted(
+                UserProfileManager.applyProfile(
                     context,
-                    !profile.usageMode.isNullOrBlank()
+                    user.uid,
+                    profile
+                )
+
+                UserProfileManager.setLoggedIn(
+                    context,
+                    true
                 )
 
                 DeviceManager.syncCurrentDevice(
@@ -509,8 +534,12 @@ class AuthViewModel : ViewModel() {
             } catch (error: Exception) {
                 errorMessage = translateFirebaseError(error)
             } finally {
-                // Dọn phiên nếu chưa chuẩn bị được hồ sơ.
-                if (firebaseAuthenticated && !completed) {
+                // Chỉ dọn phiên do lần đăng nhập Google này tạo ra.
+                if (
+                    authenticatedUid != null &&
+                    !completed &&
+                    AuthRepository.currentUid == authenticatedUid
+                ) {
                     AuthRepository.signOut()
 
                     UserProfileManager.setLoggedIn(
