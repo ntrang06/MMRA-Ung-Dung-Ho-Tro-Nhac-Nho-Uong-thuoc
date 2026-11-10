@@ -94,13 +94,27 @@ fun HomeScreen(
         .format(Calendar.getInstance().time)
         .replaceFirstChar { it.titlecase() }
 
+    val greetingText = when (
+        Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    ) {
+        in 5..11 -> "Chào buổi sáng"
+        in 12..17 -> "Chào buổi chiều"
+        else -> "Chào buổi tối"
+    }
+
+    val displayName = UserProfileManager.name
+        .trim()
+        .ifBlank { "bạn" }
+        .format(Calendar.getInstance().time)
+        .replaceFirstChar { it.titlecase() }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
         HomeHeader(
-            greeting = "Chào buổi sáng, cô Lan",
+            greeting = "$greetingText, $displayName",
             dateText = todayText,
             initials = UserProfileManager.getInitials(),
             avatarBitmap = UserProfileManager.currentAvatarBitmap,

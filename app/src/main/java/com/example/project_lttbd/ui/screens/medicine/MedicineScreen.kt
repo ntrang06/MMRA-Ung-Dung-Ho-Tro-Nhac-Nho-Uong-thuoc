@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.project_lttbd.ui.components.MMRASearchField
 import com.example.project_lttbd.ui.theme.MMRATheme
-
+import com.example.project_lttbd.data.model.UserProfileManager
 @Composable
 fun MedicineScreen(
     modifier: Modifier = Modifier,
@@ -98,7 +98,7 @@ fun MedicineScreen(
     MedicineScreenContent(
         modifier = modifier,
         medicines = medicines,
-        ownerName = state.ownerName,
+        ownerName = UserProfileManager.name.ifBlank { state.ownerName },
         isLoading = state.isLoading,
         isSignedIn = state.isSignedIn,
         errorMessage = state.errorMessage,

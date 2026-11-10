@@ -169,7 +169,7 @@ fun AvatarDeletedScreen(
                             modifier = Modifier.fillMaxSize(),
                         ) {
                             Text(
-                                text = "NL",
+                                text = UserProfileManager.getInitials(),
                                 fontSize = 36.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = primaryColor,

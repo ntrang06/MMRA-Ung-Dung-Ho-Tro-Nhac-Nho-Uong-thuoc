@@ -282,7 +282,7 @@ fun AccessibilitySettingsScreen(
                     modifier = Modifier.padding(20.dp),
                 ) {
                     Text(
-                        text = "Chào cô Lan, chữ lớn giúp đọc dễ hơn.",
+                        text = "Chào bạn, chữ lớn giúp đọc dễ hơn.",
                         fontSize = if (isLargeText) 20.sp else 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = darkTextColor,

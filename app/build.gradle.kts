@@ -26,7 +26,11 @@ android {
         release {
             optimization {
                 enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
+                packageScope = setOf(
+                    "androidx.**",
+                    "kotlin.**",
+                    "kotlinx.**"
+                )
             }
         }
     }
@@ -64,21 +68,37 @@ dependencies {
 
     // CameraX
     val cameraxVersion = "1.4.2"
+
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
 
-    // Firebase: quản lý phiên bản chung cho các thư viện Firebase
+    // Firebase: quản lý phiên bản chung
     implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
 
-    // Đăng ký, đăng nhập và quản lý phiên đăng nhập
+    // Đăng ký, đăng nhập và quản lý phiên
     implementation("com.google.firebase:firebase-auth")
 
-    // Cơ sở dữ liệu Cloud Firestore
+    // Credential Manager và đăng nhập Google
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation(
+        "androidx.credentials:credentials-play-services-auth:1.3.0"
+    )
+    implementation(
+        "com.google.android.libraries.identity.googleid:googleid:1.1.1"
+    )
+
+    // Cloud Firestore
     implementation("com.google.firebase:firebase-firestore")
 
-    // Thông báo đẩy Firebase Cloud Messaging
+    // Thông báo đẩy và Analytics
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-analytics")
+
+    // Retrofit: gọi API FastAPI
+    implementation("com.squareup.retrofit2:retrofit:3.0.0")
+
+    // Gson: chuyển đổi JSON giữa backend và các lớp dữ liệu Kotlin
+    implementation("com.squareup.retrofit2:converter-gson:3.0.0")
 }

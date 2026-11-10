@@ -2,16 +2,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Quyền và tính năng camera phục vụ quét thuốc -->
+    <!-- Kết nối Firebase và API FastAPI -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Camera phục vụ quét thuốc -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
 
-    <!-- Quyền thông báo đẩy trên Android 13+ (API 33+) -->
+    <!-- Thông báo trên Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Cho phép truy vấn dịch vụ Text-to-Speech -->
+    <!-- Truy vấn dịch vụ Text-to-Speech -->
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
@@ -26,6 +29,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
         android:theme="@style/Theme.MMRA_MedicationManager">
 
         <activity
@@ -37,13 +41,11 @@
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
         </activity>
 
-        <!-- Dịch vụ nhận thông báo đẩy Firebase Cloud Messaging -->
+        <!-- Dịch vụ nhận thông báo Firebase Cloud Messaging -->
         <service
             android:name=".notifications.MMRAFirebaseMessagingService"
             android:exported="false">

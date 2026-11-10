@@ -69,7 +69,7 @@ fun VoiceGuidanceSettingsScreen(
     }
 
     val sampleText =
-        "Chào cô Lan. Chạm vào Lịch uống để xem các liều thuốc trong ngày."
+        "Chào bạn. Chạm vào Lịch uống để xem các liều thuốc trong ngày."
 
     DisposableEffect(applicationContext, isPreview) {
         val handler = Handler(Looper.getMainLooper())
