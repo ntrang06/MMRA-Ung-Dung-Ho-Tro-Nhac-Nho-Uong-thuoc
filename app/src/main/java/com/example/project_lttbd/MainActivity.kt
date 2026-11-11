@@ -23,6 +23,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.project_lttbd.data.device.DeviceManager
+import com.example.project_lttbd.data.remote.BackendSessionCheck
 import com.example.project_lttbd.data.remote.FirebaseProvider
 import com.example.project_lttbd.notifications.NotificationHelper
 import com.example.project_lttbd.ui.components.MMRABottomBar
@@ -41,6 +42,9 @@ class MainActivity : ComponentActivity() {
 
         // Khởi tạo kênh thông báo hệ thống.
         NotificationHelper.ensureNotificationChannel(this)
+
+        // Kiểm tra Firebase ID token với backend ở bản debug.
+        BackendSessionCheck.run(this)
 
         // Thông tin phục vụ kiểm thử Firebase Cloud Messaging.
         android.util.Log.d(
@@ -139,6 +143,7 @@ class MainActivity : ComponentActivity() {
                             popUpTo(0) {
                                 inclusive = true
                             }
+
                             launchSingleTop = true
                         }
                     } else {
@@ -211,16 +216,19 @@ class MainActivity : ComponentActivity() {
         }
 
         val requestedRoute = sequenceOf(
-            intent.getStringExtra(NotificationHelper.EXTRA_DESTINATION),
+            intent.getStringExtra(
+                NotificationHelper.EXTRA_DESTINATION
+            ),
             intent.getStringExtra("destination")
         )
             .filterNotNull()
             .map { it.trim() }
             .firstOrNull { it.isNotEmpty() }
 
-        val fromFcm = intent.hasExtra("gcm.n.analytics_data") ||
-                intent.hasExtra("google.message_id") ||
-                intent.hasExtra("message_id")
+        val fromFcm =
+            intent.hasExtra("gcm.n.analytics_data") ||
+                    intent.hasExtra("google.message_id") ||
+                    intent.hasExtra("message_id")
 
         if (requestedRoute == null && !fromFcm) {
             pendingDestination.value = null
@@ -241,7 +249,8 @@ class MainActivity : ComponentActivity() {
             ?.takeIf { it in allowedRoutes }
             ?: MMRADestinations.HOME
 
-        // Đánh dấu đã nhận đích đến, giữ dữ liệu Firebase cho Analytics.
+        // Đánh dấu đã nhận đích đến,
+        // giữ dữ liệu Firebase cho Analytics.
         intent.putExtra(
             "mmra_notification_route_consumed",
             true
