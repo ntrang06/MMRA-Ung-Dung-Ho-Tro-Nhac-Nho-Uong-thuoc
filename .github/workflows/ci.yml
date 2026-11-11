@@ -39,7 +39,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: "platform-tools platforms;android-37"
+          packages: "platform-tools platforms;android-37.0"
 
       - name: Build debug APK
         run: bash ./gradlew :app:assembleDebug --no-daemon --stacktrace
