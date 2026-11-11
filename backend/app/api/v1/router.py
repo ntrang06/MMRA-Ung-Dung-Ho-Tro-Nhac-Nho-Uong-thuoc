@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     health,
     password_reset,
+    schedules,
     session,
 )
 
@@ -17,3 +18,6 @@ api_router.include_router(password_reset.router)
 
 # Kiểm tra phiên Firebase.
 api_router.include_router(session.router)
+
+# Danh sách và chi tiết lịch uống.
+api_router.include_router(schedules.router)
