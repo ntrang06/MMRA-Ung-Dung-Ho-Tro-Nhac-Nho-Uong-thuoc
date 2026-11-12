@@ -1,6 +1,7 @@
 package com.example.project_lttbd.ui.viewmodel
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -8,6 +9,7 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -118,6 +120,7 @@ class AuthViewModel : ViewModel() {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                Log.e("AuthViewModel", "Lỗi đăng nhập Google", error)
                 errorMessage = translateFirebaseError(error)
             } finally {
                 // Chỉ dọn phiên do chính lần đăng nhập này tạo ra.
@@ -540,6 +543,7 @@ class AuthViewModel : ViewModel() {
                             "Vui lòng kiểm tra tài khoản trên điện thoại " +
                             "và thử lại."
             } catch (error: Exception) {
+                Log.e("AuthViewModel", "Lỗi đăng nhập Google", error)
                 errorMessage = translateFirebaseError(error)
             } finally {
                 // Chỉ dọn phiên do lần đăng nhập Google này tạo ra.
@@ -619,9 +623,22 @@ class AuthViewModel : ViewModel() {
                 }
             }
 
-            else ->
-                "Chưa thực hiện được yêu cầu. " +
-                        "Vui lòng kiểm tra kết nối và thử lại."
+            is GetCredentialException -> {
+                Log.e("AuthViewModel", "GetCredentialException: ${error.message}", error)
+                "Chưa đăng nhập được Google do mã SHA-1 của máy tính này chưa được đăng ký trong Firebase Console. " +
+                        "Vui lòng đăng nhập bằng Email/SĐT hoặc thêm SHA-1 vào dự án."
+            }
+
+            else -> {
+                Log.e("AuthViewModel", "Unhandled Auth Error: ${error.javaClass.simpleName} - ${error.message}", error)
+                val detail = error.localizedMessage?.takeIf { it.isNotBlank() }
+                if (detail != null && !detail.contains("Exception") && detail.length < 100) {
+                    "Chưa thực hiện được yêu cầu: $detail"
+                } else {
+                    "Chưa thực hiện được yêu cầu. " +
+                            "Vui lòng kiểm tra kết nối và thử lại."
+                }
+            }
         }
     }
 }
