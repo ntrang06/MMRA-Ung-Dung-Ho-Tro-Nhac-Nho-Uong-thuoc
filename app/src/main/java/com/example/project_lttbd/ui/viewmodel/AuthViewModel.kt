@@ -15,6 +15,8 @@ import com.example.project_lttbd.data.device.DeviceManager
 import com.example.project_lttbd.data.model.UserProfileManager
 import com.example.project_lttbd.data.remote.AuthRepository
 import com.example.project_lttbd.data.remote.UserProfileRepository
+import com.example.project_lttbd.notifications.NotificationHelper
+import com.example.project_lttbd.notifications.alarm.MedicationAlarmScheduler
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.FirebaseNetworkException
@@ -398,6 +400,12 @@ class AuthViewModel : ViewModel() {
                 )
 
                 pendingRegistration = null
+
+                if (!uid.isNullOrBlank()) {
+                    MedicationAlarmScheduler.cancelAll(appContext, uid)
+                }
+                NotificationHelper.cancelAllNotifications(appContext)
+
                 isSuccess = true
                 completed = true
             } catch (cancelled: CancellationException) {
