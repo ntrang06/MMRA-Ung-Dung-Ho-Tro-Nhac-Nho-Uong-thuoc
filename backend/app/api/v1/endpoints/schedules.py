@@ -3,7 +3,11 @@ from google.api_core.exceptions import GoogleAPICallError
 
 from app.api.deps import AuthenticatedUser
 from app.repositories import schedule_repository
-from app.schemas.medication import DocumentId, ScheduleResponse
+from app.schemas.medication import (
+    DocumentId,
+    ScheduleInput,
+    ScheduleResponse,
+)
 
 
 router = APIRouter(
@@ -12,12 +16,14 @@ router = APIRouter(
 )
 
 
-def _unavailable() -> HTTPException:
+def _unavailable(
+    message: str = "Chưa tải được lịch uống. Vui lòng thử lại.",
+) -> HTTPException:
     return HTTPException(
         status_code=503,
         detail={
             "code": "schedules_unavailable",
-            "message": "Chưa tải được lịch uống. Vui lòng thử lại.",
+            "message": message,
         },
     )
 
@@ -66,3 +72,39 @@ def get_schedule(
         )
 
     return schedule
+
+
+@router.post(
+    "",
+    response_model=ScheduleResponse,
+    status_code=201,
+)
+def create_schedule(
+    body: ScheduleInput,
+    user: AuthenticatedUser,
+    response: Response,
+):
+    response.headers["Cache-Control"] = "no-store"
+
+    try:
+        return schedule_repository.create_schedule(
+            user,
+            body,
+        )
+
+    except schedule_repository.MedicineNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "medicine_not_found",
+                "message": (
+                    "Không tìm thấy thuốc trong tài khoản của bạn."
+                ),
+            },
+        ) from None
+
+    except GoogleAPICallError:
+        raise _unavailable(
+            "Chưa xác nhận được kết quả lưu. "
+            "Vui lòng tải lại danh sách trước khi thử lại."
+        ) from None

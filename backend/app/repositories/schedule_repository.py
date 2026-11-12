@@ -1,8 +1,17 @@
+from datetime import datetime, timezone
+from uuid import uuid4
+
+from firebase_admin import firestore
 from google.cloud.firestore_v1 import DocumentSnapshot
 
 from app.api.deps import CurrentUser
+from app.core.firebase import get_firebase_app
 from app.repositories.user_scope import user_collection, user_document
-from app.schemas.medication import ScheduleResponse
+from app.schemas.medication import ScheduleInput, ScheduleResponse
+
+
+class MedicineNotFoundError(Exception):
+    pass
 
 
 def _to_schedule(snapshot: DocumentSnapshot) -> ScheduleResponse | None:
@@ -57,3 +66,63 @@ def get_schedule(
     ).get()
 
     return _to_schedule(snapshot)
+
+
+def create_schedule(
+    user: CurrentUser,
+    schedule: ScheduleInput,
+) -> ScheduleResponse:
+    schedule_id = uuid4().hex
+
+    medicine_ref = user_document(
+        user,
+        "medicines",
+        schedule.medicineId,
+    )
+
+    schedule_ref = user_document(
+        user,
+        "schedules",
+        schedule_id,
+    )
+
+    client = firestore.client(app=get_firebase_app())
+
+    @firestore.transactional
+    def save(transaction):
+        # Đọc thuốc và tạo lịch trong cùng giao dịch.
+        medicine = medicine_ref.get(transaction=transaction)
+        medicine_data = medicine.to_dict() or {}
+
+        if (
+            not medicine.exists
+            or medicine_data.get("deletedAt") is not None
+        ):
+            raise MedicineNotFoundError()
+
+        now = datetime.now(timezone.utc)
+
+        result = ScheduleResponse(
+            **schedule.model_dump(),
+            scheduleId=schedule_id,
+            version=1,
+            createdAt=now,
+            updatedAt=now,
+        )
+
+        # Ngày lưu dạng yyyy-MM-dd.
+        # createdAt/updatedAt lưu dạng Firestore Timestamp.
+        data = schedule.model_dump(mode="json")
+
+        data.update(
+            version=1,
+            createdAt=now,
+            updatedAt=now,
+            deletedAt=None,
+        )
+
+        transaction.create(schedule_ref, data)
+
+        return result
+
+    return save(client.transaction())
