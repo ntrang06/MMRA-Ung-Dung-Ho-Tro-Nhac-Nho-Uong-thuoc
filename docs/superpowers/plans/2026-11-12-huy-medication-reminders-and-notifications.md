@@ -59,23 +59,23 @@
 - `LocalNotificationStore.markAllAsRead(context: Context, uid: String)`
 - `LocalNotificationStore.clearAll(context: Context, uid: String)`
 
-- [ ] **Step 1: Write Unit Test verifying UID Isolation**
+- [x] **Step 1: Write Unit Test verifying UID Isolation**
 Tạo file test `LocalNotificationStoreTest.kt` kiểm tra:
 1. Lưu thông báo cho User A và User B.
 2. Kiểm tra `getNotifications(context, "uid_A")` chỉ trả về thông báo của A.
 3. `getNotifications(context, "uid_B")` chỉ trả về thông báo của B.
 4. Xóa thông báo của A không ảnh hưởng tới B.
 
-- [ ] **Step 2: Implement LocalNotificationItem data model**
+- [x] **Step 2: Implement LocalNotificationItem data model**
 Tạo file `LocalNotificationItem.kt` chứa cấu trúc bản ghi thông báo đầy đủ các trường phục vụ hiển thị và điều hướng.
 
-- [ ] **Step 3: Implement LocalNotificationStore**
+- [x] **Step 3: Implement LocalNotificationStore**
 Tạo file `LocalNotificationStore.kt` sử dụng file JSON cục bộ lưu trong thư mục `context.filesDir` theo tên `mmra_notifications_${uid}.json` để đảm bảo lưu trữ an toàn, nhẹ, không xung đột DB và cô lập 100% theo `uid`.
 
-- [ ] **Step 4: Run test and verify pass**
+- [x] **Step 4: Run test and verify pass**
 Chạy `./gradlew testDebugUnitTest --tests com.example.project_lttbd.notifications.storage.LocalNotificationStoreTest`.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 `git commit -m "feat(notifications): add UID-isolated local notification storage"`
 
 ---
@@ -94,26 +94,26 @@ Chạy `./gradlew testDebugUnitTest --tests com.example.project_lttbd.notificati
 - `MedicationAlarmScheduler.cancelAll(context: Context, uid: String)`
 - `MedicationAlarmReceiver`: Kế thừa `BroadcastReceiver`, nhận `doseId`, `uid`, `title`, `message`, gọi `NotificationHelper.showNotification()` và ghi vào `LocalNotificationStore`.
 
-- [ ] **Step 1: Write Unit Test for MedicationAlarmScheduler**
+- [x] **Step 1: Write Unit Test for MedicationAlarmScheduler**
 Viết unit test kiểm tra tính toán request code từ `doseId`, kiểm tra logic tính giờ phát báo thức.
 
-- [ ] **Step 2: Add permissions and receiver to AndroidManifest.xml**
+- [x] **Step 2: Add permissions and receiver to AndroidManifest.xml**
 Bổ sung `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `VIBRATE` và khai báo `<receiver android:name=".notifications.alarm.MedicationAlarmReceiver" android:exported="false" />`.
 
-- [ ] **Step 3: Implement MedicationAlarmScheduler**
+- [x] **Step 3: Implement MedicationAlarmScheduler**
 Xây dựng logic đặt báo thức chính xác `AlarmManager.setExactAndAllowWhileIdle()` với fallback phù hợp cho từng phiên bản Android, quản lý PendingIntent theo `doseId.hashCode()`.
 
-- [ ] **Step 4: Implement MedicationAlarmReceiver**
+- [x] **Step 4: Implement MedicationAlarmReceiver**
 Xử lý sự kiện báo thức:
 1. Trích xuất thông tin liều từ Intent Extras.
 2. Kiểm tra nếu `uid` trùng khớp với `FirebaseProvider.auth.currentUser?.uid` (nếu khác -> bỏ qua vì tài khoản đã đổi).
 3. Hiển thị thông báo qua `NotificationHelper`.
 4. Lưu vào `LocalNotificationStore` cho `uid`.
 
-- [ ] **Step 5: Run tests and verify**
+- [x] **Step 5: Run tests and verify**
 Chạy `./gradlew testDebugUnitTest` đảm bảo compile sạch và test pass.
 
-- [ ] **Step 6: Commit changes**
+- [x] **Step 6: Commit changes**
 `git commit -m "feat(notifications): implement MedicationAlarmScheduler and MedicationAlarmReceiver"`
 
 ---
@@ -130,22 +130,22 @@ Chạy `./gradlew testDebugUnitTest` đảm bảo compile sạch và test pass.
 - `NotificationHelper.cancelNotification(context, doseId)`
 - `NotificationHelper.cancelAllNotifications(context)`
 
-- [ ] **Step 1: Write Unit Test for Notification Route Parsing**
+- [x] **Step 1: Write Unit Test for Notification Route Parsing**
 Kiểm tra hàm tạo route từ `doseId` trỏ đúng vào `reminder/{doseId}?readOnly=false`.
 
-- [ ] **Step 2: Update NotificationHelper**
+- [x] **Step 2: Update NotificationHelper**
 Bổ sung hàm tạo thông báo riêng cho nhắc thuốc với icon chuông, nút mở nhanh liều, âm thanh báo thức `NotificationCompat.CATEGORY_ALARM`, rung và gán tag theo `doseId` để có thể hủy trực tiếp khi liều đã hoàn thành.
 
-- [ ] **Step 3: Update MainActivity intent extraction**
+- [x] **Step 3: Update MainActivity intent extraction**
 Đảm bảo khi bấm vào thông báo nhắc thuốc:
 1. `MainActivity` đọc được `EXTRA_DOSE_ID` hoặc `EXTRA_DESTINATION`.
 2. Kiểm tra người dùng hiện tại có đúng UID không.
 3. Điều hướng chính xác tới màn hình liều thuốc `MMRADestinations.REMINDER`.
 
-- [ ] **Step 4: Verify build and tests**
+- [x] **Step 4: Verify build and tests**
 Chạy `./gradlew testDebugUnitTest`.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 `git commit -m "feat(notifications): support deep linking to dose reminder from notification"`
 
 ---
@@ -158,24 +158,24 @@ Chạy `./gradlew testDebugUnitTest`.
 - Modify: `app/src/main/java/com/example/project_lttbd/ui/navigation/MMRANavHost.kt` (thêm composable destination)
 - Modify: `app/src/main/java/com/example/project_lttbd/ui/screens/home/HomeScreen.kt` (nối sự kiện `onNotificationsClick`)
 
-- [ ] **Step 1: Add NOTIFICATIONS route in MMRADestinations**
+- [x] **Step 1: Add NOTIFICATIONS route in MMRADestinations**
 Thêm `const val NOTIFICATIONS = "notifications"` vào `MMRADestinations.kt`.
 
-- [ ] **Step 2: Implement NotificationHistoryScreen UI**
+- [x] **Step 2: Implement NotificationHistoryScreen UI**
 Xây dựng giao diện Composable `NotificationHistoryScreen`:
 - Thanh tiêu đề TopBar với nút Quay lại (`onBackClick`) và nút "Xóa tất cả" / "Đánh dấu đã đọc".
 - Danh sách thông báo (`LazyColumn`) hiển thị: Tiêu đề thuốc, thời gian nhận, trạng thái đã đọc/chưa đọc.
 - Bấm vào thông báo -> Đánh dấu đã đọc và gọi `onNotificationClick(item.doseId)` -> điều hướng đến liều thuốc tương ứng.
 - Trạng thái rỗng (Empty state) khi chưa có thông báo nào với icon chuông tinh tế.
 
-- [ ] **Step 3: Connect in MMRANavHost and HomeScreen**
+- [x] **Step 3: Connect in MMRANavHost and HomeScreen**
 - Trong `MMRANavHost.kt`, thêm `composable(MMRADestinations.NOTIFICATIONS)`.
 - Trong `HomeScreen.kt`, truyền callback `onNotificationsClick` điều hướng tới `navController.navigate(MMRADestinations.NOTIFICATIONS)`.
 
-- [ ] **Step 4: Verify UI build**
+- [x] **Step 4: Verify UI build**
 Chạy `./gradlew assembleDebug` để đảm bảo không lỗi giao diện.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 `git commit -m "feat(ui): add NotificationHistoryScreen and connect Home bell icon"`
 
 ---
@@ -191,24 +191,24 @@ Chạy `./gradlew assembleDebug` để đảm bảo không lỗi giao diện.
 - `MedicationReminderSync.syncDoses(context: Context, uid: String, doses: List<DoseResponseDto>)`
 - `MedicationReminderSync.onDoseAction(context: Context, doseId: String, action: DoseActionDto)`
 
-- [ ] **Step 1: Write Unit Test for Synchronization Logic**
+- [x] **Step 1: Write Unit Test for Synchronization Logic**
 Kiểm tra:
 1. Liều `PENDING` có giờ uống trong tương lai -> Gọi `scheduler.schedule()`.
 2. Liều `TAKEN` / `SKIPPED` / `CANCELLED` -> Gọi `scheduler.cancel()` và hủy thông báo trên thanh trạng thái.
 
-- [ ] **Step 2: Implement MedicationReminderSync**
+- [x] **Step 2: Implement MedicationReminderSync**
 Cài đặt hàm `syncDoses` duyệt qua danh sách liều trả về từ API/cache:
 - Đặt báo thức cho các liều `PENDING`.
 - Hủy báo thức cho các liều không còn ở trạng thái `PENDING`.
 - Xử lý hàm `onDoseAction`: khi người dùng bấm "Đã uống" hoặc "Bỏ qua", ngay lập tức hủy báo thức và thông báo của liều đó mà không cần chờ mạng đồng bộ.
 
-- [ ] **Step 3: Connect into MMRANavHost dose actions**
+- [x] **Step 3: Connect into MMRANavHost dose actions**
 Khi `onTaken` hoặc `onSkip` được xác nhận trên `DoseReminderScreen` hoặc `HomeScreen`, gọi `MedicationReminderSync.onDoseAction(context, dose.id, action)`.
 
-- [ ] **Step 4: Run tests and verify**
+- [x] **Step 4: Run tests and verify**
 Chạy `./gradlew testDebugUnitTest`.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 `git commit -m "feat(notifications): auto-cancel reminders when dose is taken or skipped"`
 
 ---
@@ -219,19 +219,19 @@ Chạy `./gradlew testDebugUnitTest`.
 - Modify: `app/src/main/java/com/example/project_lttbd/ui/viewmodel/AuthViewModel.kt`
 - Modify: `app/src/main/java/com/example/project_lttbd/ui/navigation/LogoutDestination.kt`
 
-- [ ] **Step 1: Integrate cleanup on signOut()**
+- [x] **Step 1: Integrate cleanup on signOut()**
 Trong `AuthViewModel.signOut()`, trước hoặc ngay khi phiên đăng nhập kết thúc:
 1. Gọi `MedicationAlarmScheduler.cancelAll(appContext, currentUid)`.
 2. Gọi `NotificationHelper.cancelAllNotifications(appContext)`.
 3. Đảm bảo toàn bộ báo thức và thông báo thanh trạng thái của tài khoản cũ được dọn dẹp sạch sẽ.
 
-- [ ] **Step 2: Integrate cleanup on SwitchAccount**
+- [x] **Step 2: Integrate cleanup on SwitchAccount**
 Trong `SwitchAccountDestination.kt` và luồng đổi tài khoản, thực hiện thao tác hủy báo thức tương tự.
 
-- [ ] **Step 3: Run unit tests to verify auth flow remains healthy**
+- [x] **Step 3: Run unit tests to verify auth flow remains healthy**
 Chạy `./gradlew testDebugUnitTest`.
 
-- [ ] **Step 4: Commit changes**
+- [x] **Step 4: Commit changes**
 `git commit -m "fix(auth): cancel all reminders and clear notifications on sign out"`
 
 ---
@@ -244,23 +244,23 @@ Chạy `./gradlew testDebugUnitTest`.
 - Modify: `app/src/main/java/com/example/project_lttbd/notifications/alarm/MedicationAlarmScheduler.kt` (hỗ trợ snooze)
 - Test: `app/src/test/java/com/example/project_lttbd/notifications/alarm/MedicationBootReceiverTest.kt`
 
-- [ ] **Step 1: Implement MedicationBootReceiver**
+- [x] **Step 1: Implement MedicationBootReceiver**
 Tạo `MedicationBootReceiver`:
 - Lắng nghe `Intent.ACTION_BOOT_COMPLETED`.
 - Kiểm tra `FirebaseProvider.auth.currentUser?.uid`. Nếu có người dùng đang đăng nhập:
   - Tải danh sách liều lưu trong cache hoặc đồng bộ lại từ API.
   - Gọi `MedicationReminderSync.syncDoses()` để tái thiết lập toàn bộ báo thức cho các liều `PENDING` còn lại trong ngày.
 
-- [ ] **Step 2: Register BootReceiver in AndroidManifest.xml**
+- [x] **Step 2: Register BootReceiver in AndroidManifest.xml**
 Khai báo receiver với intent filter `BOOT_COMPLETED`.
 
-- [ ] **Step 3: Implement Snooze Reminders logic**
+- [x] **Step 3: Implement Snooze Reminders logic**
 Thêm hàm `scheduleSnooze(context, uid, doseId, minutes, ...)` cho phép đặt chuông nhắc lại sau 5, 10, 15 hoặc 30 phút theo chuẩn `medication-api-contract-v1.md`.
 
-- [ ] **Step 4: Run tests and verify**
+- [x] **Step 4: Run tests and verify**
 Chạy `./gradlew testDebugUnitTest`.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
 `git commit -m "feat(notifications): implement boot restoration receiver and snooze reminders"`
 
 ---
@@ -270,10 +270,10 @@ Chạy `./gradlew testDebugUnitTest`.
 **Files:**
 - Create: `docs/notification-testing-guide.md`
 
-- [ ] **Step 1: Run full test suite**
+- [x] **Step 1: Run full test suite**
 Chạy `./gradlew testDebugUnitTest` và `./gradlew assembleDebug` đảm bảo toàn bộ dự án compile và test pass 100%.
 
-- [ ] **Step 2: Document Real-Device Testing Steps**
+- [x] **Step 2: Document Real-Device Testing Steps**
 Soạn hướng dẫn kiểm thử chi tiết trong `docs/notification-testing-guide.md`:
 1. Cách thiết lập quyền thông báo và kiểm tra trên Android 13+.
 2. Cách kích hoạt báo thức thử nghiệm 1 phút để test nổ chuông trên máy thật.
@@ -281,5 +281,5 @@ Soạn hướng dẫn kiểm thử chi tiết trong `docs/notification-testing-g
 4. Kiểm tra bấm "Đã uống" -> thông báo biến mất và không báo lại.
 5. Kiểm tra đăng xuất và đổi sang tài khoản khác -> hộp thư thông báo và báo thức tách biệt hoàn toàn.
 
-- [ ] **Step 3: Commit documentation**
+- [x] **Step 3: Commit documentation**
 `git commit -m "docs: add medication reminders and notification testing guide"`
