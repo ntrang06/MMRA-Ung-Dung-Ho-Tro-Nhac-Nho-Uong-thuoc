@@ -19,7 +19,7 @@ object BackendSessionCheck {
     private const val TAG = "MMRA_API_TEST"
 
     private const val URL =
-        "http://127.0.0.1:8000/api/v1/auth/me"
+        "http://192.168.1.200:8000/api/v1/auth/me"
 
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO
@@ -152,12 +152,11 @@ object BackendSessionCheck {
                         ) {
                             throw cancelled
                         } catch (error: Exception) {
-                            Log.e(
-                                TAG,
-                                "Kiểm tra thất bại: " +
-                                        error.javaClass.simpleName
-                            )
-                        }
+                        Log.e(
+                            TAG,
+                            "Kiểm tra thất bại: ${error.message}",
+                            error
+                        ) }
                     }
                 }
             }

@@ -4,6 +4,7 @@ from app.api.v1.endpoints import (
     health,
     password_reset,
     session,
+    doses,
 )
 
 
@@ -17,3 +18,4 @@ api_router.include_router(password_reset.router)
 
 # Kiểm tra phiên Firebase.
 api_router.include_router(session.router)
+api_router.include_router(doses.router)
