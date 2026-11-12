@@ -171,3 +171,19 @@
 - Với version > 1, chỉ sinh liều có scheduledAt >= updatedAt của phiên bản hiện tại. Không tạo lại liều quá khứ bằng phiên bản mới.
 
 - Huy: sau khi tải lại dữ liệu, hủy nhắc trên máy cho liều CANCELLED và cập nhật nhắc cho phiên bản mới.
+
+## Xóa mềm lịch uống
+
+- DELETE /api/v1/schedules/{scheduleId}?expectedVersion={version}.
+
+- Thành công trả 204, không có response body.
+
+- Server đặt enabled=false, deletedAt/updatedAt mới và tăng version.
+
+- Hủy các liều PENDING có scheduledAt từ thời điểm xóa trở đi.
+
+- Giữ document lịch, liều quá khứ, trạng thái đã ghi nhận và medicineSnapshot.
+
+- Lịch đã xóa không xuất hiện trong danh sách; đọc/sửa/xóa lại trả 404.
+
+- Phiên bản cũ trả 409; app cần tải lại trước khi thao tác tiếp.

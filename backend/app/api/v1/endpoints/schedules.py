@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, Response
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query, Response
 from google.api_core.exceptions import GoogleAPICallError
 
 from app.api.deps import AuthenticatedUser
@@ -168,3 +170,56 @@ def update_schedule(
             "Chưa xác nhận được kết quả lưu. "
             "Vui lòng tải lại danh sách trước khi thử lại."
         ) from None
+
+
+@router.delete(
+    "/{schedule_id}",
+    status_code=204,
+    response_class=Response,
+)
+def delete_schedule(
+    schedule_id: DocumentId,
+    user: AuthenticatedUser,
+    expected_version: Annotated[
+        int,
+        Query(alias="expectedVersion", ge=1),
+    ],
+) -> Response:
+    try:
+        schedule_service.delete_schedule(
+            user,
+            schedule_id,
+            expected_version,
+        )
+
+    except schedule_service.ScheduleNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "schedule_not_found",
+                "message": "Không tìm thấy lịch uống.",
+            },
+        ) from None
+
+    except schedule_service.ScheduleVersionConflictError:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "version_conflict",
+                "message": (
+                    "Lịch đã thay đổi. "
+                    "Vui lòng tải lại trước khi xóa."
+                ),
+            },
+        ) from None
+
+    except GoogleAPICallError:
+        raise _unavailable(
+            "Chưa xác nhận được kết quả xóa. "
+            "Vui lòng tải lại danh sách trước khi thử lại."
+        ) from None
+
+    return Response(
+        status_code=204,
+        headers={"Cache-Control": "no-store"},
+    )
