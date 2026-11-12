@@ -14,6 +14,14 @@
     <!-- Thông báo trên Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Đặt báo thức chính xác cho lịch nhắc thuốc -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Khôi phục lịch nhắc sau khi khởi động máy -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- Truy vấn dịch vụ Text-to-Speech -->
     <queries>
         <intent>
@@ -53,6 +61,11 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- Receiver nhận sự kiện báo thức nhắc uống thuốc -->
+        <receiver
+            android:name=".notifications.alarm.MedicationAlarmReceiver"
+            android:exported="false" />
 
     </application>
 </manifest>
