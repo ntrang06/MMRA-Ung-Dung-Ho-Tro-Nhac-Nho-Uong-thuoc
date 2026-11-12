@@ -96,10 +96,12 @@ adb -s af7a32ac shell "am start -n com.example.project_lttbd/.MainActivity --es 
 ---
 
 ### 2.8 Kiểm tra Khôi Phục Báo Thức Sau Khi Khởi Động Máy (Boot Restoration)
-Chạy lệnh ADB để giả lập sự kiện thiết bị vừa khởi động xong:
+Trên Android, sự kiện `BOOT_COMPLETED` là broadcast đặc quyền chỉ hệ điều hành (system/root) được phép phát. Để kiểm thử tính năng này qua ADB mà không cần khởi động lại máy điện thoại, chạy lệnh:
 ```bash
-adb -s af7a32ac shell "am broadcast -a android.intent.action.BOOT_COMPLETED -p com.example.project_lttbd"
+adb -s af7a32ac shell "am broadcast -a com.example.project_lttbd.ACTION_TEST_BOOT --es extra_uid test_uid -p com.example.project_lttbd"
 ```
+Hoặc khi khởi động lại máy thật bằng `adb reboot`, hệ thống Android sẽ tự động phát `BOOT_COMPLETED` kích hoạt `MedicationBootReceiver`.
+
 **Kết quả mong đợi:**
 - `MedicationBootReceiver` nhận sự kiện, kiểm tra tài khoản đang đăng nhập và quét các liều thuốc `PENDING` trong ngày còn thời gian ở tương lai để tự động đặt lại `AlarmManager`.
 

@@ -80,6 +80,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.example.project_lttbd.ACTION_TEST_BOOT" />
             </intent-filter>
         </receiver>
 

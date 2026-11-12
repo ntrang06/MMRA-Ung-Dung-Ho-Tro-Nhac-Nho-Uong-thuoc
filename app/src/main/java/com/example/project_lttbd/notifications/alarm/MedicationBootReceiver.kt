@@ -17,6 +17,7 @@ class MedicationBootReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "MedicationBootReceiver"
+        const val ACTION_TEST_BOOT = "com.example.project_lttbd.ACTION_TEST_BOOT"
 
         /**
          * Kiểm tra xem một liều thuốc có đủ điều kiện để khôi phục báo thức hay không:
@@ -71,18 +72,20 @@ class MedicationBootReceiver : BroadcastReceiver() {
         val action = intent?.action
         if (action != Intent.ACTION_BOOT_COMPLETED &&
             action != "android.intent.action.QUICKBOOT_POWERON" &&
-            action != Intent.ACTION_LOCKED_BOOT_COMPLETED
+            action != Intent.ACTION_LOCKED_BOOT_COMPLETED &&
+            action != ACTION_TEST_BOOT
         ) {
             return
         }
 
-        val uid = FirebaseProvider.auth.currentUser?.uid
+        val extraUid = intent.getStringExtra("extra_uid")?.ifBlank { null }
+        val uid = extraUid ?: FirebaseProvider.auth.currentUser?.uid
         if (uid.isNullOrBlank()) {
             Log.d(TAG, "Thiết bị khởi động xong nhưng chưa có người dùng đăng nhập. Bỏ qua.")
             return
         }
 
-        Log.d(TAG, "Thiết bị khởi động xong, tiến hành khôi phục lịch báo thức cho UID: $uid")
+        Log.d(TAG, "Thiết bị khởi động xong (hoặc nhận lệnh test boot), tiến hành khôi phục lịch báo thức cho UID: $uid")
         restoreAlarms(context, uid)
     }
 }
