@@ -8,6 +8,7 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,6 +16,8 @@ import com.example.project_lttbd.data.device.DeviceManager
 import com.example.project_lttbd.data.model.UserProfileManager
 import com.example.project_lttbd.data.remote.AuthRepository
 import com.example.project_lttbd.data.remote.UserProfileRepository
+import com.example.project_lttbd.notifications.NotificationHelper
+import com.example.project_lttbd.notifications.alarm.MedicationAlarmScheduler
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.FirebaseNetworkException
@@ -398,6 +401,12 @@ class AuthViewModel : ViewModel() {
                 )
 
                 pendingRegistration = null
+
+                if (!uid.isNullOrBlank()) {
+                    MedicationAlarmScheduler.cancelAll(appContext, uid)
+                }
+                NotificationHelper.cancelAllNotifications(appContext)
+
                 isSuccess = true
                 completed = true
             } catch (cancelled: CancellationException) {
@@ -611,9 +620,11 @@ class AuthViewModel : ViewModel() {
                 }
             }
 
+            is GetCredentialException ->
+                "Không thể xác thực tài khoản Google. Vui lòng thử lại hoặc chọn cách đăng nhập khác."
+
             else ->
-                "Chưa thực hiện được yêu cầu. " +
-                        "Vui lòng kiểm tra kết nối và thử lại."
+                "Chưa thực hiện được yêu cầu. Vui lòng kiểm tra kết nối và thử lại."
         }
     }
 }

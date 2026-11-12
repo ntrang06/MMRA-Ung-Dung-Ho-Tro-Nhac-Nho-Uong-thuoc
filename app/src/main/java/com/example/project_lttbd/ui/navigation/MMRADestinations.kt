@@ -45,6 +45,7 @@ object MMRADestinations {
     const val LOGOUT_CONFIRMATION = "logout_confirmation"
 
     const val REMINDER = "reminder/{doseId}?readOnly={readOnly}"
+    const val NOTIFICATIONS = "notifications"
 
     // Màn hình phụ thuộc luồng Quét thuốc & Gia đình (Huy)
     const val FAMILY_INVITE = "family_invite"
