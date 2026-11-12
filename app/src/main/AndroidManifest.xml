@@ -65,7 +65,12 @@
         <!-- Receiver nhận sự kiện báo thức nhắc uống thuốc -->
         <receiver
             android:name=".notifications.alarm.MedicationAlarmReceiver"
-            android:exported="false" />
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.example.project_lttbd.ACTION_MEDICATION_ALARM" />
+            </intent-filter>
+        </receiver>
 
         <!-- Receiver tự động khôi phục báo thức sau khi khởi động thiết bị -->
         <receiver

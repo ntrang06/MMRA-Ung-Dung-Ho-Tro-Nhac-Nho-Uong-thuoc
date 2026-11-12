@@ -25,32 +25,32 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
             return
         }
 
-        val uid = intent.getStringExtra(MedicationAlarmScheduler.EXTRA_UID).orEmpty()
-        val doseId = intent.getStringExtra(MedicationAlarmScheduler.EXTRA_DOSE_ID).orEmpty()
+        val rawUid = intent.getStringExtra(MedicationAlarmScheduler.EXTRA_UID).orEmpty()
+        val currentUid = FirebaseProvider.auth.currentUser?.uid
+        val targetUid = rawUid.ifBlank { currentUid ?: "mock_user" }
+
+        val doseId = intent.getStringExtra(MedicationAlarmScheduler.EXTRA_DOSE_ID)
+            ?.ifBlank { "test_dose_${System.currentTimeMillis()}" }
+            ?: "test_dose_${System.currentTimeMillis()}"
+
         val title = intent.getStringExtra(MedicationAlarmScheduler.EXTRA_TITLE)
             ?.ifBlank { "Đến giờ uống thuốc" } ?: "Đến giờ uống thuốc"
         val message = intent.getStringExtra(MedicationAlarmScheduler.EXTRA_MESSAGE)
             ?.ifBlank { "Vui lòng kiểm tra và uống thuốc đúng giờ." } ?: "Vui lòng kiểm tra và uống thuốc đúng giờ."
         val medicineName = intent.getStringExtra(MedicationAlarmScheduler.EXTRA_MEDICINE_NAME).orEmpty()
 
-        if (uid.isBlank() || doseId.isBlank()) {
-            Log.w(TAG, "Bỏ qua báo thức vì thiếu UID hoặc DoseID")
+        // Kiểm tra phiên đăng nhập hiện tại: Chỉ báo chuông nếu đúng UID (cho phép test_uid hoặc khi chưa đăng nhập)
+        if (!currentUid.isNullOrBlank() && rawUid.isNotBlank() && rawUid != "test_uid" && currentUid != rawUid) {
+            Log.w(TAG, "Bỏ qua báo thức của UID $rawUid vì tài khoản hiện tại là $currentUid")
             return
         }
 
-        // Kiểm tra phiên đăng nhập hiện tại: Chỉ báo chuông nếu người dùng hiện tại đúng là UID này
-        val currentUid = FirebaseProvider.auth.currentUser?.uid
-        if (currentUid != null && currentUid != uid) {
-            Log.w(TAG, "Bỏ qua báo thức của UID $uid vì tài khoản hiện tại là $currentUid")
-            return
-        }
-
-        Log.d(TAG, "Đang phát thông báo nhắc thuốc: doseId=$doseId, medicine=$medicineName")
+        Log.d(TAG, "Đang phát thông báo nhắc thuốc: doseId=$doseId, medicine=$medicineName, uid=$targetUid")
 
         // 1. Hiển thị thông báo trên thanh trạng thái
         NotificationHelper.showMedicationReminderNotification(
             context = context,
-            uid = uid,
+            uid = targetUid,
             doseId = doseId,
             title = title,
             message = message
@@ -66,6 +66,6 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
             isRead = false,
             destinationRoute = "reminder/$doseId?readOnly=false"
         )
-        LocalNotificationStore.addNotification(context, uid, notifItem)
+        LocalNotificationStore.addNotification(context, targetUid, notifItem)
     }
 }

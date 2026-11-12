@@ -8,6 +8,7 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.project_lttbd.MainActivity
 import com.example.project_lttbd.R
@@ -97,7 +98,7 @@ object NotificationHelper {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_REMINDERS)
-            .setSmallIcon(R.drawable.chuong)
+            .setSmallIcon(R.drawable.ic_notification_bell)
             .setContentTitle(title)
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
@@ -108,9 +109,14 @@ object NotificationHelper {
             .setVibrate(longArrayOf(0, 400, 200, 400))
             .build()
 
-        val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(NOTIFICATION_TAG_REMINDER, notifId, notification)
+        try {
+            val notificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.notify(NOTIFICATION_TAG_REMINDER, notifId, notification)
+            Log.d("NotificationHelper", "Đã gửi thông báo thành công: tag=$NOTIFICATION_TAG_REMINDER, id=$notifId, title=$title")
+        } catch (e: Exception) {
+            Log.e("NotificationHelper", "Lỗi khi gửi thông báo", e)
+        }
     }
 
     fun cancelNotification(context: Context, doseId: String) {
@@ -151,7 +157,7 @@ object NotificationHelper {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_REMINDERS)
-            .setSmallIcon(R.drawable.chuong)
+            .setSmallIcon(R.drawable.ic_notification_bell)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -160,9 +166,13 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .build()
 
-        val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val notificationId = (System.currentTimeMillis() % 100000).toInt()
-        notificationManager.notify(notificationId, notification)
+        try {
+            val notificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notificationId = (System.currentTimeMillis() % 100000).toInt()
+            notificationManager.notify(notificationId, notification)
+        } catch (e: Exception) {
+            Log.e("NotificationHelper", "Lỗi khi gửi thông báo chung", e)
+        }
     }
 }
