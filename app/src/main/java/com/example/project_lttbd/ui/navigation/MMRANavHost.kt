@@ -1687,11 +1687,11 @@ private fun ReminderDestination(
                 )
 
                 val currentUid = FirebaseProvider.auth.currentUser?.uid.orEmpty()
-                MedicationAlarmScheduler.schedule(
+                MedicationAlarmScheduler.scheduleSnooze(
                     context = context,
                     uid = currentUid,
                     doseId = dose.doseId,
-                    triggerAtMillis = System.currentTimeMillis() + 10 * 60 * 1000L,
+                    snoozeMinutes = 10,
                     title = "Nhắc lại: ${dose.medicineName}",
                     message = "${dose.quantityText}. ${dose.mealInstruction}".trim(),
                     medicineName = dose.medicineName

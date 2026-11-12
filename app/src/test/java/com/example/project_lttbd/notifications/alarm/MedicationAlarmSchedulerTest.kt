@@ -32,4 +32,13 @@ class MedicationAlarmSchedulerTest {
         assertEquals(false, shouldPast)
         assertEquals(true, shouldFuture)
     }
+
+    @Test
+    fun testComputeSnoozeTriggerMillis() {
+        val now = 1_700_000_000_000L
+        assertEquals(now + 5 * 60_000L, MedicationAlarmScheduler.computeSnoozeTriggerMillis(now, 5))
+        assertEquals(now + 10 * 60_000L, MedicationAlarmScheduler.computeSnoozeTriggerMillis(now, 10))
+        assertEquals(now + 15 * 60_000L, MedicationAlarmScheduler.computeSnoozeTriggerMillis(now, 15))
+        assertEquals(now + 30 * 60_000L, MedicationAlarmScheduler.computeSnoozeTriggerMillis(now, 30))
+    }
 }

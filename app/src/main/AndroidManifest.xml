@@ -67,5 +67,16 @@
             android:name=".notifications.alarm.MedicationAlarmReceiver"
             android:exported="false" />
 
+        <!-- Receiver tự động khôi phục báo thức sau khi khởi động thiết bị -->
+        <receiver
+            android:name=".notifications.alarm.MedicationBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>

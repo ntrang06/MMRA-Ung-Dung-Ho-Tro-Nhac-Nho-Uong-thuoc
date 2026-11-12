@@ -34,6 +34,35 @@ object MedicationAlarmScheduler {
         return triggerAtMillis > nowMillis
     }
 
+    fun computeSnoozeTriggerMillis(nowMillis: Long, snoozeMinutes: Int): Long {
+        return nowMillis + (snoozeMinutes * 60 * 1000L)
+    }
+
+    /**
+     * Lập lịch hoãn báo thức (Snooze) sau [snoozeMinutes] phút (hỗ trợ 5, 10, 15, 30 phút theo chuẩn BE2/BE3).
+     */
+    fun scheduleSnooze(
+        context: Context,
+        uid: String,
+        doseId: String,
+        snoozeMinutes: Int,
+        title: String,
+        message: String,
+        medicineName: String = "",
+        nowMillis: Long = System.currentTimeMillis()
+    ) {
+        val triggerAtMillis = computeSnoozeTriggerMillis(nowMillis, snoozeMinutes)
+        schedule(
+            context = context,
+            uid = uid,
+            doseId = doseId,
+            triggerAtMillis = triggerAtMillis,
+            title = title,
+            message = message,
+            medicineName = medicineName
+        )
+    }
+
     fun schedule(
         context: Context,
         uid: String,
