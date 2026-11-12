@@ -7,7 +7,9 @@ from app.schemas.medication import (
     DocumentId,
     ScheduleInput,
     ScheduleResponse,
+    ScheduleUpdate,
 )
+from app.services import schedule_service
 
 
 router = APIRouter(
@@ -91,6 +93,64 @@ def create_schedule(
             user,
             body,
         )
+
+    except schedule_repository.MedicineNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "medicine_not_found",
+                "message": (
+                    "Không tìm thấy thuốc trong tài khoản của bạn."
+                ),
+            },
+        ) from None
+
+    except GoogleAPICallError:
+        raise _unavailable(
+            "Chưa xác nhận được kết quả lưu. "
+            "Vui lòng tải lại danh sách trước khi thử lại."
+        ) from None
+
+
+@router.put(
+    "/{schedule_id}",
+    response_model=ScheduleResponse,
+)
+def update_schedule(
+    schedule_id: DocumentId,
+    body: ScheduleUpdate,
+    user: AuthenticatedUser,
+    response: Response,
+):
+    response.headers["Cache-Control"] = "no-store"
+
+    try:
+        return schedule_service.update_schedule(
+            user,
+            schedule_id,
+            body,
+        )
+
+    except schedule_service.ScheduleNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "schedule_not_found",
+                "message": "Không tìm thấy lịch uống.",
+            },
+        ) from None
+
+    except schedule_service.ScheduleVersionConflictError:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "version_conflict",
+                "message": (
+                    "Lịch đã thay đổi. "
+                    "Vui lòng tải lại trước khi sửa."
+                ),
+            },
+        ) from None
 
     except schedule_repository.MedicineNotFoundError:
         raise HTTPException(
