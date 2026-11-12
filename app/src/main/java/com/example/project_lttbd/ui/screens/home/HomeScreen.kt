@@ -13,13 +13,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.project_lttbd.data.mock.MockDoseAction
 import com.example.project_lttbd.data.mock.MockDoseActions
 import com.example.project_lttbd.data.mock.MockReminderDoses
 import com.example.project_lttbd.data.model.UserProfileManager
+import com.example.project_lttbd.data.remote.FirebaseProvider
+import com.example.project_lttbd.notifications.storage.LocalNotificationStore
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -109,6 +113,12 @@ fun HomeScreen(
         .format(Calendar.getInstance().time)
         .replaceFirstChar { it.titlecase() }
 
+    val context = LocalContext.current
+    val currentUid = FirebaseProvider.auth.currentUser?.uid.orEmpty()
+    val hasUnread = remember(currentUid) {
+        LocalNotificationStore.getNotifications(context, currentUid).any { !it.isRead }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -120,7 +130,8 @@ fun HomeScreen(
             initials = UserProfileManager.getInitials(),
             avatarBitmap = UserProfileManager.currentAvatarBitmap,
             onNotificationsClick = onNotificationsClick,
-            onAccountClick = onAccountClick
+            onAccountClick = onAccountClick,
+            hasUnreadNotifications = hasUnread
         )
 
         Column(
