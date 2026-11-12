@@ -109,7 +109,7 @@ fun SwitchAccountScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Bạn đang sử dụng tài khoản của cô Lan.",
+                text = "Bạn đang sử dụng tài khoản ${UserProfileManager.name.ifBlank { "hiện tại" }}.",
                 fontSize = 14.sp,
                 color = subTextColor,
             )
@@ -147,7 +147,7 @@ fun SwitchAccountScreen(
                                 modifier = Modifier.fillMaxSize(),
                             ) {
                                 Text(
-                                    text = "NL",
+                                    text = UserProfileManager.getInitials(),
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = primaryColor,

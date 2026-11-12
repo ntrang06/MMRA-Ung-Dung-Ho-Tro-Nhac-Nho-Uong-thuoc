@@ -135,7 +135,7 @@ fun LogoutConfirmationScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "Cô Lan muốn đăng xuất?",
+                text = "Bạn muốn đăng xuất?",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = darkTextColor,
@@ -174,7 +174,7 @@ fun LogoutConfirmationScreen(
                                 modifier = Modifier.fillMaxSize(),
                             ) {
                                 Text(
-                                    text = "NL",
+                                    text = UserProfileManager.getInitials(),
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = primaryColor,
@@ -234,7 +234,7 @@ fun LogoutConfirmationScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Hãy đăng nhập lại để tiếp tục nhận nhắc nhở của tài khoản cô Lan.",
+                        text = "Hãy đăng nhập lại để tiếp tục nhận nhắc nhở của tài khoản này.",
                         fontSize = 13.sp,
                         color = Color(0xFF6D4C41),
                         lineHeight = 18.sp,

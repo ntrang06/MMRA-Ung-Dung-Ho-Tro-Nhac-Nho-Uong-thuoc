@@ -1,5 +1,7 @@
 package com.example.project_lttbd.ui.screens.account
 
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,8 +15,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -22,7 +24,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.project_lttbd.R
+import com.example.project_lttbd.data.remote.AuthRepository
+import com.example.project_lttbd.ui.viewmodel.AccountPasswordViewModel
 
 @Composable
 fun ChangePasswordScreen(
@@ -32,25 +37,34 @@ fun ChangePasswordScreen(
     onForgotPasswordClick: () -> Unit = {},
     onCancelClick: () -> Unit = {}
 ) {
-    val primaryColor = Color(0xFF0F5B51)
-    val lightBgColor = Color(0xFFE0F0EC)
-    val darkTextColor = Color(0xFF0A3C35)
-    val subTextColor = Color(0xFF5A6E6A)
-    val borderColor = Color(0xFFE2E8E6)
-    val infoBgColor = Color(0xFFEFF6F4)
+    val passwordViewModel: AccountPasswordViewModel = viewModel()
+    val context = LocalContext.current
 
-    // Giá trị thật bắt đầu trống, không điền sẵn ký tự dấu chấm.
+    val hasPassword = AuthRepository.hasPasswordProvider
+    val signedIn = AuthRepository.currentUser != null
+    val loading = passwordViewModel.isLoading
+
+    val primary = Color(0xFF0F5B51)
+    val light = Color(0xFFE0F0EC)
+    val dark = Color(0xFF0A3C35)
+    val secondary = Color(0xFF5A6E6A)
+    val border = Color(0xFFE2E8E6)
+
+    // Mật khẩu chỉ được giữ tạm trong trạng thái của màn hình.
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
-    // Mỗi ô có trạng thái ẩn/hiện riêng.
     var currentVisible by remember { mutableStateOf(false) }
     var newVisible by remember { mutableStateOf(false) }
     var confirmVisible by remember { mutableStateOf(false) }
 
-    var errorMessage by remember {
+    var validationError by remember {
         mutableStateOf<String?>(null)
+    }
+
+    BackHandler(enabled = loading) {
+        // Đợi Firebase trả kết quả lưu.
     }
 
     Surface(
@@ -69,8 +83,9 @@ fun ChangePasswordScreen(
             ) {
                 Surface(
                     onClick = onBackClick,
+                    enabled = !loading,
                     shape = CircleShape,
-                    color = lightBgColor,
+                    color = light,
                     modifier = Modifier.size(44.dp)
                 ) {
                     Box(
@@ -79,10 +94,8 @@ fun ChangePasswordScreen(
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.ic_back),
-                            contentDescription = stringResource(
-                                R.string.cd_back_button
-                            ),
-                            tint = primaryColor,
+                            contentDescription = "Quay lại",
+                            tint = primary,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -92,19 +105,20 @@ fun ChangePasswordScreen(
 
                 Column {
                     Text(
-                        text = stringResource(
-                            R.string.account_change_password
-                        ),
+                        text = if (hasPassword) {
+                            "Đổi mật khẩu"
+                        } else {
+                            "Đặt mật khẩu"
+                        },
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = darkTextColor
+                        color = dark
                     )
+
                     Text(
-                        text = stringResource(
-                            R.string.account_change_password_sub
-                        ),
+                        text = "Bảo vệ tài khoản của bạn",
                         fontSize = 13.sp,
-                        color = subTextColor
+                        color = secondary
                     )
                 }
             }
@@ -112,9 +126,19 @@ fun ChangePasswordScreen(
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text = "Nhập mật khẩu hiện tại để bảo vệ tài khoản của cô Lan.",
+                text = when {
+                    !signedIn ->
+                        "Vui lòng đăng nhập trước khi đặt mật khẩu."
+
+                    hasPassword ->
+                        "Nhập mật khẩu hiện tại và mật khẩu mới của bạn."
+
+                    else ->
+                        "Bạn đang đăng nhập bằng Google. Đặt mật khẩu " +
+                                "để có thể đăng nhập thêm bằng email và mật khẩu."
+                },
                 fontSize = 14.sp,
-                color = subTextColor,
+                color = secondary,
                 lineHeight = 20.sp
             )
 
@@ -123,7 +147,7 @@ fun ChangePasswordScreen(
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = Color.White,
-                border = BorderStroke(1.dp, borderColor),
+                border = BorderStroke(1.dp, border),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -131,60 +155,66 @@ fun ChangePasswordScreen(
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
-                    ChangePasswordInput(
-                        label = "Mật khẩu hiện tại",
-                        placeholder = "Nhập mật khẩu hiện tại",
-                        value = currentPassword,
-                        onValueChange = {
-                            currentPassword = it
-                            errorMessage = null
-                        },
-                        visible = currentVisible,
-                        onToggleVisibility = {
-                            currentVisible = !currentVisible
-                        }
-                    )
+                    // Chỉ hiện ô mật khẩu cũ nếu tài khoản đã có mật khẩu.
+                    if (hasPassword) {
+                        AccountPasswordInput(
+                            label = "Mật khẩu hiện tại",
+                            value = currentPassword,
+                            onValueChange = {
+                                currentPassword = it
+                                validationError = null
+                                passwordViewModel.clearError()
+                            },
+                            visible = currentVisible,
+                            onToggleVisibility = {
+                                currentVisible = !currentVisible
+                            },
+                            enabled = !loading
+                        )
 
-                    Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(16.dp))
+                    }
 
-                    ChangePasswordInput(
-                        label = stringResource(
-                            R.string.label_new_password
-                        ),
-                        placeholder = "Nhập mật khẩu mới",
+                    AccountPasswordInput(
+                        label = "Mật khẩu mới",
                         value = newPassword,
                         onValueChange = {
                             newPassword = it
-                            errorMessage = null
+                            validationError = null
+                            passwordViewModel.clearError()
                         },
                         visible = newVisible,
                         onToggleVisibility = {
                             newVisible = !newVisible
-                        }
+                        },
+                        enabled = !loading
                     )
 
                     Spacer(Modifier.height(16.dp))
 
-                    ChangePasswordInput(
-                        label = stringResource(
-                            R.string.label_confirm_password
-                        ),
-                        placeholder = "Nhập lại mật khẩu mới",
+                    AccountPasswordInput(
+                        label = "Nhập lại mật khẩu mới",
                         value = confirmPassword,
                         onValueChange = {
                             confirmPassword = it
-                            errorMessage = null
+                            validationError = null
+                            passwordViewModel.clearError()
                         },
                         visible = confirmVisible,
                         onToggleVisibility = {
                             confirmVisible = !confirmVisible
-                        }
+                        },
+                        enabled = !loading
                     )
 
-                    errorMessage?.let { message ->
+                    val message =
+                        validationError ?: passwordViewModel.errorMessage
+
+                    message?.let {
                         Spacer(Modifier.height(8.dp))
+
                         Text(
-                            text = message,
+                            text = it,
                             fontSize = 12.sp,
                             color = Color(0xFFD32F2F)
                         )
@@ -196,7 +226,7 @@ fun ChangePasswordScreen(
 
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = infoBgColor,
+                color = Color(0xFFEFF6F4),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -206,18 +236,16 @@ fun ChangePasswordScreen(
                     Icon(
                         painter = painterResource(R.drawable.ic_lock),
                         contentDescription = null,
-                        tint = primaryColor,
-                        modifier = Modifier
-                            .size(18.dp)
-                            .padding(top = 2.dp)
+                        tint = primary,
+                        modifier = Modifier.size(18.dp)
                     )
+
                     Spacer(Modifier.width(10.dp))
+
                     Text(
-                        text = stringResource(
-                            R.string.register_password_note
-                        ),
+                        text = "Mật khẩu cần ít nhất 8 ký tự, gồm chữ và số.",
                         fontSize = 12.sp,
-                        color = subTextColor,
+                        color = secondary,
                         lineHeight = 18.sp
                     )
                 }
@@ -226,67 +254,101 @@ fun ChangePasswordScreen(
             Spacer(Modifier.height(24.dp))
 
             Button(
+                enabled = signedIn && !loading,
                 onClick = {
-                    when {
-                        currentPassword.isBlank() -> {
-                            errorMessage =
-                                "Vui lòng nhập mật khẩu hiện tại."
-                        }
+                    validationError = when {
+                        hasPassword && currentPassword.isBlank() ->
+                            "Vui lòng nhập mật khẩu hiện tại."
 
-                        newPassword.length < 8 -> {
-                            errorMessage =
-                                "Mật khẩu mới phải có ít nhất 8 ký tự."
-                        }
+                        newPassword.length < 8 ||
+                                !newPassword.any { it.isLetter() } ||
+                                !newPassword.any { it.isDigit() } ->
+                            "Mật khẩu mới cần ít nhất 8 ký tự, gồm chữ và số."
 
-                        newPassword != confirmPassword -> {
-                            errorMessage =
-                                "Mật khẩu xác nhận không khớp."
-                        }
+                        newPassword != confirmPassword ->
+                            "Mật khẩu xác nhận không khớp."
 
-                        else -> {
-                            errorMessage = null
-                            onSaveSuccess()
+                        else -> null
+                    }
+
+                    if (validationError == null) {
+                        passwordViewModel.savePassword(
+                            currentPassword,
+                            newPassword
+                        ) { success ->
+                            if (success) {
+                                currentPassword = ""
+                                newPassword = ""
+                                confirmPassword = ""
+
+                                Toast.makeText(
+                                    context,
+                                    if (hasPassword) {
+                                        "Đã đổi mật khẩu"
+                                    } else {
+                                        "Đã thêm đăng nhập bằng email và mật khẩu"
+                                    },
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                onSaveSuccess()
+                            }
                         }
                     }
                 },
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = primaryColor
+                    containerColor = primary
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
             ) {
+                if (loading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = "Lưu mật khẩu",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            if (hasPassword) {
+                Spacer(Modifier.height(20.dp))
+
                 Text(
-                    text = "Lưu mật khẩu",
-                    fontSize = 16.sp,
+                    text = "Quên mật khẩu hiện tại?",
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = primary,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .clickable(
+                            enabled = !loading,
+                            onClick = onForgotPasswordClick
+                        )
                 )
             }
 
             Spacer(Modifier.height(20.dp))
 
             Text(
-                text = "Quên mật khẩu hiện tại?",
+                text = "Hủy",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = primaryColor,
+                color = secondary,
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .clickable { onForgotPasswordClick() }
-            )
-
-            Spacer(Modifier.height(20.dp))
-
-            Text(
-                text = stringResource(R.string.avatar_action_cancel),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = subTextColor,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .clickable { onCancelClick() }
+                    .clickable(
+                        enabled = !loading,
+                        onClick = onCancelClick
+                    )
             )
 
             Spacer(Modifier.height(16.dp))
@@ -295,24 +357,21 @@ fun ChangePasswordScreen(
 }
 
 @Composable
-private fun ChangePasswordInput(
+private fun AccountPasswordInput(
     label: String,
-    placeholder: String,
     value: String,
     onValueChange: (String) -> Unit,
     visible: Boolean,
-    onToggleVisibility: () -> Unit
+    onToggleVisibility: () -> Unit,
+    enabled: Boolean
 ) {
-    val primaryColor = Color(0xFF0F5B51)
-    val darkTextColor = Color(0xFF0A3C35)
-    val subTextColor = Color(0xFF5A6E6A)
-    val borderColor = Color(0xFFE2E8E6)
+    val primary = Color(0xFF0F5B51)
 
     Text(
         text = label,
         fontSize = 14.sp,
         fontWeight = FontWeight.Bold,
-        color = darkTextColor
+        color = Color(0xFF0A3C35)
     )
 
     Spacer(Modifier.height(8.dp))
@@ -320,10 +379,10 @@ private fun ChangePasswordInput(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
+        enabled = enabled,
         placeholder = {
             Text(
-                text = placeholder,
-                color = subTextColor,
+                text = "Nhập ${label.lowercase()}",
                 fontSize = 14.sp
             )
         },
@@ -337,7 +396,8 @@ private fun ChangePasswordInput(
         ),
         trailingIcon = {
             IconButton(
-                onClick = onToggleVisibility
+                onClick = onToggleVisibility,
+                enabled = enabled
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_eye),
@@ -346,15 +406,15 @@ private fun ChangePasswordInput(
                     } else {
                         "Hiện $label"
                     },
-                    tint = if (visible) primaryColor else subTextColor,
+                    tint = primary,
                     modifier = Modifier.size(20.dp)
                 )
             }
         },
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            unfocusedBorderColor = borderColor,
-            focusedBorderColor = primaryColor
+            unfocusedBorderColor = Color(0xFFE2E8E6),
+            focusedBorderColor = primary
         ),
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
@@ -363,6 +423,17 @@ private fun ChangePasswordInput(
 
 @Preview(showBackground = true)
 @Composable
-fun ChangePasswordScreenPreview() {
-    ChangePasswordScreen()
+private fun AccountPasswordInputPreview() {
+    Column(
+        modifier = Modifier.padding(16.dp)
+    ) {
+        AccountPasswordInput(
+            label = "Mật khẩu mới",
+            value = "",
+            onValueChange = {},
+            visible = false,
+            onToggleVisibility = {},
+            enabled = true
+        )
+    }
 }

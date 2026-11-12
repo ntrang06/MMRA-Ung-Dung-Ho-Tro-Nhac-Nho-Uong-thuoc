@@ -1,5 +1,13 @@
 package com.example.project_lttbd.ui.navigation
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
+import com.example.project_lttbd.data.remote.FirebaseProvider
+import com.example.project_lttbd.data.remote.dto.MedicineDto
+import com.example.project_lttbd.data.repository.MedicineRepository
+import com.google.firebase.auth.FirebaseAuth
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -15,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -57,7 +66,6 @@ import com.example.project_lttbd.data.mock.MockCalendar
 import com.example.project_lttbd.data.mock.MockDoseAction
 import com.example.project_lttbd.data.mock.MockDoseActions
 import com.example.project_lttbd.data.mock.MockFamilyData
-import com.example.project_lttbd.data.mock.MockMedicines
 import com.example.project_lttbd.data.mock.MockReminderDoses
 import com.example.project_lttbd.ui.components.rememberUiNow
 import com.example.project_lttbd.ui.screens.history.HistoryScreen
@@ -77,7 +85,15 @@ import com.example.project_lttbd.ui.screens.reminder.rememberReminderSpeech
 import com.example.project_lttbd.ui.screens.scan.ScanScreen
 import com.example.project_lttbd.ui.screens.schedule.ScheduleScreen
 import com.example.project_lttbd.ui.screens.schedule.ScheduleSetupEditor
-
+import com.example.project_lttbd.data.remote.AuthRepository
+import com.example.project_lttbd.data.remote.UserProfileRepository
+import com.example.project_lttbd.data.device.DeviceManager
+import com.example.project_lttbd.ui.viewmodel.AuthViewModel
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import com.example.project_lttbd.ui.screens.medicine.MedicineDeleteAction
 private const val MANUAL_MEDICINE_DRAFT_KEY = "manual_medicine_draft"
 
 @Composable
@@ -87,13 +103,73 @@ fun MMRANavHost(
 ) {
     val context = LocalContext.current
 
+    // Một ViewModel dùng chung cho ba nút Google trong Login/Email Login/Register.
+    val googleAuthViewModel: AuthViewModel = viewModel(
+        key = "mmra_google_auth"
+    )
+
+    val signInGoogle: () -> Unit = {
+        googleAuthViewModel.signInWithGoogle(context) { success ->
+            if (success) {
+                authenticateAndProceed(navController, context)
+            }
+        }
+    }
+
+    if (googleAuthViewModel.isLoading) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Đang đăng nhập Google") },
+            text = {
+                Column {
+                    CircularProgressIndicator()
+                    Text("Đang xác thực và tải hồ sơ của bạn…")
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    googleAuthViewModel.errorMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = {
+                googleAuthViewModel.clearError()
+            },
+            title = { Text("Chưa đăng nhập được") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        googleAuthViewModel.clearError()
+                    }
+                ) {
+                    Text("Đóng")
+                }
+            }
+        )
+    }
+
     UserProfileManager.init(context)
-    val isLoggedIn = UserProfileManager.isLoggedIn(context)
+    val currentUser = AuthRepository.currentUser
     val isSetupCompleted = UserProfileManager.isSetupCompleted(context)
 
-    val startDest = MMRADestinations.WELCOME
+    // Chỉ xác định màn khởi động một lần.
+    // Sau khi đăng nhập thành công, callback sẽ điều hướng.
+    val startDest = remember {
+        when {
+            currentUser == null -> MMRADestinations.WELCOME
+            !isSetupCompleted -> MMRADestinations.INITIAL_SETUP_TARGET
+            else -> MMRADestinations.HOME
+        }
+    }
 
-    var setupPreferences by remember {
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
+            DeviceManager.syncCurrentDevice(context, currentUser.uid)
+        }
+    }
+
+    var setupPreferences by remember(currentUser?.uid) {
         mutableStateOf(InitialSetupPreferences())
     }
 
@@ -103,6 +179,7 @@ fun MMRANavHost(
         modifier = modifier
     ) {
         // --- Authentication & Setup ---
+
         composable(MMRADestinations.WELCOME) {
             WelcomeScreen(
                 onLoginClick = {
@@ -119,9 +196,7 @@ fun MMRANavHost(
                 onBackClick = {
                     navController.popBackStack()
                 },
-                onGoogleSignInClick = {
-                    authenticateAndProceed(navController, context)
-                },
+                onGoogleSignInClick = signInGoogle,
                 onPhoneSignInClick = {
                     navController.navigate(MMRADestinations.PHONE_LOGIN)
                 },
@@ -155,42 +230,73 @@ fun MMRANavHost(
         }
 
         composable(MMRADestinations.EMAIL_LOGIN) {
+            val authViewModel: AuthViewModel = remember {
+                AuthViewModel()
+            }
+
             EmailLoginScreen(
                 onBackClick = {
                     navController.popBackStack()
                 },
-                onLoginClick = {
-                    authenticateAndProceed(navController, context)
+                onLoginClick = { email, pass ->
+                    authViewModel.signIn(
+                        email,
+                        pass,
+                        context
+                    ) { success ->
+                        if (success) {
+                            authenticateAndProceed(navController, context)
+                        }
+                    }
                 },
                 onOtpLoginClick = {
                     authenticateAndProceed(navController, context)
                 },
-                onGoogleLoginClick = {
-                    authenticateAndProceed(navController, context)
-                },
+                onGoogleLoginClick = signInGoogle,
                 onForgotPasswordClick = {
                     navController.navigate(MMRADestinations.FORGOT_PASSWORD)
                 },
                 onRegisterClick = {
                     navController.navigate(MMRADestinations.REGISTER)
-                }
+                },
+                isLoading = authViewModel.isLoading,
+                externalError = authViewModel.errorMessage
             )
         }
 
         composable(MMRADestinations.REGISTER) {
+            val authViewModel: AuthViewModel = remember {
+                AuthViewModel()
+            }
+
             RegisterScreen(
                 onBackClick = {
                     navController.popBackStack()
                 },
-                onRegisterClick = {
-                    navController.navigate(MMRADestinations.VERIFY_PHONE)
+                onRegisterClick = { name, email, pass ->
+                    authViewModel.signUp(
+                        name,
+                        email,
+                        pass,
+                        context
+                    ) { success ->
+                        if (success) {
+                            navController.navigate(
+                                MMRADestinations.INITIAL_SETUP_TARGET
+                            ) {
+                                popUpTo(MMRADestinations.WELCOME) {
+                                    inclusive = true
+                                }
+                            }
+                        }
+                    }
                 },
-                onGoogleClick = {
-                    authenticateAndProceed(navController, context)
-                },
+                onGoogleClick = signInGoogle,
                 onLoginClick = {
                     navController.navigate(MMRADestinations.LOGIN)
-                }
+                },
+                isLoading = authViewModel.isLoading,
+                externalError = authViewModel.errorMessage
             )
         }
 
@@ -227,12 +333,12 @@ fun MMRANavHost(
                 onBackClick = {
                     navController.popBackStack()
                 },
-                onSendCodeClick = {
-                    navController.navigate(MMRADestinations.CREATE_NEW_PASSWORD)
-                },
                 onBackToLoginClick = {
                     navController.navigate(MMRADestinations.LOGIN) {
-                        popUpTo(MMRADestinations.LOGIN) { inclusive = true }
+                        popUpTo(MMRADestinations.LOGIN) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -265,8 +371,13 @@ fun MMRANavHost(
                 initialSelectedRoles = setupPreferences.selectedRoles,
                 onBackClick = {},
                 onContinueClick = { roles ->
-                    setupPreferences = setupPreferences.copy(selectedRoles = roles)
-                    navController.navigate(MMRADestinations.INITIAL_SETUP_DISPLAY) {
+                    setupPreferences = setupPreferences.copy(
+                        selectedRoles = roles
+                    )
+
+                    navController.navigate(
+                        MMRADestinations.INITIAL_SETUP_DISPLAY
+                    ) {
                         launchSingleTop = true
                     }
                 }
@@ -276,7 +387,8 @@ fun MMRANavHost(
         composable(MMRADestinations.INITIAL_SETUP_DISPLAY) {
             SetupDisplayPreferenceScreen(
                 initialLargeText = setupPreferences.isLargeTextEnabled,
-                initialVoiceGuidance = setupPreferences.isVoiceGuidanceEnabled,
+                initialVoiceGuidance =
+                    setupPreferences.isVoiceGuidanceEnabled,
                 onBackClick = {
                     navController.popBackStack()
                 },
@@ -285,16 +397,41 @@ fun MMRANavHost(
                         isLargeTextEnabled = isLargeText,
                         isVoiceGuidanceEnabled = isVoiceGuidance
                     )
+
                     UserProfileManager.setSetupCompleted(context, true)
                     UserProfileManager.setLoggedIn(context, true)
+
+                    val uid = AuthRepository.currentUid
+
+                    if (uid != null) {
+                        val roleStr =
+                            setupPreferences.selectedRoles.joinToString(",") {
+                                it.name
+                            }
+
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                UserProfileRepository.updateProfile(
+                                    uid,
+                                    mapOf("usageMode" to roleStr)
+                                )
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+
                     navController.navigate(MMRADestinations.HOME) {
-                        popUpTo(MMRADestinations.WELCOME) { inclusive = true }
+                        popUpTo(MMRADestinations.WELCOME) {
+                            inclusive = true
+                        }
                     }
                 }
             )
         }
 
         // --- Profile & Account Management ---
+
         composable(MMRADestinations.MY_ACCOUNT) {
             MyAccountScreen(
                 avatarBitmap = UserProfileManager.currentAvatarBitmap,
@@ -302,7 +439,9 @@ fun MMRANavHost(
                     navController.popBackStack()
                 },
                 onAvatarOptionsClick = {
-                    navController.navigate(MMRADestinations.MY_ACCOUNT_AVATAR_OPTIONS)
+                    navController.navigate(
+                        MMRADestinations.MY_ACCOUNT_AVATAR_OPTIONS
+                    )
                 },
                 onEditNameClick = {
                     navController.navigate(MMRADestinations.EDIT_NAME)
@@ -317,22 +456,32 @@ fun MMRANavHost(
                     navController.navigate(MMRADestinations.CHANGE_PASSWORD)
                 },
                 onNotificationsClick = {
-                    navController.navigate(MMRADestinations.NOTIFICATION_SETTINGS)
+                    navController.navigate(
+                        MMRADestinations.NOTIFICATION_SETTINGS
+                    )
                 },
                 onAccessibilityClick = {
-                    navController.navigate(MMRADestinations.ACCESSIBILITY_SETTINGS)
+                    navController.navigate(
+                        MMRADestinations.ACCESSIBILITY_SETTINGS
+                    )
                 },
                 onVoiceGuidanceClick = {
-                    navController.navigate(MMRADestinations.VOICE_GUIDANCE_SETTINGS)
+                    navController.navigate(
+                        MMRADestinations.VOICE_GUIDANCE_SETTINGS
+                    )
                 },
                 onUsageModeClick = {
-                    navController.navigate(MMRADestinations.MANAGE_USAGE_MODE)
+                    navController.navigate(
+                        MMRADestinations.MANAGE_USAGE_MODE
+                    )
                 },
                 onSwitchAccountClick = {
                     navController.navigate(MMRADestinations.SWITCH_ACCOUNT)
                 },
                 onLogoutClick = {
-                    navController.navigate(MMRADestinations.LOGOUT_CONFIRMATION)
+                    navController.navigate(
+                        MMRADestinations.LOGOUT_CONFIRMATION
+                    )
                 }
             )
         }
@@ -348,7 +497,10 @@ fun MMRANavHost(
                 },
                 onDeletePhotoClick = {
                     UserProfileManager.deleteAvatar(context)
-                    navController.navigate(MMRADestinations.AVATAR_DELETED_SUCCESS)
+
+                    navController.navigate(
+                        MMRADestinations.AVATAR_DELETED_SUCCESS
+                    )
                 },
                 onCancelClick = {
                     navController.popBackStack()
@@ -363,7 +515,10 @@ fun MMRANavHost(
                 },
                 onPhotoCaptured = { bitmap ->
                     UserProfileManager.tempCapturedBitmap = bitmap
-                    navController.navigate(MMRADestinations.REVIEW_CAPTURED_PHOTO)
+
+                    navController.navigate(
+                        MMRADestinations.REVIEW_CAPTURED_PHOTO
+                    )
                 },
                 onCancelClick = {
                     navController.popBackStack()
@@ -408,8 +563,14 @@ fun MMRANavHost(
                     navController.popBackStack()
                 },
                 onConfirmCrop = { croppedBitmap ->
-                    UserProfileManager.saveAvatarBitmap(context, croppedBitmap)
-                    navController.navigate(MMRADestinations.AVATAR_UPDATED_SUCCESS)
+                    UserProfileManager.saveAvatarBitmap(
+                        context,
+                        croppedBitmap
+                    )
+
+                    navController.navigate(
+                        MMRADestinations.AVATAR_UPDATED_SUCCESS
+                    )
                 }
             )
         }
@@ -418,7 +579,10 @@ fun MMRANavHost(
             AvatarUpdatedScreen(
                 updatedBitmap = UserProfileManager.currentAvatarBitmap,
                 onBackToAccountClick = {
-                    navController.popBackStack(MMRADestinations.MY_ACCOUNT, false)
+                    navController.popBackStack(
+                        MMRADestinations.MY_ACCOUNT,
+                        false
+                    )
                 }
             )
         }
@@ -426,111 +590,176 @@ fun MMRANavHost(
         composable(MMRADestinations.AVATAR_DELETED_SUCCESS) {
             AvatarDeletedScreen(
                 onBackToAccountClick = {
-                    navController.popBackStack(MMRADestinations.MY_ACCOUNT, false)
+                    navController.popBackStack(
+                        MMRADestinations.MY_ACCOUNT,
+                        false
+                    )
                 }
             )
         }
 
         composable(MMRADestinations.EDIT_NAME) {
             EditNameScreen(
-                onBackClick = { navController.popBackStack() },
-                onSaveSuccess = { navController.popBackStack() },
-                onCancelClick = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onSaveSuccess = {
+                    navController.popBackStack()
+                },
+                onCancelClick = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(MMRADestinations.EDIT_EMAIL) {
             EditEmailScreen(
-                onBackClick = { navController.popBackStack() },
-                onContinueVerify = { navController.popBackStack() },
-                onCancelClick = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onContinueVerify = {
+                    navController.popBackStack()
+                },
+                onCancelClick = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(MMRADestinations.EDIT_PHONE) {
             EditPhoneScreen(
-                onBackClick = { navController.popBackStack() },
-                onContinueVerify = { navController.popBackStack() },
-                onCancelClick = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onContinueVerify = {
+                    navController.popBackStack()
+                },
+                onCancelClick = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(MMRADestinations.CHANGE_PASSWORD) {
             ChangePasswordScreen(
-                onBackClick = { navController.popBackStack() },
-                onSaveSuccess = { navController.popBackStack() },
-                onForgotPasswordClick = { navController.navigate(MMRADestinations.FORGOT_PASSWORD) },
-                onCancelClick = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onSaveSuccess = {
+                    navController.popBackStack()
+                },
+                onForgotPasswordClick = {
+                    navController.navigate(
+                        MMRADestinations.FORGOT_PASSWORD
+                    )
+                },
+                onCancelClick = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(MMRADestinations.NOTIFICATION_SETTINGS) {
             NotificationSettingsScreen(
-                onBackClick = { navController.popBackStack() },
-                onSaveSuccess = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onSaveSuccess = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(MMRADestinations.ACCESSIBILITY_SETTINGS) {
             AccessibilitySettingsScreen(
-                onBackClick = { navController.popBackStack() },
-                onSaveSuccess = { navController.popBackStack() },
-                onResetClick = { navController.navigate(MMRADestinations.INITIAL_SETUP_TARGET) }
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onSaveSuccess = {
+                    navController.popBackStack()
+                },
+                onResetClick = {
+                    navController.navigate(
+                        MMRADestinations.INITIAL_SETUP_TARGET
+                    )
+                }
             )
         }
 
         composable(MMRADestinations.VOICE_GUIDANCE_SETTINGS) {
             VoiceGuidanceSettingsScreen(
-                onBackClick = { navController.popBackStack() },
-                onSaveSuccess = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onSaveSuccess = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(MMRADestinations.MANAGE_USAGE_MODE) {
             ManageUsageModeScreen(
                 initialSelectedRoles = setupPreferences.selectedRoles,
-                onBackClick = { navController.popBackStack() },
-                onCancelClick = { navController.popBackStack() },
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onCancelClick = {
+                    navController.popBackStack()
+                },
                 onConfirmSave = { updatedRoles ->
-                    setupPreferences = setupPreferences.copy(selectedRoles = updatedRoles)
+                    setupPreferences = setupPreferences.copy(
+                        selectedRoles = updatedRoles
+                    )
+
                     navController.popBackStack()
                 }
             )
         }
 
         composable(MMRADestinations.SWITCH_ACCOUNT) {
-            SwitchAccountScreen(
-                avatarBitmap = UserProfileManager.currentAvatarBitmap,
-                onBackClick = { navController.popBackStack() },
-                onAddAccountClick = { navController.navigate(MMRADestinations.LOGIN) },
-                onCancelClick = { navController.popBackStack() }
-            )
-        }
+            SwitchAccountDestination(
+                onBack = {
+                    navController.popBackStack()
+                },
 
-        composable(MMRADestinations.LOGOUT_CONFIRMATION) {
-            LogoutConfirmationScreen(
-                avatarBitmap = UserProfileManager.currentAvatarBitmap,
-                onBackClick = { navController.popBackStack() },
-                onCancelClick = { navController.popBackStack() },
-                onConfirmLogout = {
-                    UserProfileManager.setLoggedIn(context, false)
-                    UserProfileManager.setSetupCompleted(context, false)
-                    navController.navigate(MMRADestinations.WELCOME) {
-                        popUpTo(0) { inclusive = true }
+                onSignedOut = {
+                    navController.navigate(MMRADestinations.LOGIN) {
+                        popUpTo(0) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
                     }
                 }
             )
         }
 
-        // --- Main Feature Destinations ---
+        composable(MMRADestinations.LOGOUT_CONFIRMATION) {
+            LogoutDestination(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onSignedOut = {
+                    navController.navigate(MMRADestinations.WELCOME) {
+                        popUpTo(0) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
         composable(MMRADestinations.ACCOUNT) {
             MyAccountScreen(
                 avatarBitmap = UserProfileManager.currentAvatarBitmap,
-                onBackClick = { navController.popBackStack() },
+                onBackClick = {
+                    navController.popBackStack()
+                },
                 onLogoutClick = {
-                    UserProfileManager.setLoggedIn(context, false)
-                    navController.navigate(MMRADestinations.WELCOME) {
-                        popUpTo(0) { inclusive = true }
+                    navController.navigate(
+                        MMRADestinations.LOGOUT_CONFIRMATION
+                    ) {
+                        launchSingleTop = true
                     }
                 }
             )
@@ -543,6 +772,7 @@ fun MMRANavHost(
                         popUpTo(MMRADestinations.HOME) {
                             saveState = true
                         }
+
                         launchSingleTop = true
                         restoreState = true
                     }
@@ -724,16 +954,24 @@ fun MMRANavHost(
         composable(MMRADestinations.FAMILY) {
             FamilyScreen(
                 onMemberClick = { memberId ->
-                    navController.navigate(MMRADestinations.familyMemberDetail(memberId))
+                    navController.navigate(
+                        MMRADestinations.familyMemberDetail(memberId)
+                    )
                 },
                 onInviteClick = {
-                    navController.navigate(MMRADestinations.FAMILY_INVITE)
+                    navController.navigate(
+                        MMRADestinations.FAMILY_INVITE
+                    )
                 },
                 onInviteDetailClick = {
-                    navController.navigate(MMRADestinations.FAMILY_INVITE_DETAIL)
+                    navController.navigate(
+                        MMRADestinations.FAMILY_INVITE_DETAIL
+                    )
                 },
                 onAlertsClick = {
-                    navController.navigate(MMRADestinations.FAMILY_ALERTS)
+                    navController.navigate(
+                        MMRADestinations.FAMILY_ALERTS
+                    )
                 },
                 onAccountClick = {
                     navController.navigate(MMRADestinations.MY_ACCOUNT)
@@ -743,14 +981,18 @@ fun MMRANavHost(
 
         composable(MMRADestinations.FAMILY_INVITE) {
             InviteFamilyScreen(
-                onBackClick = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(MMRADestinations.FAMILY_INVITE_DETAIL) {
             FamilyInviteDetailScreen(
                 onAcceptClick = {
-                    navController.navigate(MMRADestinations.FAMILY_PERMISSIONS)
+                    navController.navigate(
+                        MMRADestinations.FAMILY_PERMISSIONS
+                    )
                 },
                 onDeclineClick = {
                     navController.popBackStack()
@@ -785,45 +1027,78 @@ fun MMRANavHost(
 
         composable(MMRADestinations.FAMILY_PERMISSIONS) {
             FamilyPermissionsScreen(
-                onBackClick = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable(
             route = MMRADestinations.FAMILY_PERMISSIONS_MEMBER,
-            arguments = listOf(navArgument("memberId") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("memberId") {
+                    type = NavType.StringType
+                }
+            )
         ) { backStackEntry ->
-            val memberId = backStackEntry.arguments?.getString("memberId") ?: ""
-            val member = MockFamilyData.mockMembers.firstOrNull { it.id == memberId }
+            val memberId =
+                backStackEntry.arguments?.getString("memberId") ?: ""
+
+            val member = MockFamilyData.mockMembers.firstOrNull {
+                it.id == memberId
+            }
+
             FamilyPermissionsScreen(
-                onBackClick = { navController.popBackStack() },
+                onBackClick = {
+                    navController.popBackStack()
+                },
                 memberName = member?.fullName ?: "Nguyễn Minh Anh",
-                memberRole = if (member != null) "${member.relationship} • Hồ sơ theo dõi" else "Con gái • Người chăm sóc"
+                memberRole = if (member != null) {
+                    "${member.relationship} • Hồ sơ theo dõi"
+                } else {
+                    "Con gái • Người chăm sóc"
+                }
             )
         }
 
         composable(
             route = MMRADestinations.FAMILY_MEMBER_DETAIL,
-            arguments = listOf(navArgument("memberId") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("memberId") {
+                    type = NavType.StringType
+                }
+            )
         ) { backStackEntry ->
-            val memberId = backStackEntry.arguments?.getString("memberId") ?: ""
+            val memberId =
+                backStackEntry.arguments?.getString("memberId") ?: ""
+
             CaregiverMemberDetailScreen(
                 memberId = memberId,
-                onBackClick = { navController.popBackStack() },
+                onBackClick = {
+                    navController.popBackStack()
+                },
                 onViewHistoryClick = {
                     navController.navigate(MMRADestinations.HISTORY)
                 },
                 onPermissionsClick = {
-                    navController.navigate(MMRADestinations.familyPermissions(memberId))
+                    navController.navigate(
+                        MMRADestinations.familyPermissions(memberId)
+                    )
                 }
             )
         }
 
         composable(MMRADestinations.FAMILY_ALERTS) {
             FamilyAlertsScreen(
-                onBackClick = { navController.popBackStack() },
+                onBackClick = {
+                    navController.popBackStack()
+                },
                 onAlertClick = { alert ->
-                    navController.navigate(MMRADestinations.familyMemberDetail(alert.memberId))
+                    navController.navigate(
+                        MMRADestinations.familyMemberDetail(
+                            alert.memberId
+                        )
+                    )
                 }
             )
         }
@@ -834,15 +1109,34 @@ private fun authenticateAndProceed(
     navController: NavHostController,
     context: android.content.Context
 ) {
+    // Chỉ cho tiếp tục khi Firebase đã có phiên đăng nhập thật.
+    if (AuthRepository.currentUser == null) {
+        Toast.makeText(
+            context,
+            "Vui lòng đăng nhập bằng email hoặc Google trước khi tiếp tục.",
+            Toast.LENGTH_LONG
+        ).show()
+
+        return
+    }
+
     UserProfileManager.setLoggedIn(context, true)
+
     val setupDone = UserProfileManager.isSetupCompleted(context)
+
     if (setupDone) {
         navController.navigate(MMRADestinations.HOME) {
-            popUpTo(MMRADestinations.WELCOME) { inclusive = true }
+            popUpTo(MMRADestinations.WELCOME) {
+                inclusive = true
+            }
         }
     } else {
-        navController.navigate(MMRADestinations.INITIAL_SETUP_TARGET) {
-            popUpTo(MMRADestinations.WELCOME) { inclusive = true }
+        navController.navigate(
+            MMRADestinations.INITIAL_SETUP_TARGET
+        ) {
+            popUpTo(MMRADestinations.WELCOME) {
+                inclusive = true
+            }
         }
     }
 }
@@ -864,47 +1158,409 @@ private fun MedicineEntryDestination(
     entry: NavBackStackEntry,
     medicineId: String? = null
 ) {
-    val previous = MockMedicines.findById(medicineId)
+    val context = LocalContext.current
+    val repository = remember { MedicineRepository() }
+    val auth = FirebaseProvider.auth
 
-    if (medicineId != null && previous == null) {
-        Column {
-            Text("Không tìm thấy thuốc cần sửa.")
-
-            TextButton(
-                onClick = {
-                    navController.popBackStack()
-                }
-            ) {
-                Text("Quay lại")
-            }
-        }
-        return
+    var userId by remember(entry) {
+        mutableStateOf<String?>(null)
     }
 
-    ManualMedicineScreen(
-        initialDraft = previous?.draft(),
-        onBackClick = {
-            navController.popBackStack()
-        },
-        onContinue = { draft ->
-            entry.savedStateHandle[MANUAL_MEDICINE_DRAFT_KEY] =
-                Bundle().apply {
-                    putString("medicineId", medicineId)
-                    putString("medicineName", draft.medicineName)
-                    putString("strength", draft.strength)
-                    putString("strengthUnit", draft.strengthUnit)
-                    putString("dosageForm", draft.dosageForm)
-                    putString("note", draft.note)
-                    putString("imageUri", draft.imageUri)
-                }
+    var initialDraft by remember(entry) {
+        mutableStateOf<ManualMedicineDraft?>(null)
+    }
 
-            navController.navigate(
-                MMRADestinations.SCHEDULE_SETUP
-            ) {
-                launchSingleTop = true
+    var savedImageUrl by remember(entry) {
+        mutableStateOf<String?>(null)
+    }
+
+    var loading by remember(entry) {
+        mutableStateOf(true)
+    }
+
+    var signedIn by remember(entry) {
+        mutableStateOf(false)
+    }
+
+    var loadError by remember(entry) {
+        mutableStateOf<String?>(null)
+    }
+
+    var saveError by remember(entry) {
+        mutableStateOf<String?>(null)
+    }
+
+    var saving by remember(entry) {
+        mutableStateOf(false)
+    }
+
+    var pendingDraft by remember(entry) {
+        mutableStateOf<ManualMedicineDraft?>(null)
+    }
+
+    var retryVersion by remember(entry) {
+        mutableStateOf(0)
+    }
+
+    var requestVersion by remember(entry) {
+        mutableStateOf(0)
+    }
+
+    var listening by remember(entry) {
+        mutableStateOf(false)
+    }
+
+    DisposableEffect(entry, medicineId, retryVersion) {
+        listening = true
+
+        val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            val version = ++requestVersion
+            val uid = firebaseAuth.currentUser?.uid
+
+            userId = uid
+            signedIn = uid != null
+            initialDraft = null
+            savedImageUrl = null
+            loadError = null
+            saveError = null
+            pendingDraft = null
+            saving = false
+            loading = uid != null && medicineId != null
+
+            if (uid != null && medicineId != null) {
+                repository.getMedicine(medicineId)
+                    .addOnSuccessListener { record ->
+                        if (
+                            listening && version == requestVersion &&
+                            auth.currentUser?.uid == uid
+                        ) {
+                            val medicine = record.data
+
+                            initialDraft = ManualMedicineDraft(
+                                medicineName = medicine.medicineName,
+                                strength = medicine.strength,
+                                strengthUnit = medicine.strengthUnit,
+                                dosageForm = medicine.dosageForm,
+                                note = medicine.note,
+                                imageUri = medicine.imageUrl
+                            )
+
+                            savedImageUrl = medicine.imageUrl
+                            loading = false
+                        }
+                    }
+                    .addOnFailureListener {
+                        if (
+                            listening && version == requestVersion &&
+                            auth.currentUser?.uid == uid
+                        ) {
+                            loading = false
+
+                            loadError =
+                                "Không thể mở thuốc. Thuốc có thể đã bị xóa " +
+                                        "hoặc kết nối đang gặp lỗi."
+                        }
+                    }
             }
         }
-    )
+
+        auth.addAuthStateListener(listener)
+
+        onDispose {
+            listening = false
+            requestVersion++
+            auth.removeAuthStateListener(listener)
+        }
+    }
+
+    BackHandler(enabled = saving) {
+        // Chờ kết quả lưu trước khi rời màn hình.
+    }
+
+    when {
+        loading -> {
+            Column {
+                CircularProgressIndicator()
+                Text("Đang tải thông tin thuốc…")
+            }
+        }
+
+        !signedIn -> {
+            Column {
+                Text("Vui lòng đăng nhập để quản lý thuốc.")
+
+                TextButton(
+                    onClick = {
+                        navController.navigate(
+                            MMRADestinations.LOGIN
+                        ) {
+                            launchSingleTop = true
+                        }
+                    }
+                ) {
+                    Text("Đăng nhập")
+                }
+
+                TextButton(
+                    onClick = {
+                        navController.popBackStack()
+                    }
+                ) {
+                    Text("Quay lại")
+                }
+            }
+        }
+
+        loadError != null -> {
+            Column {
+                Text(loadError.orEmpty())
+
+                TextButton(
+                    onClick = {
+                        retryVersion++
+                    }
+                ) {
+                    Text("Thử lại")
+                }
+
+                TextButton(
+                    onClick = {
+                        navController.popBackStack()
+                    }
+                ) {
+                    Text("Quay lại")
+                }
+            }
+        }
+
+        else -> {
+            key(userId, medicineId) {
+                ManualMedicineScreen(
+                    initialDraft = initialDraft,
+                    isEditing = medicineId != null,
+                    saveMedicineOnly = true,
+
+                    deleteAction = if (medicineId != null) {
+                        {
+                            MedicineDeleteAction(
+                                medicineId = medicineId,
+                                medicineName =
+                                    initialDraft?.medicineName.orEmpty(),
+
+                                onDeleted = {
+                                    val returnedToList =
+                                        navController.popBackStack(
+                                            MMRADestinations.MEDICINE,
+                                            false
+                                        )
+
+                                    if (!returnedToList) {
+                                        navController.navigate(
+                                            MMRADestinations.MEDICINE
+                                        ) {
+                                            popUpTo(MMRADestinations.HOME)
+                                            launchSingleTop = true
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    } else null,
+
+                    onBackClick = {
+                        if (!saving) {
+                            navController.popBackStack()
+                        }
+                    },
+
+                    onContinue = { draft ->
+                        if (!saving) {
+                            pendingDraft = draft
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    pendingDraft?.let { draft ->
+        val hasLocalImage = draft.imageUri?.let {
+            !it.startsWith("https://")
+        } == true
+
+        AlertDialog(
+            onDismissRequest = {
+                pendingDraft = null
+            },
+            title = {
+                Text(
+                    if (medicineId == null) {
+                        "Lưu thuốc?"
+                    } else {
+                        "Lưu thay đổi?"
+                    }
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        "Lưu thông tin ${draft.medicineName}. " +
+                                "Bước này chưa thiết lập lịch uống."
+                    )
+
+                    if (hasLocalImage) {
+                        Text(
+                            "Ảnh vừa chọn chưa được tải lên nên " +
+                                    "sẽ chưa được lưu cùng thuốc."
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val uid = auth.currentUser?.uid
+
+                        if (
+                            uid == null ||
+                            uid != userId ||
+                            !listening
+                        ) {
+                            pendingDraft = null
+
+                            saveError =
+                                "Tài khoản đã thay đổi. " +
+                                        "Vui lòng mở lại màn hình thuốc."
+                        } else if (!saving) {
+                            pendingDraft = null
+                            saving = true
+                            saveError = null
+
+                            val version = ++requestVersion
+
+                            val medicine = MedicineDto(
+                                medicineName = draft.medicineName,
+                                strength = draft.strength,
+                                strengthUnit =
+                                    if (draft.strength.isBlank()) {
+                                        ""
+                                    } else {
+                                        draft.strengthUnit
+                                    },
+                                dosageForm = draft.dosageForm,
+                                note = draft.note,
+                                imageUrl = draft.imageUri
+                                    ?.takeIf {
+                                        it.startsWith("https://")
+                                    }
+                                    ?: savedImageUrl
+                            )
+
+                            val task: com.google.android.gms.tasks.Task<*> =
+                                if (medicineId == null) {
+                                    repository.addMedicine(medicine)
+                                } else {
+                                    repository.updateMedicine(
+                                        medicineId,
+                                        medicine
+                                    )
+                                }
+
+                            task.addOnSuccessListener {
+                                if (
+                                    listening &&
+                                    version == requestVersion &&
+                                    auth.currentUser?.uid == uid
+                                ) {
+                                    Toast.makeText(
+                                        context,
+                                        "Đã lưu thông tin thuốc",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+
+                                    if (
+                                        !navController.popBackStack(
+                                            MMRADestinations.MEDICINE,
+                                            false
+                                        )
+                                    ) {
+                                        navController.navigate(
+                                            MMRADestinations.MEDICINE
+                                        ) {
+                                            popUpTo(MMRADestinations.HOME)
+                                            launchSingleTop = true
+                                        }
+                                    }
+                                }
+                            }.addOnFailureListener {
+                                if (
+                                    listening &&
+                                    version == requestVersion &&
+                                    auth.currentUser?.uid == uid
+                                ) {
+                                    saving = false
+
+                                    saveError =
+                                        "Chưa lưu được thuốc. " +
+                                                "Vui lòng kiểm tra kết nối và thử lại."
+                                }
+                            }
+                        }
+                    }
+                ) {
+                    Text("Lưu")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingDraft = null
+                    }
+                ) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
+    if (saving) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = {
+                Text("Đang lưu thuốc")
+            },
+            text = {
+                Column {
+                    CircularProgressIndicator()
+                    Text("Vui lòng chờ…")
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    saveError?.let { message ->
+        AlertDialog(
+            onDismissRequest = {
+                saveError = null
+            },
+            title = {
+                Text("Chưa lưu được")
+            },
+            text = {
+                Text(message)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        saveError = null
+                    }
+                ) {
+                    Text("Đã hiểu")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -923,15 +1579,19 @@ private fun ReminderDestination(
         Column {
             Text("Không tìm thấy liều thuốc.")
 
-            TextButton(onClick = onBackClick) {
+            TextButton(
+                onClick = onBackClick
+            ) {
                 Text("Quay lại")
             }
         }
+
         return
     }
 
     val record = MockDoseActions.get(dose.doseId)
     val finished = MockDoseActions.isFinished(dose.doseId)
+
     val today = MockCalendar.day(dose.scheduledAtMillis) ==
             MockCalendar.day(rememberUiNow())
 
@@ -966,10 +1626,14 @@ private fun ReminderDestination(
         notice = notice,
         onClose = onBackClick,
         onTaken = {
-            if (canAct) dialog = "CONFIRM_TAKEN"
+            if (canAct) {
+                dialog = "CONFIRM_TAKEN"
+            }
         },
         onSkip = {
-            if (canAct) dialog = "CONFIRM_SKIP"
+            if (canAct) {
+                dialog = "CONFIRM_SKIP"
+            }
         },
         onSnooze = {
             if (canAct) {
@@ -977,6 +1641,7 @@ private fun ReminderDestination(
                     it,
                     MockDoseAction.SNOOZED
                 )
+
                 dialog = "SNOOZED"
             }
         },
@@ -1034,6 +1699,7 @@ private fun ReminderDestination(
                                     dose.doseId,
                                     MockDoseAction.TAKEN
                                 )
+
                                 dialog = "TAKEN"
                             }
 
@@ -1042,6 +1708,7 @@ private fun ReminderDestination(
                                     dose.doseId,
                                     MockDoseAction.SKIPPED
                                 )
+
                                 dialog = "SKIPPED"
                             }
 

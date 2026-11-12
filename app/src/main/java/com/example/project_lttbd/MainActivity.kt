@@ -23,6 +23,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.project_lttbd.data.device.DeviceManager
+import com.example.project_lttbd.data.remote.BackendSessionCheck
 import com.example.project_lttbd.data.remote.FirebaseProvider
 import com.example.project_lttbd.notifications.NotificationHelper
 import com.example.project_lttbd.ui.components.MMRABottomBar
@@ -33,57 +34,122 @@ import com.example.project_lttbd.ui.theme.MMRATheme
 
 class MainActivity : ComponentActivity() {
 
-    private var pendingDestination = mutableStateOf<String?>(null)
+    private val pendingDestination = mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Khởi tạo kênh thông báo hệ thống
+        // Khởi tạo kênh thông báo hệ thống.
         NotificationHelper.ensureNotificationChannel(this)
 
-        // Trích xuất intent điều hướng nếu mở từ thông báo
+        // Kiểm tra Firebase ID token với backend ở bản debug.
+        BackendSessionCheck.run(this)
+
+        // Thông tin phục vụ kiểm thử Firebase Cloud Messaging.
+        android.util.Log.d(
+            "MMRA_FCM_TEST",
+            "PROJECT=" +
+                    com.google.firebase.FirebaseApp.getInstance()
+                        .options.projectId
+        )
+
+        com.google.firebase.messaging.FirebaseMessaging.getInstance()
+            .token
+            .addOnSuccessListener { token ->
+                android.util.Log.d(
+                    "MMRA_FCM_TEST",
+                    "TOKEN=$token"
+                )
+            }
+            .addOnFailureListener { error ->
+                android.util.Log.e(
+                    "MMRA_FCM_TEST",
+                    "Không lấy được token",
+                    error
+                )
+            }
+
+        // Trích xuất đích đến nếu mở app từ thông báo.
         extractNotificationRoute(intent)
 
-        // Đồng bộ thiết bị nếu đã có phiên đăng nhập
+        // Đồng bộ thiết bị nếu đã có phiên đăng nhập.
         syncDeviceIfLoggedIn()
 
         setContent {
             MMRATheme {
                 val navController = rememberNavController()
-                val backStackEntry by navController.currentBackStackEntryAsState()
-                val currentRoute = backStackEntry?.destination?.route
 
-                // Xử lý xin quyền thông báo trên Android 13+ (API 33+)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    val permissionLauncher = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.RequestPermission()
-                    ) { _ ->
-                        syncDeviceIfLoggedIn()
-                    }
+                val backStackEntry by
+                navController.currentBackStackEntryAsState()
+
+                val currentRoute =
+                    backStackEntry?.destination?.route
+
+                // Xin quyền thông báo trên Android 13 trở lên.
+                if (
+                    Build.VERSION.SDK_INT >=
+                    Build.VERSION_CODES.TIRAMISU
+                ) {
+                    val permissionLauncher =
+                        rememberLauncherForActivityResult(
+                            contract =
+                                ActivityResultContracts.RequestPermission()
+                        ) { _ ->
+                            syncDeviceIfLoggedIn()
+                        }
 
                     LaunchedEffect(Unit) {
-                        val hasPermission = ContextCompat.checkSelfPermission(
-                            this@MainActivity,
-                            Manifest.permission.POST_NOTIFICATIONS
-                        ) == PackageManager.PERMISSION_GRANTED
+                        val hasPermission =
+                            ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) == PackageManager.PERMISSION_GRANTED
 
                         if (!hasPermission) {
-                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            permissionLauncher.launch(
+                                Manifest.permission.POST_NOTIFICATIONS
+                            )
                         }
                     }
                 }
 
-                // Điều hướng khi có đích đến từ thông báo
+                // Chỉ mở nội dung thông báo khi đã đăng nhập.
                 val targetRoute by pendingDestination
-                LaunchedEffect(targetRoute) {
-                    targetRoute?.let { route ->
-                        if (route.isNotBlank()) {
-                            navController.navigate(route) {
-                                launchSingleTop = true
+
+                LaunchedEffect(targetRoute, currentRoute) {
+                    val route = targetRoute
+                        ?.takeIf { it.isNotBlank() }
+                        ?: return@LaunchedEffect
+
+                    // Chờ NavHost khởi tạo xong.
+                    if (currentRoute == null) {
+                        return@LaunchedEffect
+                    }
+
+                    // Mỗi yêu cầu chỉ được xử lý một lần.
+                    pendingDestination.value = null
+
+                    if (FirebaseProvider.auth.currentUser == null) {
+                        android.widget.Toast.makeText(
+                            this@MainActivity,
+                            "Vui lòng đăng nhập để xem thông báo.",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+
+                        navController.navigate(
+                            MMRADestinations.LOGIN
+                        ) {
+                            popUpTo(0) {
+                                inclusive = true
                             }
+
+                            launchSingleTop = true
                         }
-                        pendingDestination.value = null
+                    } else {
+                        navController.navigate(route) {
+                            launchSingleTop = true
+                        }
                     }
                 }
 
@@ -93,23 +159,29 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
+
                     bottomBar = {
                         if (showBottomBar) {
                             MMRABottomBar(
                                 currentRoute = currentRoute,
+
                                 onItemClick = { route ->
                                     navController.navigate(route) {
                                         popUpTo(
                                             navController.graph
-                                                .findStartDestination().id
+                                                .findStartDestination()
+                                                .id
                                         ) {
                                             saveState = true
                                         }
+
                                         launchSingleTop = true
                                         restoreState = true
                                     }
                                 },
-                                modifier = Modifier.navigationBarsPadding()
+
+                                modifier = Modifier
+                                    .navigationBarsPadding()
                             )
                         }
                     }
@@ -132,16 +204,68 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun extractNotificationRoute(intent: Intent?) {
-        val destination = intent?.getStringExtra(NotificationHelper.EXTRA_DESTINATION)
-        if (!destination.isNullOrBlank()) {
-            pendingDestination.value = destination
+        if (
+            intent == null ||
+            intent.getBooleanExtra(
+                "mmra_notification_route_consumed",
+                false
+            )
+        ) {
+            pendingDestination.value = null
+            return
         }
+
+        val requestedRoute = sequenceOf(
+            intent.getStringExtra(
+                NotificationHelper.EXTRA_DESTINATION
+            ),
+            intent.getStringExtra("destination")
+        )
+            .filterNotNull()
+            .map { it.trim() }
+            .firstOrNull { it.isNotEmpty() }
+
+        val fromFcm =
+            intent.hasExtra("gcm.n.analytics_data") ||
+                    intent.hasExtra("google.message_id") ||
+                    intent.hasExtra("message_id")
+
+        if (requestedRoute == null && !fromFcm) {
+            pendingDestination.value = null
+            return
+        }
+
+        val allowedRoutes = setOf(
+            MMRADestinations.HOME,
+            MMRADestinations.MEDICINE,
+            MMRADestinations.SCHEDULE,
+            MMRADestinations.HISTORY,
+            MMRADestinations.FAMILY,
+            MMRADestinations.ACCOUNT,
+            MMRADestinations.MY_ACCOUNT
+        )
+
+        pendingDestination.value = requestedRoute
+            ?.takeIf { it in allowedRoutes }
+            ?: MMRADestinations.HOME
+
+        // Đánh dấu đã nhận đích đến,
+        // giữ dữ liệu Firebase cho Analytics.
+        intent.putExtra(
+            "mmra_notification_route_consumed",
+            true
+        )
     }
 
     private fun syncDeviceIfLoggedIn() {
-        val currentUid = FirebaseProvider.auth.currentUser?.uid
+        val currentUid =
+            FirebaseProvider.auth.currentUser?.uid
+
         if (!currentUid.isNullOrBlank()) {
-            DeviceManager.syncCurrentDevice(this, currentUid)
+            DeviceManager.syncCurrentDevice(
+                this,
+                currentUid
+            )
         }
     }
 }
