@@ -29,7 +29,8 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onViewAllClick: () -> Unit = {},
     onViewDoseClick: (String) -> Unit = {},
-    onAccountClick: () -> Unit = {}
+    onAccountClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {}
 ) {
     val doses = MockReminderDoses.doses
 
@@ -118,9 +119,7 @@ fun HomeScreen(
             dateText = todayText,
             initials = UserProfileManager.getInitials(),
             avatarBitmap = UserProfileManager.currentAvatarBitmap,
-            onNotificationsClick = {
-                // Chờ ghép phần thông báo của nhóm.
-            },
+            onNotificationsClick = onNotificationsClick,
             onAccountClick = onAccountClick
         )
 

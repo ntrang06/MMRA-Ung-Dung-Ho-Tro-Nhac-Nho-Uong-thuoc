@@ -79,6 +79,8 @@ import com.example.project_lttbd.ui.screens.family.InviteFamilyScreen
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineDraft
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineScreen
 import com.example.project_lttbd.ui.screens.medicine.MedicineScreen
+import com.example.project_lttbd.ui.screens.notifications.NotificationHistoryScreen
+import com.example.project_lttbd.notifications.storage.LocalNotificationStore
 import com.example.project_lttbd.ui.screens.reminder.DoseReminderScreen
 import com.example.project_lttbd.ui.screens.reminder.ReminderNoticeUiModel
 import com.example.project_lttbd.ui.screens.reminder.rememberReminderSpeech
@@ -784,6 +786,45 @@ fun MMRANavHost(
                     navController.navigate(MMRADestinations.MY_ACCOUNT) {
                         launchSingleTop = true
                     }
+                },
+                onNotificationsClick = {
+                    navController.navigate(MMRADestinations.NOTIFICATIONS) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable(MMRADestinations.NOTIFICATIONS) {
+            val context = LocalContext.current
+            val currentUid = FirebaseProvider.auth.currentUser?.uid.orEmpty()
+            var notifications by remember {
+                mutableStateOf(LocalNotificationStore.getNotifications(context, currentUid))
+            }
+
+            NotificationHistoryScreen(
+                notifications = notifications,
+                onNotificationClick = { item ->
+                    LocalNotificationStore.markAsRead(context, currentUid, item.id)
+                    notifications = LocalNotificationStore.getNotifications(context, currentUid)
+                    if (item.destinationRoute.isNotBlank()) {
+                        navController.navigate(item.destinationRoute) {
+                            launchSingleTop = true
+                        }
+                    } else if (item.doseId.isNotBlank()) {
+                        navController.openReminder(item.doseId)
+                    }
+                },
+                onMarkAllAsRead = {
+                    LocalNotificationStore.markAllAsRead(context, currentUid)
+                    notifications = LocalNotificationStore.getNotifications(context, currentUid)
+                },
+                onClearAll = {
+                    LocalNotificationStore.clearAll(context, currentUid)
+                    notifications = emptyList()
+                },
+                onBackClick = {
+                    navController.popBackStack()
                 }
             )
         }
