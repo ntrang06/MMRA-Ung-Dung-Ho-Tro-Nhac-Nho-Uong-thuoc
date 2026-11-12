@@ -81,6 +81,8 @@ import com.example.project_lttbd.ui.screens.medicine.ManualMedicineScreen
 import com.example.project_lttbd.ui.screens.medicine.MedicineScreen
 import com.example.project_lttbd.ui.screens.notifications.NotificationHistoryScreen
 import com.example.project_lttbd.notifications.storage.LocalNotificationStore
+import com.example.project_lttbd.notifications.sync.MedicationReminderSync
+import com.example.project_lttbd.notifications.alarm.MedicationAlarmScheduler
 import com.example.project_lttbd.ui.screens.reminder.DoseReminderScreen
 import com.example.project_lttbd.ui.screens.reminder.ReminderNoticeUiModel
 import com.example.project_lttbd.ui.screens.reminder.rememberReminderSpeech
@@ -1610,6 +1612,7 @@ private fun ReminderDestination(
     readOnly: Boolean,
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val dose = MockReminderDoses.findById(doseId)
 
     var dialog by rememberSaveable(doseId) {
@@ -1683,6 +1686,17 @@ private fun ReminderDestination(
                     MockDoseAction.SNOOZED
                 )
 
+                val currentUid = FirebaseProvider.auth.currentUser?.uid.orEmpty()
+                MedicationAlarmScheduler.schedule(
+                    context = context,
+                    uid = currentUid,
+                    doseId = dose.doseId,
+                    triggerAtMillis = System.currentTimeMillis() + 10 * 60 * 1000L,
+                    title = "Nhắc lại: ${dose.medicineName}",
+                    message = "${dose.quantityText}. ${dose.mealInstruction}".trim(),
+                    medicineName = dose.medicineName
+                )
+
                 dialog = "SNOOZED"
             }
         },
@@ -1740,7 +1754,7 @@ private fun ReminderDestination(
                                     dose.doseId,
                                     MockDoseAction.TAKEN
                                 )
-
+                                MedicationReminderSync.onDoseAction(context, dose.doseId)
                                 dialog = "TAKEN"
                             }
 
@@ -1749,7 +1763,7 @@ private fun ReminderDestination(
                                     dose.doseId,
                                     MockDoseAction.SKIPPED
                                 )
-
+                                MedicationReminderSync.onDoseAction(context, dose.doseId)
                                 dialog = "SKIPPED"
                             }
 
