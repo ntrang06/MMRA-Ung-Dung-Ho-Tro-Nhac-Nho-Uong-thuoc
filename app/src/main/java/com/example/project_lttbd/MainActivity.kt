@@ -31,6 +31,7 @@ import com.example.project_lttbd.ui.navigation.MMRADestinations
 import com.example.project_lttbd.ui.navigation.MMRANavHost
 import com.example.project_lttbd.ui.navigation.mmraBottomNavItems
 import com.example.project_lttbd.ui.theme.MMRATheme
+import com.example.project_lttbd.data.debug.FirebaseAuthDebug
 
 class MainActivity : ComponentActivity() {
 
@@ -45,7 +46,7 @@ class MainActivity : ComponentActivity() {
 
         // Kiểm tra Firebase ID token với backend ở bản debug.
         BackendSessionCheck.run(this)
-
+        FirebaseAuthDebug.printIdTokenForLocalTesting()
         // Thông tin phục vụ kiểm thử Firebase Cloud Messaging.
         android.util.Log.d(
             "MMRA_FCM_TEST",
