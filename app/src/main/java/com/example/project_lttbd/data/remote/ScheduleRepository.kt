@@ -1,5 +1,6 @@
 package com.example.project_lttbd.data.remote
 
+import android.util.Log
 import com.example.project_lttbd.data.remote.dto.ScheduleInputDto
 import com.example.project_lttbd.data.remote.dto.ScheduleResponseDto
 import com.example.project_lttbd.data.remote.dto.ScheduleUpdateDto
@@ -8,6 +9,8 @@ import com.google.gson.JsonParser
 import kotlinx.coroutines.CancellationException
 import retrofit2.Response
 import java.io.IOException
+
+private const val SCHEDULE_REPOSITORY_LOG_TAG = "MMRA_API_ERROR"
 
 class ScheduleException(
     message: String,
@@ -18,60 +21,104 @@ class ScheduleException(
 class ScheduleRepository(
     private val api: ScheduleApi = ScheduleApiClient.api
 ) {
-
     suspend fun listSchedules(): List<ScheduleResponseDto> {
-        return requireBody(execute { authorization ->
-            api.listSchedules(authorization)
-        })
+        return requireBody(
+            execute(
+                operation = "GET /api/v1/schedules"
+            ) { authorization ->
+                api.listSchedules(authorization)
+            }
+        )
     }
 
-    suspend fun getSchedule(scheduleId: String): ScheduleResponseDto {
-        return requireBody(execute { authorization ->
-            api.getSchedule(authorization, scheduleId)
-        })
+    suspend fun getSchedule(
+        scheduleId: String
+    ): ScheduleResponseDto {
+        return requireBody(
+            execute(
+                operation = "GET /api/v1/schedules/{scheduleId}"
+            ) { authorization ->
+                api.getSchedule(
+                    authorization,
+                    scheduleId
+                )
+            }
+        )
     }
 
     suspend fun createSchedule(
         body: ScheduleInputDto
     ): ScheduleResponseDto {
-        return requireBody(execute(isWrite = true) { authorization ->
-            api.createSchedule(authorization, body)
-        })
+        return requireBody(
+            execute(
+                operation = "POST /api/v1/schedules",
+                isWrite = true
+            ) { authorization ->
+                api.createSchedule(
+                    authorization,
+                    body
+                )
+            }
+        )
     }
 
     suspend fun updateSchedule(
         scheduleId: String,
         body: ScheduleUpdateDto
     ): ScheduleResponseDto {
-        return requireBody(execute(isWrite = true) { authorization ->
-            api.updateSchedule(authorization, scheduleId, body)
-        })
+        return requireBody(
+            execute(
+                operation = "PUT /api/v1/schedules/{scheduleId}",
+                isWrite = true
+            ) { authorization ->
+                api.updateSchedule(
+                    authorization,
+                    scheduleId,
+                    body
+                )
+            }
+        )
     }
 
     suspend fun deleteSchedule(
         scheduleId: String,
         expectedVersion: Int
     ) {
-        execute(isWrite = true) { authorization ->
+        execute(
+            operation = "DELETE /api/v1/schedules/{scheduleId}",
+            isWrite = true
+        ) { authorization ->
             api.deleteSchedule(
                 authorization,
                 scheduleId,
                 expectedVersion
             )
         }
-
-        // HTTP 204 thành công không có response body.
     }
 
     private suspend fun <T> execute(
+        operation: String,
         isWrite: Boolean = false,
         call: suspend (String) -> Response<T>
     ): Response<T> {
+        Log.i(
+            SCHEDULE_REPOSITORY_LOG_TAG,
+            "BEGIN $operation"
+        )
+
         val uid = FirebaseProvider.auth.currentUser?.uid
-            ?: throw ScheduleException(
+
+        if (uid == null) {
+            Log.w(
+                SCHEDULE_REPOSITORY_LOG_TAG,
+                "$operation: chưa đăng nhập"
+            )
+
+            throw ScheduleException(
                 "Vui lòng đăng nhập lại.",
                 "unauthenticated"
             )
+        }
 
         val authorization = try {
             BackendSession.authorizationHeader()
@@ -79,6 +126,12 @@ class ScheduleRepository(
             throw cancelled
         } catch (error: Exception) {
             ensureSameUser(uid)
+
+            Log.e(
+                SCHEDULE_REPOSITORY_LOG_TAG,
+                "$operation: lỗi lấy phiên xác thực",
+                error
+            )
 
             throw ScheduleException(
                 "Chưa xác thực được phiên đăng nhập. " +
@@ -92,34 +145,72 @@ class ScheduleRepository(
         try {
             val response = call(authorization)
 
-            // Bỏ kết quả nếu đã đăng xuất hoặc đổi tài khoản.
             ensureSameUser(uid, response)
 
             if (!response.isSuccessful) {
-                throw apiError(response, isWrite)
+                Log.e(
+                    SCHEDULE_REPOSITORY_LOG_TAG,
+                    "$operation: HTTP ${response.code()}"
+                )
+
+                throw apiError(
+                    response = response,
+                    isWrite = isWrite
+                )
             }
 
+            Log.i(
+                SCHEDULE_REPOSITORY_LOG_TAG,
+                "DONE $operation: HTTP ${response.code()}"
+            )
+
             return response
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: ScheduleException) {
+            throw error
         } catch (error: IOException) {
             ensureSameUser(uid)
 
+            Log.e(
+                SCHEDULE_REPOSITORY_LOG_TAG,
+                "$operation: ${error.javaClass.simpleName}: ${error.message}",
+                error
+            )
+
             throw ScheduleException(
-                if (isWrite) {
+                message = if (isWrite) {
                     uncertainWriteMessage()
                 } else {
                     "Không kết nối được máy chủ. " +
                             "Vui lòng kiểm tra kết nối và thử lại."
                 },
-                "network_error"
+                errorCode = "network_error"
             )
         } catch (error: JsonParseException) {
             ensureSameUser(uid)
+
+            Log.e(
+                SCHEDULE_REPOSITORY_LOG_TAG,
+                "$operation: lỗi đọc dữ liệu JSON",
+                error
+            )
 
             throw ScheduleException(
                 "Máy chủ trả về dữ liệu chưa hợp lệ. " +
                         "Vui lòng tải lại danh sách trước khi thử lại.",
                 "invalid_response"
             )
+        } catch (error: Exception) {
+            ensureSameUser(uid)
+
+            Log.e(
+                SCHEDULE_REPOSITORY_LOG_TAG,
+                "$operation: lỗi chưa được phân loại",
+                error
+            )
+
+            throw error
         }
     }
 
@@ -136,12 +227,25 @@ class ScheduleRepository(
         }
     }
 
-    private fun <T> requireBody(response: Response<T>): T {
-        return response.body() ?: throw ScheduleException(
-            "Chưa nhận được dữ liệu hợp lệ. " +
-                    "Vui lòng tải lại danh sách trước khi thử lại.",
-            "invalid_response"
-        )
+    private fun <T> requireBody(
+        response: Response<T>
+    ): T {
+        val body = response.body()
+
+        if (body == null) {
+            Log.e(
+                SCHEDULE_REPOSITORY_LOG_TAG,
+                "HTTP ${response.code()}: không có dữ liệu phản hồi"
+            )
+
+            throw ScheduleException(
+                "Chưa nhận được dữ liệu hợp lệ. " +
+                        "Vui lòng tải lại danh sách trước khi thử lại.",
+                "invalid_response"
+            )
+        }
+
+        return body
     }
 
     private fun apiError(
@@ -149,19 +253,27 @@ class ScheduleRepository(
         isWrite: Boolean
     ): ScheduleException {
         val code = runCatching {
-            val text = response.errorBody()?.string()
-                ?: return@runCatching null
+            val text = response.errorBody()?.use {
+                it.string()
+            } ?: return@runCatching null
 
             val detail = JsonParser.parseString(text)
                 .asJsonObject
                 .get("detail")
 
             if (detail?.isJsonObject == true) {
-                detail.asJsonObject.get("code")?.asString
+                detail.asJsonObject
+                    .get("code")
+                    ?.asString
             } else {
                 null
             }
         }.getOrNull()
+
+        Log.e(
+            SCHEDULE_REPOSITORY_LOG_TAG,
+            "API_ERROR HTTP ${response.code()}, code=${code?.take(80)}"
+        )
 
         val message = when (response.code()) {
             401 ->
@@ -209,9 +321,9 @@ class ScheduleRepository(
         }
 
         return ScheduleException(
-            message,
-            code,
-            response.code()
+            message = message,
+            errorCode = code,
+            httpCode = response.code()
         )
     }
 
