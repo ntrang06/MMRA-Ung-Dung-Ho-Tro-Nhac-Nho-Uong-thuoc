@@ -54,7 +54,8 @@ data class MedicineUiModel(
     val quantityText: String,
     val scheduleText: String,
     val hasSchedule: Boolean,
-    val accent: MedicineAccent = MedicineAccent.GREEN
+    val accent: MedicineAccent = MedicineAccent.GREEN,
+    val scheduleStatusText: String? = null
 )
 
 @Composable
@@ -142,11 +143,12 @@ fun MedicineCard(
                     color = Color(0xFF102A2A)
                 )
 
-                val scheduleStatus = if (medicine.hasSchedule) {
-                    "Đã có lịch uống"
-                } else {
-                    "Chưa có lịch uống"
-                }
+                val scheduleStatus = medicine.scheduleStatusText
+                    ?: if (medicine.hasSchedule) {
+                        "Đã có lịch uống"
+                    } else {
+                        "Chưa có lịch uống"
+                    }
 
                 Text(
                     text = listOf(

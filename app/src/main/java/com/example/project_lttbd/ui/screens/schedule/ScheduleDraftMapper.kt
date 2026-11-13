@@ -96,3 +96,72 @@ internal fun ScheduleResponseDto.toInput(): ScheduleInputDto {
         enabled = enabled
     )
 }
+internal fun ScheduleResponseDto.toEditorSchedule(): MockMedicineSchedule {
+    return MockMedicineSchedule(
+        quantity = doseQuantity,
+
+        unit = when (doseUnit) {
+            DoseUnitDto.TABLET -> "viên"
+            DoseUnitDto.SACHET -> "gói"
+            DoseUnitDto.ML -> "ml"
+            DoseUnitDto.DROP -> "giọt"
+            DoseUnitDto.DOSE -> "liều"
+        },
+
+        times = times.sorted(),
+
+        // Backend: thứ Hai = 1; Calendar: Chủ nhật = 1.
+        weekdays = weekdays.map {
+            it % 7 + 1
+        }.toSet(),
+
+        meal = mealInstruction,
+        reminderMinutes = reminderMinutes,
+        startDay = parseScheduleDay(startDate),
+        endDay = endDate?.let {
+            parseScheduleDay(it)
+        }
+    )
+}
+
+internal fun MockMedicineSchedule.toScheduleUpdate(
+    original: ScheduleResponseDto
+): com.example.project_lttbd.data.remote.dto.ScheduleUpdateDto {
+    val input = toScheduleInput(original.medicineId)
+
+    return com.example.project_lttbd.data.remote.dto.ScheduleUpdateDto(
+        medicineId = original.medicineId,
+        expectedVersion = original.version,
+        doseQuantity = input.doseQuantity,
+        doseUnit = input.doseUnit,
+        times = input.times,
+        weekdays = input.weekdays,
+        startDate = input.startDate,
+        endDate = input.endDate,
+        timeZone = original.timeZone,
+        mealInstruction = input.mealInstruction,
+        reminderMinutes = input.reminderMinutes,
+        enabled = original.enabled
+    )
+}
+
+private fun parseScheduleDay(value: String): Long {
+    require(
+        Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(value)
+    ) {
+        "Ngày trong lịch chưa hợp lệ."
+    }
+
+    val format = java.text.SimpleDateFormat(
+        "yyyy-MM-dd",
+        java.util.Locale.ROOT
+    )
+
+    format.isLenient = false
+
+    val date = requireNotNull(format.parse(value)) {
+        "Ngày trong lịch chưa hợp lệ."
+    }
+
+    return MockCalendar.day(date.time)
+}

@@ -79,6 +79,7 @@ import com.example.project_lttbd.ui.screens.family.InviteFamilyScreen
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineDraft
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineScreen
 import com.example.project_lttbd.ui.screens.medicine.MedicineScreen
+import com.example.project_lttbd.ui.screens.medicine.MedicineEditFlowScreen
 import com.example.project_lttbd.ui.screens.notifications.NotificationHistoryScreen
 import com.example.project_lttbd.notifications.storage.LocalNotificationStore
 import com.example.project_lttbd.notifications.sync.MedicationReminderSync
@@ -99,6 +100,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.project_lttbd.ui.screens.medicine.MedicineDeleteAction
 import com.example.project_lttbd.ui.screens.schedule.ScheduleCreateScreen
+import com.example.project_lttbd.ui.screens.schedule.MedicineSchedulesScreen
+import com.example.project_lttbd.ui.screens.schedule.ScheduleEditScreen
+import com.example.project_lttbd.ui.components.MedicineFormSkeleton
 
 private const val MANUAL_MEDICINE_DRAFT_KEY = "manual_medicine_draft"
 
@@ -109,7 +113,6 @@ fun MMRANavHost(
 ) {
     val context = LocalContext.current
 
-    // Một ViewModel dùng chung cho ba nút Google trong Login/Email Login/Register.
     val googleAuthViewModel: AuthViewModel = viewModel(
         key = "mmra_google_auth"
     )
@@ -125,7 +128,9 @@ fun MMRANavHost(
     if (googleAuthViewModel.isLoading) {
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Đang đăng nhập Google") },
+            title = {
+                Text("Đang đăng nhập Google")
+            },
             text = {
                 Column {
                     CircularProgressIndicator()
@@ -141,8 +146,12 @@ fun MMRANavHost(
             onDismissRequest = {
                 googleAuthViewModel.clearError()
             },
-            title = { Text("Chưa đăng nhập được") },
-            text = { Text(message) },
+            title = {
+                Text("Chưa đăng nhập được")
+            },
+            text = {
+                Text(message)
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -156,22 +165,29 @@ fun MMRANavHost(
     }
 
     UserProfileManager.init(context)
+
     val currentUser = AuthRepository.currentUser
     val isSetupCompleted = UserProfileManager.isSetupCompleted(context)
 
-    // Chỉ xác định màn khởi động một lần.
-    // Sau khi đăng nhập thành công, callback sẽ điều hướng.
     val startDest = remember {
         when {
-            currentUser == null -> MMRADestinations.WELCOME
-            !isSetupCompleted -> MMRADestinations.INITIAL_SETUP_TARGET
-            else -> MMRADestinations.HOME
+            currentUser == null ->
+                MMRADestinations.WELCOME
+
+            !isSetupCompleted ->
+                MMRADestinations.INITIAL_SETUP_TARGET
+
+            else ->
+                MMRADestinations.HOME
         }
     }
 
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
-            DeviceManager.syncCurrentDevice(context, currentUser.uid)
+            DeviceManager.syncCurrentDevice(
+                context,
+                currentUser.uid
+            )
         }
     }
 
@@ -184,8 +200,6 @@ fun MMRANavHost(
         startDestination = startDest,
         modifier = modifier
     ) {
-        // --- Authentication & Setup ---
-
         composable(MMRADestinations.WELCOME) {
             WelcomeScreen(
                 onLoginClick = {
@@ -227,7 +241,9 @@ fun MMRANavHost(
                     authenticateAndProceed(navController, context)
                 },
                 onForgotPasswordClick = {
-                    navController.navigate(MMRADestinations.FORGOT_PASSWORD)
+                    navController.navigate(
+                        MMRADestinations.FORGOT_PASSWORD
+                    )
                 },
                 onRegisterClick = {
                     navController.navigate(MMRADestinations.REGISTER)
@@ -251,7 +267,10 @@ fun MMRANavHost(
                         context
                     ) { success ->
                         if (success) {
-                            authenticateAndProceed(navController, context)
+                            authenticateAndProceed(
+                                navController,
+                                context
+                            )
                         }
                     }
                 },
@@ -260,7 +279,9 @@ fun MMRANavHost(
                 },
                 onGoogleLoginClick = signInGoogle,
                 onForgotPasswordClick = {
-                    navController.navigate(MMRADestinations.FORGOT_PASSWORD)
+                    navController.navigate(
+                        MMRADestinations.FORGOT_PASSWORD
+                    )
                 },
                 onRegisterClick = {
                     navController.navigate(MMRADestinations.REGISTER)
@@ -312,7 +333,9 @@ fun MMRANavHost(
                     navController.popBackStack()
                 },
                 onVerifyClick = {
-                    navController.navigate(MMRADestinations.VERIFY_EMAIL)
+                    navController.navigate(
+                        MMRADestinations.VERIFY_EMAIL
+                    )
                 },
                 onChangePhoneClick = {
                     navController.popBackStack()
@@ -326,7 +349,9 @@ fun MMRANavHost(
                     navController.popBackStack()
                 },
                 onVerifyClick = {
-                    navController.navigate(MMRADestinations.COMPLETION)
+                    navController.navigate(
+                        MMRADestinations.COMPLETION
+                    )
                 },
                 onChangeEmailClick = {
                     navController.popBackStack()
@@ -356,7 +381,9 @@ fun MMRANavHost(
                     navController.popBackStack()
                 },
                 onSavePasswordClick = {
-                    navController.navigate(MMRADestinations.COMPLETION)
+                    navController.navigate(
+                        MMRADestinations.COMPLETION
+                    )
                 }
             )
         }
@@ -392,7 +419,8 @@ fun MMRANavHost(
 
         composable(MMRADestinations.INITIAL_SETUP_DISPLAY) {
             SetupDisplayPreferenceScreen(
-                initialLargeText = setupPreferences.isLargeTextEnabled,
+                initialLargeText =
+                    setupPreferences.isLargeTextEnabled,
                 initialVoiceGuidance =
                     setupPreferences.isVoiceGuidanceEnabled,
                 onBackClick = {
@@ -404,16 +432,24 @@ fun MMRANavHost(
                         isVoiceGuidanceEnabled = isVoiceGuidance
                     )
 
-                    UserProfileManager.setSetupCompleted(context, true)
-                    UserProfileManager.setLoggedIn(context, true)
+                    UserProfileManager.setSetupCompleted(
+                        context,
+                        true
+                    )
+
+                    UserProfileManager.setLoggedIn(
+                        context,
+                        true
+                    )
 
                     val uid = AuthRepository.currentUid
 
                     if (uid != null) {
                         val roleStr =
-                            setupPreferences.selectedRoles.joinToString(",") {
-                                it.name
-                            }
+                            setupPreferences.selectedRoles
+                                .joinToString(",") {
+                                    it.name
+                                }
 
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
@@ -436,11 +472,10 @@ fun MMRANavHost(
             )
         }
 
-        // --- Profile & Account Management ---
-
         composable(MMRADestinations.MY_ACCOUNT) {
             MyAccountScreen(
-                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                avatarBitmap =
+                    UserProfileManager.currentAvatarBitmap,
                 onBackClick = {
                     navController.popBackStack()
                 },
@@ -459,7 +494,9 @@ fun MMRANavHost(
                     navController.navigate(MMRADestinations.EDIT_PHONE)
                 },
                 onChangePasswordClick = {
-                    navController.navigate(MMRADestinations.CHANGE_PASSWORD)
+                    navController.navigate(
+                        MMRADestinations.CHANGE_PASSWORD
+                    )
                 },
                 onNotificationsClick = {
                     navController.navigate(
@@ -482,7 +519,9 @@ fun MMRANavHost(
                     )
                 },
                 onSwitchAccountClick = {
-                    navController.navigate(MMRADestinations.SWITCH_ACCOUNT)
+                    navController.navigate(
+                        MMRADestinations.SWITCH_ACCOUNT
+                    )
                 },
                 onLogoutClick = {
                     navController.navigate(
@@ -494,12 +533,17 @@ fun MMRANavHost(
 
         composable(MMRADestinations.MY_ACCOUNT_AVATAR_OPTIONS) {
             AvatarOptionsScreen(
-                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                avatarBitmap =
+                    UserProfileManager.currentAvatarBitmap,
                 onTakePhotoClick = {
-                    navController.navigate(MMRADestinations.CAPTURE_AVATAR)
+                    navController.navigate(
+                        MMRADestinations.CAPTURE_AVATAR
+                    )
                 },
                 onPickGalleryClick = {
-                    navController.navigate(MMRADestinations.GALLERY_PICKER)
+                    navController.navigate(
+                        MMRADestinations.GALLERY_PICKER
+                    )
                 },
                 onDeletePhotoClick = {
                     UserProfileManager.deleteAvatar(context)
@@ -534,12 +578,15 @@ fun MMRANavHost(
 
         composable(MMRADestinations.REVIEW_CAPTURED_PHOTO) {
             ReviewCapturedPhotoScreen(
-                capturedBitmap = UserProfileManager.tempCapturedBitmap,
+                capturedBitmap =
+                    UserProfileManager.tempCapturedBitmap,
                 onBackClick = {
                     navController.popBackStack()
                 },
                 onContinueCropClick = {
-                    navController.navigate(MMRADestinations.CROP_AVATAR)
+                    navController.navigate(
+                        MMRADestinations.CROP_AVATAR
+                    )
                 },
                 onRetakeClick = {
                     navController.popBackStack()
@@ -554,7 +601,10 @@ fun MMRANavHost(
                 },
                 onPhotoSelected = { bitmap ->
                     UserProfileManager.tempCapturedBitmap = bitmap
-                    navController.navigate(MMRADestinations.CROP_AVATAR)
+
+                    navController.navigate(
+                        MMRADestinations.CROP_AVATAR
+                    )
                 },
                 onCancelClick = {
                     navController.popBackStack()
@@ -564,7 +614,8 @@ fun MMRANavHost(
 
         composable(MMRADestinations.CROP_AVATAR) {
             CropAvatarScreen(
-                inputBitmap = UserProfileManager.tempCapturedBitmap,
+                inputBitmap =
+                    UserProfileManager.tempCapturedBitmap,
                 onBackClick = {
                     navController.popBackStack()
                 },
@@ -583,7 +634,8 @@ fun MMRANavHost(
 
         composable(MMRADestinations.AVATAR_UPDATED_SUCCESS) {
             AvatarUpdatedScreen(
-                updatedBitmap = UserProfileManager.currentAvatarBitmap,
+                updatedBitmap =
+                    UserProfileManager.currentAvatarBitmap,
                 onBackToAccountClick = {
                     navController.popBackStack(
                         MMRADestinations.MY_ACCOUNT,
@@ -705,7 +757,8 @@ fun MMRANavHost(
 
         composable(MMRADestinations.MANAGE_USAGE_MODE) {
             ManageUsageModeScreen(
-                initialSelectedRoles = setupPreferences.selectedRoles,
+                initialSelectedRoles =
+                    setupPreferences.selectedRoles,
                 onBackClick = {
                     navController.popBackStack()
                 },
@@ -727,12 +780,12 @@ fun MMRANavHost(
                 onBack = {
                     navController.popBackStack()
                 },
-
                 onSignedOut = {
                     navController.navigate(MMRADestinations.LOGIN) {
                         popUpTo(0) {
                             inclusive = true
                         }
+
                         launchSingleTop = true
                     }
                 }
@@ -745,10 +798,13 @@ fun MMRANavHost(
                     navController.popBackStack()
                 },
                 onSignedOut = {
-                    navController.navigate(MMRADestinations.WELCOME) {
+                    navController.navigate(
+                        MMRADestinations.WELCOME
+                    ) {
                         popUpTo(0) {
                             inclusive = true
                         }
+
                         launchSingleTop = true
                     }
                 }
@@ -757,7 +813,8 @@ fun MMRANavHost(
 
         composable(MMRADestinations.ACCOUNT) {
             MyAccountScreen(
-                avatarBitmap = UserProfileManager.currentAvatarBitmap,
+                avatarBitmap =
+                    UserProfileManager.currentAvatarBitmap,
                 onBackClick = {
                     navController.popBackStack()
                 },
@@ -774,7 +831,9 @@ fun MMRANavHost(
         composable(MMRADestinations.HOME) {
             HomeScreen(
                 onViewAllClick = {
-                    navController.navigate(MMRADestinations.SCHEDULE) {
+                    navController.navigate(
+                        MMRADestinations.SCHEDULE
+                    ) {
                         popUpTo(MMRADestinations.HOME) {
                             saveState = true
                         }
@@ -787,12 +846,16 @@ fun MMRANavHost(
                     navController.openReminder(it)
                 },
                 onAccountClick = {
-                    navController.navigate(MMRADestinations.MY_ACCOUNT) {
+                    navController.navigate(
+                        MMRADestinations.MY_ACCOUNT
+                    ) {
                         launchSingleTop = true
                     }
                 },
                 onNotificationsClick = {
-                    navController.navigate(MMRADestinations.NOTIFICATIONS) {
+                    navController.navigate(
+                        MMRADestinations.NOTIFICATIONS
+                    ) {
                         launchSingleTop = true
                     }
                 }
@@ -801,18 +864,38 @@ fun MMRANavHost(
 
         composable(MMRADestinations.NOTIFICATIONS) {
             val context = LocalContext.current
-            val currentUid = FirebaseProvider.auth.currentUser?.uid.orEmpty()
+
+            val currentUid =
+                FirebaseProvider.auth.currentUser?.uid.orEmpty()
+
             var notifications by remember {
-                mutableStateOf(LocalNotificationStore.getNotifications(context, currentUid))
+                mutableStateOf(
+                    LocalNotificationStore.getNotifications(
+                        context,
+                        currentUid
+                    )
+                )
             }
 
             NotificationHistoryScreen(
                 notifications = notifications,
                 onNotificationClick = { item ->
-                    LocalNotificationStore.markAsRead(context, currentUid, item.id)
-                    notifications = LocalNotificationStore.getNotifications(context, currentUid)
+                    LocalNotificationStore.markAsRead(
+                        context,
+                        currentUid,
+                        item.id
+                    )
+
+                    notifications =
+                        LocalNotificationStore.getNotifications(
+                            context,
+                            currentUid
+                        )
+
                     if (item.destinationRoute.isNotBlank()) {
-                        navController.navigate(item.destinationRoute) {
+                        navController.navigate(
+                            item.destinationRoute
+                        ) {
                             launchSingleTop = true
                         }
                     } else if (item.doseId.isNotBlank()) {
@@ -820,11 +903,23 @@ fun MMRANavHost(
                     }
                 },
                 onMarkAllAsRead = {
-                    LocalNotificationStore.markAllAsRead(context, currentUid)
-                    notifications = LocalNotificationStore.getNotifications(context, currentUid)
+                    LocalNotificationStore.markAllAsRead(
+                        context,
+                        currentUid
+                    )
+
+                    notifications =
+                        LocalNotificationStore.getNotifications(
+                            context,
+                            currentUid
+                        )
                 },
                 onClearAll = {
-                    LocalNotificationStore.clearAll(context, currentUid)
+                    LocalNotificationStore.clearAll(
+                        context,
+                        currentUid
+                    )
+
                     notifications = emptyList()
                 },
                 onBackClick = {
@@ -848,13 +943,92 @@ fun MMRANavHost(
                     }
                 },
                 onAccountClick = {
-                    navController.navigate(MMRADestinations.MY_ACCOUNT)
+                    navController.navigate(
+                        MMRADestinations.MY_ACCOUNT
+                    )
+                },
+                onScheduleClick = { id ->
+                    navController.navigate(
+                        "medicine/schedules/${Uri.encode(id)}"
+                    )
+                }
+            )
+        }
+
+        composable(
+            route = "medicine/schedules/{medicineId}",
+            arguments = listOf(
+                navArgument("medicineId") {
+                    type = NavType.StringType
+                }
+            )
+        ) { entry ->
+            val medicineId = entry.arguments
+                ?.getString("medicineId")
+                .orEmpty()
+
+            MedicineSchedulesScreen(
+                medicineId = medicineId,
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onCreateClick = {
+                    navController.navigate(
+                        "${MMRADestinations.SCHEDULE_SETUP}/${Uri.encode(medicineId)}"
+                    )
+                },
+                onEditClick = { scheduleId ->
+                    navController.navigate(
+                        "schedule/edit/${Uri.encode(scheduleId)}"
+                    )
+                }
+            )
+        }
+
+        composable(
+            route = "schedule/edit/{scheduleId}",
+            arguments = listOf(
+                navArgument("scheduleId") {
+                    type = NavType.StringType
+                }
+            )
+        ) { entry ->
+            ScheduleEditScreen(
+                scheduleId = entry.arguments
+                    ?.getString("scheduleId")
+                    .orEmpty(),
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onSaved = {
+                    Toast.makeText(
+                        context,
+                        "Đã cập nhật lịch uống",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    if (
+                        !navController.popBackStack(
+                            MMRADestinations.MEDICINE,
+                            false
+                        )
+                    ) {
+                        navController.navigate(
+                            MMRADestinations.MEDICINE
+                        ) {
+                            popUpTo(MMRADestinations.HOME)
+                            launchSingleTop = true
+                        }
+                    }
                 }
             )
         }
 
         composable(MMRADestinations.MANUAL_MEDICINE) { entry ->
-            MedicineEntryDestination(navController, entry)
+            MedicineEntryDestination(
+                navController = navController,
+                entry = entry
+            )
         }
 
         composable(
@@ -865,12 +1039,31 @@ fun MMRANavHost(
                 }
             )
         ) { entry ->
-            MedicineEntryDestination(
-                navController,
-                entry,
-                entry.arguments?.getString("medicineId")
+            MedicineEditFlowScreen(
+                medicineId = entry.arguments
+                    ?.getString("medicineId")
+                    .orEmpty(),
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onFinished = {
+                    if (
+                        !navController.popBackStack(
+                            MMRADestinations.MEDICINE,
+                            false
+                        )
+                    ) {
+                        navController.navigate(
+                            MMRADestinations.MEDICINE
+                        ) {
+                            popUpTo(MMRADestinations.HOME)
+                            launchSingleTop = true
+                        }
+                    }
+                }
             )
         }
+
         composable(
             route = "${MMRADestinations.SCHEDULE_SETUP}/{medicineId}",
             arguments = listOf(
@@ -883,11 +1076,9 @@ fun MMRANavHost(
                 medicineId = entry.arguments
                     ?.getString("medicineId")
                     .orEmpty(),
-
                 onBackClick = {
                     navController.popBackStack()
                 },
-
                 onSaved = {
                     Toast.makeText(
                         context,
@@ -911,6 +1102,7 @@ fun MMRANavHost(
                 }
             )
         }
+
         composable(MMRADestinations.SCHEDULE_SETUP) { entry ->
             val saved = remember(entry) {
                 navController.previousBackStackEntry
@@ -918,20 +1110,25 @@ fun MMRANavHost(
                     ?.get<Bundle>(MANUAL_MEDICINE_DRAFT_KEY)
             }
 
-            val name = saved?.getString("medicineName").orEmpty()
+            val name = saved
+                ?.getString("medicineName")
+                .orEmpty()
 
             if (saved != null && name.isNotBlank()) {
                 ScheduleSetupEditor(
                     medicineId = saved.getString("medicineId"),
                     draft = ManualMedicineDraft(
                         medicineName = name,
-                        strength = saved.getString("strength").orEmpty(),
+                        strength =
+                            saved.getString("strength").orEmpty(),
                         strengthUnit =
                             saved.getString("strengthUnit") ?: "mg",
                         dosageForm =
                             saved.getString("dosageForm").orEmpty(),
-                        note = saved.getString("note").orEmpty(),
-                        imageUri = saved.getString("imageUri")
+                        note =
+                            saved.getString("note").orEmpty(),
+                        imageUri =
+                            saved.getString("imageUri")
                     ),
                     onBackClick = {
                         navController.popBackStack()
@@ -979,7 +1176,9 @@ fun MMRANavHost(
                     navController.openReminder(it)
                 },
                 onAccountClick = {
-                    navController.navigate(MMRADestinations.MY_ACCOUNT)
+                    navController.navigate(
+                        MMRADestinations.MY_ACCOUNT
+                    )
                 }
             )
         }
@@ -990,12 +1189,30 @@ fun MMRANavHost(
                     scanEntry.savedStateHandle[
                         MANUAL_MEDICINE_DRAFT_KEY
                     ] = Bundle().apply {
-                        putString("medicineName", draft.medicineName)
-                        putString("strength", draft.strength)
-                        putString("strengthUnit", draft.strengthUnit)
-                        putString("dosageForm", draft.dosageForm)
-                        putString("note", draft.note)
-                        putString("imageUri", draft.imageUri)
+                        putString(
+                            "medicineName",
+                            draft.medicineName
+                        )
+                        putString(
+                            "strength",
+                            draft.strength
+                        )
+                        putString(
+                            "strengthUnit",
+                            draft.strengthUnit
+                        )
+                        putString(
+                            "dosageForm",
+                            draft.dosageForm
+                        )
+                        putString(
+                            "note",
+                            draft.note
+                        )
+                        putString(
+                            "imageUri",
+                            draft.imageUri
+                        )
                     }
 
                     navController.navigate(
@@ -1030,7 +1247,9 @@ fun MMRANavHost(
                     )
                 },
                 onAccountClick = {
-                    navController.navigate(MMRADestinations.MY_ACCOUNT)
+                    navController.navigate(
+                        MMRADestinations.MY_ACCOUNT
+                    )
                 }
             )
         }
@@ -1039,7 +1258,9 @@ fun MMRANavHost(
             FamilyScreen(
                 onMemberClick = { memberId ->
                     navController.navigate(
-                        MMRADestinations.familyMemberDetail(memberId)
+                        MMRADestinations.familyMemberDetail(
+                            memberId
+                        )
                     )
                 },
                 onInviteClick = {
@@ -1058,7 +1279,9 @@ fun MMRANavHost(
                     )
                 },
                 onAccountClick = {
-                    navController.navigate(MMRADestinations.MY_ACCOUNT)
+                    navController.navigate(
+                        MMRADestinations.MY_ACCOUNT
+                    )
                 }
             )
         }
@@ -1100,7 +1323,8 @@ fun MMRANavHost(
             )
         ) { entry ->
             ReminderDestination(
-                doseId = entry.arguments?.getString("doseId"),
+                doseId =
+                    entry.arguments?.getString("doseId"),
                 readOnly =
                     entry.arguments?.getBoolean("readOnly") ?: false,
                 onBackClick = {
@@ -1125,8 +1349,9 @@ fun MMRANavHost(
                 }
             )
         ) { backStackEntry ->
-            val memberId =
-                backStackEntry.arguments?.getString("memberId") ?: ""
+            val memberId = backStackEntry.arguments
+                ?.getString("memberId")
+                ?: ""
 
             val member = MockFamilyData.mockMembers.firstOrNull {
                 it.id == memberId
@@ -1136,7 +1361,8 @@ fun MMRANavHost(
                 onBackClick = {
                     navController.popBackStack()
                 },
-                memberName = member?.fullName ?: "Nguyễn Minh Anh",
+                memberName =
+                    member?.fullName ?: "Nguyễn Minh Anh",
                 memberRole = if (member != null) {
                     "${member.relationship} • Hồ sơ theo dõi"
                 } else {
@@ -1153,8 +1379,9 @@ fun MMRANavHost(
                 }
             )
         ) { backStackEntry ->
-            val memberId =
-                backStackEntry.arguments?.getString("memberId") ?: ""
+            val memberId = backStackEntry.arguments
+                ?.getString("memberId")
+                ?: ""
 
             CaregiverMemberDetailScreen(
                 memberId = memberId,
@@ -1162,11 +1389,15 @@ fun MMRANavHost(
                     navController.popBackStack()
                 },
                 onViewHistoryClick = {
-                    navController.navigate(MMRADestinations.HISTORY)
+                    navController.navigate(
+                        MMRADestinations.HISTORY
+                    )
                 },
                 onPermissionsClick = {
                     navController.navigate(
-                        MMRADestinations.familyPermissions(memberId)
+                        MMRADestinations.familyPermissions(
+                            memberId
+                        )
                     )
                 }
             )
@@ -1193,7 +1424,6 @@ private fun authenticateAndProceed(
     navController: NavHostController,
     context: android.content.Context
 ) {
-    // Chỉ cho tiếp tục khi Firebase đã có phiên đăng nhập thật.
     if (AuthRepository.currentUser == null) {
         Toast.makeText(
             context,
@@ -1206,7 +1436,8 @@ private fun authenticateAndProceed(
 
     UserProfileManager.setLoggedIn(context, true)
 
-    val setupDone = UserProfileManager.isSetupCompleted(context)
+    val setupDone =
+        UserProfileManager.isSetupCompleted(context)
 
     if (setupDone) {
         navController.navigate(MMRADestinations.HOME) {
@@ -1315,7 +1546,8 @@ private fun MedicineEntryDestination(
                 repository.getMedicine(medicineId)
                     .addOnSuccessListener { record ->
                         if (
-                            listening && version == requestVersion &&
+                            listening &&
+                            version == requestVersion &&
                             auth.currentUser?.uid == uid
                         ) {
                             val medicine = record.data
@@ -1335,7 +1567,8 @@ private fun MedicineEntryDestination(
                     }
                     .addOnFailureListener {
                         if (
-                            listening && version == requestVersion &&
+                            listening &&
+                            version == requestVersion &&
                             auth.currentUser?.uid == uid
                         ) {
                             loading = false
@@ -1363,10 +1596,7 @@ private fun MedicineEntryDestination(
 
     when {
         loading -> {
-            Column {
-                CircularProgressIndicator()
-                Text("Đang tải thông tin thuốc…")
-            }
+            MedicineFormSkeleton()
         }
 
         !signedIn -> {
@@ -1430,7 +1660,6 @@ private fun MedicineEntryDestination(
                                 medicineId = medicineId,
                                 medicineName =
                                     initialDraft?.medicineName.orEmpty(),
-
                                 onDeleted = {
                                     val returnedToList =
                                         navController.popBackStack(
@@ -1442,14 +1671,19 @@ private fun MedicineEntryDestination(
                                         navController.navigate(
                                             MMRADestinations.MEDICINE
                                         ) {
-                                            popUpTo(MMRADestinations.HOME)
+                                            popUpTo(
+                                                MMRADestinations.HOME
+                                            )
+
                                             launchSingleTop = true
                                         }
                                     }
                                 }
                             )
                         }
-                    } else null,
+                    } else {
+                        null
+                    },
 
                     onBackClick = {
                         if (!saving) {
@@ -1476,6 +1710,7 @@ private fun MedicineEntryDestination(
             onDismissRequest = {
                 pendingDraft = null
             },
+
             title = {
                 Text(
                     if (medicineId == null) {
@@ -1485,6 +1720,7 @@ private fun MedicineEntryDestination(
                     }
                 )
             },
+
             text = {
                 Column {
                     Text(
@@ -1503,6 +1739,7 @@ private fun MedicineEntryDestination(
                     }
                 }
             },
+
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1595,7 +1832,10 @@ private fun MedicineEntryDestination(
                                         navController.navigate(
                                             MMRADestinations.MEDICINE
                                         ) {
-                                            popUpTo(MMRADestinations.HOME)
+                                            popUpTo(
+                                                MMRADestinations.HOME
+                                            )
+
                                             launchSingleTop = true
                                         }
                                     }
@@ -1619,6 +1859,7 @@ private fun MedicineEntryDestination(
                     Text("Lưu")
                 }
             },
+
             dismissButton = {
                 TextButton(
                     onClick = {
@@ -1734,16 +1975,19 @@ private fun ReminderDestination(
         actionsEnabled = canAct,
         notice = notice,
         onClose = onBackClick,
+
         onTaken = {
             if (canAct) {
                 dialog = "CONFIRM_TAKEN"
             }
         },
+
         onSkip = {
             if (canAct) {
                 dialog = "CONFIRM_SKIP"
             }
         },
+
         onSnooze = {
             if (canAct) {
                 MockDoseActions.record(
@@ -1751,20 +1995,25 @@ private fun ReminderDestination(
                     MockDoseAction.SNOOZED
                 )
 
-                val currentUid = FirebaseProvider.auth.currentUser?.uid.orEmpty()
+                val currentUid =
+                    FirebaseProvider.auth.currentUser?.uid.orEmpty()
+
                 MedicationAlarmScheduler.scheduleSnooze(
                     context = context,
                     uid = currentUid,
                     doseId = dose.doseId,
                     snoozeMinutes = 10,
                     title = "Nhắc lại: ${dose.medicineName}",
-                    message = "${dose.quantityText}. ${dose.mealInstruction}".trim(),
+                    message =
+                        "${dose.quantityText}. ${dose.mealInstruction}"
+                            .trim(),
                     medicineName = dose.medicineName
                 )
 
                 dialog = "SNOOZED"
             }
         },
+
         onPlayInstructions = playInstructions
     )
 
@@ -1804,12 +2053,15 @@ private fun ReminderDestination(
             onDismissRequest = {
                 dialog = null
             },
+
             title = {
                 Text(title)
             },
+
             text = {
                 Text(message)
             },
+
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1819,7 +2071,12 @@ private fun ReminderDestination(
                                     dose.doseId,
                                     MockDoseAction.TAKEN
                                 )
-                                MedicationReminderSync.onDoseAction(context, dose.doseId)
+
+                                MedicationReminderSync.onDoseAction(
+                                    context,
+                                    dose.doseId
+                                )
+
                                 dialog = "TAKEN"
                             }
 
@@ -1828,7 +2085,12 @@ private fun ReminderDestination(
                                     dose.doseId,
                                     MockDoseAction.SKIPPED
                                 )
-                                MedicationReminderSync.onDoseAction(context, dose.doseId)
+
+                                MedicationReminderSync.onDoseAction(
+                                    context,
+                                    dose.doseId
+                                )
+
                                 dialog = "SKIPPED"
                             }
 
@@ -1848,6 +2110,7 @@ private fun ReminderDestination(
                     )
                 }
             },
+
             dismissButton = {
                 if (confirming) {
                     TextButton(

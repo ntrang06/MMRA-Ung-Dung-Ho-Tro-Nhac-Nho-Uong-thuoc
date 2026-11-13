@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,15 +30,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.data.model.UserProfileManager
+import com.example.project_lttbd.ui.components.MedicineListSkeleton
 import com.example.project_lttbd.ui.components.MMRASearchField
 import com.example.project_lttbd.ui.theme.MMRATheme
-import com.example.project_lttbd.data.model.UserProfileManager
+
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun MedicineScreen(
     modifier: Modifier = Modifier,
     onMedicineClick: (String) -> Unit = {},
     onAddMedicineClick: () -> Unit = {},
-    onAccountClick: () -> Unit = {}
+    onAccountClick: () -> Unit = {},
+    onScheduleClick: (String) -> Unit = {}
 ) {
     if (LocalInspectionMode.current) {
         MedicineScreenContent(
@@ -57,7 +60,9 @@ fun MedicineScreen(
         return
     }
 
-    val state = remember { MedicineListState() }
+    val state = remember {
+        MedicineListState()
+    }
 
     DisposableEffect(state) {
         state.start()
@@ -68,41 +73,26 @@ fun MedicineScreen(
     }
 
     val medicines = state.medicines.map { record ->
-        val medicine = record.data
-
-        val strengthText = listOf(
-            medicine.strength,
-            medicine.strengthUnit
-        )
-            .filter { it.isNotBlank() }
-            .joinToString(" ")
-
-        val displayName = listOf(
-            medicine.medicineName,
-            strengthText
-        )
-            .filter { it.isNotBlank() }
-            .joinToString(" ")
-
-        MedicineUiModel(
-            medicineId = record.id,
-            medicineName = displayName,
-            medicineCode = "",
-            quantityText = "",
-            scheduleText = "",
-            hasSchedule = false,
-            accent = MedicineAccent.GREEN
+        record.toMedicineUiModel(
+            schedules = state.schedules,
+            schedulesLoading = state.isSchedulesLoading,
+            schedulesFailed = state.scheduleErrorMessage != null
         )
     }
 
     MedicineScreenContent(
         modifier = modifier,
         medicines = medicines,
-        ownerName = UserProfileManager.name.ifBlank { state.ownerName },
-        isLoading = state.isLoading,
+        ownerName = UserProfileManager.name.ifBlank {
+            state.ownerName
+        },
+        isLoading = state.isLoading || state.isSchedulesLoading,
         isSignedIn = state.isSignedIn,
         errorMessage = state.errorMessage,
-        onRetry = { state.refresh() },
+        scheduleErrorMessage = state.scheduleErrorMessage,
+        onRetry = {
+            state.refresh()
+        },
         onMedicineClick = onMedicineClick,
         onAddMedicineClick = onAddMedicineClick,
         onAccountClick = onAccountClick
@@ -120,15 +110,20 @@ private fun MedicineScreenContent(
     onMedicineClick: (String) -> Unit,
     onAddMedicineClick: () -> Unit,
     onAccountClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    scheduleErrorMessage: String? = null
 ) {
     var searchQuery by rememberSaveable {
         mutableStateOf("")
     }
 
     val query = searchQuery.trim()
+
     val visibleMedicines = medicines.filter {
-        it.medicineName.contains(query, ignoreCase = true)
+        it.medicineName.contains(
+            query,
+            ignoreCase = true
+        )
     }
 
     val initials = ownerName
@@ -136,7 +131,9 @@ private fun MedicineScreenContent(
         .split(Regex("\\s+"))
         .filter { it.isNotBlank() }
         .takeLast(2)
-        .joinToString("") { it.first().toString() }
+        .joinToString("") {
+            it.first().toString()
+        }
         .uppercase()
 
     Column(
@@ -163,27 +160,7 @@ private fun MedicineScreenContent(
         ) {
             when {
                 isLoading -> {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(
-                            12.dp,
-                            Alignment.CenterHorizontally
-                        ),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = Color(0xFF126B62),
-                            strokeWidth = 2.dp
-                        )
-
-                        Text(
-                            text = "Đang tải danh sách thuốc…",
-                            color = Color(0xFF526565)
-                        )
-                    }
+                    MedicineListSkeleton()
                 }
 
                 !isSignedIn -> {
@@ -194,7 +171,9 @@ private fun MedicineScreenContent(
                         color = Color(0xFF526565)
                     )
 
-                    TextButton(onClick = onAccountClick) {
+                    TextButton(
+                        onClick = onAccountClick
+                    ) {
                         Text(
                             text = "Mở tài khoản",
                             color = Color(0xFF126B62)
@@ -210,7 +189,9 @@ private fun MedicineScreenContent(
                         color = MaterialTheme.colorScheme.error
                     )
 
-                    TextButton(onClick = onRetry) {
+                    TextButton(
+                        onClick = onRetry
+                    ) {
                         Text(
                             text = "Thử lại",
                             color = Color(0xFF126B62)
@@ -219,9 +200,29 @@ private fun MedicineScreenContent(
                 }
 
                 else -> {
+                    if (scheduleErrorMessage != null) {
+                        Text(
+                            text = "Chưa tải được lịch uống. " +
+                                    scheduleErrorMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+
+                        TextButton(
+                            onClick = onRetry
+                        ) {
+                            Text(
+                                text = "Tải lại lịch uống",
+                                color = Color(0xFF126B62)
+                            )
+                        }
+                    }
+
                     MMRASearchField(
                         value = searchQuery,
-                        onValueChange = { searchQuery = it },
+                        onValueChange = {
+                            searchQuery = it
+                        },
                         placeholder = "Tìm tên thuốc"
                     )
 
