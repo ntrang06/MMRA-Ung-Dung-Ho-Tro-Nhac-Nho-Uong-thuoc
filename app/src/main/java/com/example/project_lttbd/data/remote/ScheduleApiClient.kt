@@ -99,12 +99,19 @@ object ScheduleApiClient {
             .build()
     }
 
-    val api: ScheduleApi by lazy {
+    private val retrofit: Retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(httpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-            .create(ScheduleApi::class.java)
+    }
+
+    val api: ScheduleApi by lazy {
+        retrofit.create(ScheduleApi::class.java)
+    }
+
+    val doseApi: DoseApi by lazy {
+        retrofit.create(DoseApi::class.java)
     }
 }

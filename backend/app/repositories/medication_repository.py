@@ -1,27 +1,42 @@
-from google.cloud import firestore as google_firestore
-from datetime import date, datetime, timezone
-from typing import Any
 from datetime import date, datetime, timedelta, timezone
+from typing import Any
+
 from firebase_admin import firestore
 from google.api_core.exceptions import AlreadyExists
+from google.cloud import firestore as google_firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
+
 from app.api.deps import CurrentUser
 from app.core.firebase import get_firebase_app
-from app.repositories.user_scope import user_collection, user_document
+from app.repositories.user_scope import (
+    user_collection,
+    user_document,
+)
 
 
-def _snapshot_to_dict(snapshot: Any) -> dict[str, Any] | None:
+def _snapshot_to_dict(
+    snapshot: Any,
+    *,
+    id_field: str = "id",
+) -> dict[str, Any] | None:
     """Chuyển Firestore DocumentSnapshot thành dictionary."""
     if not snapshot.exists:
         return None
 
     data = snapshot.to_dict() or {}
-    data.setdefault("id", snapshot.id)
+
+    if id_field == "doseId":
+        # DoseResponse không cho phép trường metadata "id".
+        data.pop("id", None)
+        data["doseId"] = snapshot.id
+    else:
+        data.setdefault(id_field, snapshot.id)
+
     return data
 
 
 class MedicationRepository:
-    """Repository quản lý medicines, schedules và doses trong Firestore."""
+    """Quản lý medicines, schedules và doses trong Firestore."""
 
     # ---------------------------------------------------------
     # MEDICINES
@@ -32,7 +47,6 @@ class MedicationRepository:
         user: CurrentUser,
         medicine_id: str,
     ) -> dict[str, Any] | None:
-        """Lấy thông tin một thuốc thuộc tài khoản hiện tại."""
         snapshot = user_document(
             user,
             "medicines",
@@ -50,7 +64,6 @@ class MedicationRepository:
         user: CurrentUser,
         schedule_id: str,
     ) -> dict[str, Any] | None:
-        """Lấy một lịch uống thuốc."""
         snapshot = user_document(
             user,
             "schedules",
@@ -64,7 +77,6 @@ class MedicationRepository:
         user: CurrentUser,
         enabled_only: bool = False,
     ) -> list[dict[str, Any]]:
-        """Lấy danh sách lịch uống thuốc của người dùng."""
         snapshots = user_collection(
             user,
             "schedules",
@@ -91,7 +103,6 @@ class MedicationRepository:
         schedule_id: str,
         data: dict[str, Any],
     ) -> dict[str, Any]:
-        """Tạo một lịch uống thuốc mới."""
         reference = user_document(
             user,
             "schedules",
@@ -105,7 +116,6 @@ class MedicationRepository:
             "id": schedule_id,
         }
 
-
     @staticmethod
     def should_cancel_future_dose(
         dose_data: dict[str, Any],
@@ -113,12 +123,8 @@ class MedicationRepository:
         now: datetime,
     ) -> bool:
         """
-        Xác định Dose có phải chuyển sang CANCELLED không.
-
-        Chỉ hủy khi:
-        - Dose thuộc version hiện tại của Schedule.
-        - Dose đang PENDING.
-        - scheduledAt hợp lệ và nằm trong tương lai.
+        Chỉ hủy liều PENDING thuộc phiên bản hiện tại
+        và có giờ uống nằm trong tương lai.
         """
         if dose_data.get("scheduleVersion") != current_version:
             return False
@@ -149,13 +155,12 @@ class MedicationRepository:
         data: dict[str, Any],
     ) -> dict[str, Any] | None | bool:
         """
-        Cập nhật Schedule và hủy các Dose PENDING thuộc version cũ
-        có scheduledAt nằm trong tương lai, trong cùng transaction.
+        Cập nhật lịch và hủy liều tương lai của phiên bản cũ
+        trong cùng transaction.
 
-        Trả về:
-        - None: không tìm thấy Schedule.
-        - False: expected_version không khớp.
-        - dict: cập nhật thành công.
+        None: không tìm thấy lịch.
+        False: phiên bản không khớp.
+        dict: cập nhật thành công.
         """
         schedule_ref = user_document(
             user,
@@ -168,7 +173,6 @@ class MedicationRepository:
 
         @google_firestore.transactional
         def _update(transaction: Any):
-            # 1. Đọc Schedule hiện tại.
             schedule_snapshot = schedule_ref.get(
                 transaction=transaction,
             )
@@ -182,30 +186,26 @@ class MedicationRepository:
 
             current_version = current_schedule.get("version", 1)
 
-            # 2. Kiểm tra optimistic locking.
             if current_version != expected_version:
                 return False
 
-            # 3. Lấy các Dose thuộc Schedule và version cũ.
-            doses_query = (
-                user_collection(user, "doses")
-                .where(
-                    filter=FieldFilter(
-                        "scheduleId",
-                        "==",
-                        schedule_id,
-                    )
+            doses_query = user_collection(
+                user,
+                "doses",
+            ).where(
+                filter=FieldFilter(
+                    "scheduleId",
+                    "==",
+                    schedule_id,
                 )
             )
 
             dose_snapshots = transaction.get(doses_query)
-
             now = datetime.now(timezone.utc)
-            cancelled_count = 0
 
-            # 4. Chỉ hủy Dose PENDING có giờ uống trong tương lai.
             for dose_snapshot in dose_snapshots:
                 dose_data = dose_snapshot.to_dict() or {}
+
                 if not MedicationRepository.should_cancel_future_dose(
                     dose_data,
                     current_version,
@@ -222,16 +222,14 @@ class MedicationRepository:
                     },
                 )
 
-                cancelled_count += 1
-
-            # 5. Cập nhật Schedule trong cùng transaction.
             transaction.update(schedule_ref, data)
+
             return {
                 **current_schedule,
                 **data,
             }
-        return _update(transaction)
 
+        return _update(transaction)
 
     # ---------------------------------------------------------
     # DOSES
@@ -242,31 +240,41 @@ class MedicationRepository:
         user: CurrentUser,
         dose_id: str,
     ) -> dict[str, Any] | None:
-        """Lấy thông tin một liều thuốc."""
         snapshot = user_document(
             user,
             "doses",
             dose_id,
         ).get()
 
-        return _snapshot_to_dict(snapshot)
+        return _snapshot_to_dict(
+            snapshot,
+            id_field="doseId",
+        )
 
     @staticmethod
     def list_doses(
         user: CurrentUser,
         local_date: date,
     ) -> list[dict[str, Any]]:
-        """Lấy các liều thuốc của một ngày theo múi giờ địa phương."""
         snapshots = (
             user_collection(user, "doses")
-            .where("localDate", "==", local_date.isoformat())
+            .where(
+                filter=FieldFilter(
+                    "localDate",
+                    "==",
+                    local_date.isoformat(),
+                )
+            )
             .stream()
         )
 
         doses = []
 
         for snapshot in snapshots:
-            data = _snapshot_to_dict(snapshot)
+            data = _snapshot_to_dict(
+                snapshot,
+                id_field="doseId",
+            )
 
             if data is not None:
                 doses.append(data)
@@ -283,10 +291,8 @@ class MedicationRepository:
         data: dict[str, Any],
     ) -> bool:
         """
-        Tạo Dose nếu chưa tồn tại.
-
-        DocumentReference.create() đảm bảo không ghi đè document
-        đã tồn tại. Trả về True nếu tạo mới, False nếu đã tồn tại.
+        Tạo liều nếu chưa tồn tại.
+        Không ghi đè trạng thái liều đã có.
         """
         reference = user_document(
             user,
@@ -297,7 +303,6 @@ class MedicationRepository:
         try:
             reference.create(data)
             return True
-
         except AlreadyExists:
             return False
 
@@ -308,15 +313,12 @@ class MedicationRepository:
         status: str,
     ) -> dict[str, Any] | None:
         """
-        Cập nhật trạng thái Dose một cách nguyên tử.
+        Chuyển PENDING sang TAKEN hoặc SKIPPED.
 
-        Chỉ cho phép chuyển từ PENDING sang TAKEN hoặc SKIPPED.
-        Nếu trạng thái đã được cập nhật thành cùng một giá trị,
-        trả lại dữ liệu hiện tại để hỗ trợ request lặp lại.
+        Nếu gửi lại cùng hành động đã lưu,
+        trả về kết quả hiện tại.
         """
-        allowed_statuses = {"TAKEN", "SKIPPED"}
-
-        if status not in allowed_statuses:
+        if status not in {"TAKEN", "SKIPPED"}:
             raise ValueError("Trạng thái Dose không hợp lệ.")
 
         reference = user_document(
@@ -327,18 +329,25 @@ class MedicationRepository:
 
         client = firestore.client(app=get_firebase_app())
         transaction = client.transaction()
-        @google_firestore.transactional
-        def _update(transaction: Any) -> dict[str, Any] | None:
-            snapshot = reference.get(transaction=transaction)
 
-            current = _snapshot_to_dict(snapshot)
+        @google_firestore.transactional
+        def _update(
+            transaction: Any,
+        ) -> dict[str, Any] | None:
+            snapshot = reference.get(
+                transaction=transaction,
+            )
+
+            current = _snapshot_to_dict(
+                snapshot,
+                id_field="doseId",
+            )
 
             if current is None:
                 return None
 
             current_status = current.get("status")
 
-            # Request lặp lại cùng một hành động: không cập nhật lại.
             if current_status == status:
                 return current
 
@@ -361,8 +370,8 @@ class MedicationRepository:
                 **current,
                 **updates,
             }
-        return _update(transaction)
 
+        return _update(transaction)
 
     @staticmethod
     def snooze_dose_if_pending(
@@ -370,11 +379,7 @@ class MedicationRepository:
         dose_id: str,
         minutes: int,
     ) -> dict[str, Any] | None:
-        """
-        Cập nhật nextReminderAt bằng transaction.
-
-        Chỉ cho phép snooze khi Dose vẫn ở trạng thái PENDING.
-        """
+        """Lưu thời điểm nhắc lại nếu liều vẫn PENDING."""
         reference = user_document(
             user,
             "doses",
@@ -386,9 +391,14 @@ class MedicationRepository:
 
         @google_firestore.transactional
         def _snooze(transaction: Any):
-            snapshot = reference.get(transaction=transaction)
+            snapshot = reference.get(
+                transaction=transaction,
+            )
 
-            current = _snapshot_to_dict(snapshot)
+            current = _snapshot_to_dict(
+                snapshot,
+                id_field="doseId",
+            )
 
             if current is None:
                 return None
@@ -399,10 +409,9 @@ class MedicationRepository:
                 )
 
             now = datetime.now(timezone.utc)
-            next_reminder_at = now + timedelta(minutes=minutes)
 
             updates = {
-                "nextReminderAt": next_reminder_at,
+                "nextReminderAt": now + timedelta(minutes=minutes),
                 "updatedAt": now,
             }
 
@@ -414,4 +423,3 @@ class MedicationRepository:
             }
 
         return _snooze(transaction)
-

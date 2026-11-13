@@ -1,28 +1,28 @@
 package com.example.project_lttbd.ui.navigation
 
-import androidx.activity.compose.BackHandler
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.key
-import com.example.project_lttbd.data.remote.FirebaseProvider
-import com.example.project_lttbd.data.remote.dto.MedicineDto
-import com.example.project_lttbd.data.repository.MedicineRepository
-import com.google.firebase.auth.FirebaseAuth
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
@@ -30,18 +30,30 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.project_lttbd.data.device.DeviceManager
+import com.example.project_lttbd.data.mock.MockCalendar
+import com.example.project_lttbd.data.mock.MockDoseAction
+import com.example.project_lttbd.data.mock.MockDoseActions
+import com.example.project_lttbd.data.mock.MockFamilyData
+import com.example.project_lttbd.data.mock.MockReminderDoses
 import com.example.project_lttbd.data.model.InitialSetupPreferences
 import com.example.project_lttbd.data.model.UserProfileManager
-import com.example.project_lttbd.ui.screens.auth.CompletionScreen
-import com.example.project_lttbd.ui.screens.auth.CreateNewPasswordScreen
-import com.example.project_lttbd.ui.screens.auth.EmailLoginScreen
-import com.example.project_lttbd.ui.screens.auth.ForgotPasswordScreen
-import com.example.project_lttbd.ui.screens.auth.LoginScreen
-import com.example.project_lttbd.ui.screens.auth.PhoneLoginScreen
-import com.example.project_lttbd.ui.screens.auth.RegisterScreen
-import com.example.project_lttbd.ui.screens.auth.VerifyEmailScreen
-import com.example.project_lttbd.ui.screens.auth.VerifyPhoneScreen
-import com.example.project_lttbd.ui.screens.auth.WelcomeScreen
+import com.example.project_lttbd.data.remote.AuthRepository
+import com.example.project_lttbd.data.remote.DoseException
+import com.example.project_lttbd.data.remote.DoseRepository
+import com.example.project_lttbd.data.remote.FirebaseProvider
+import com.example.project_lttbd.data.remote.UserProfileRepository
+import com.example.project_lttbd.data.remote.dto.DoseActionDto
+import com.example.project_lttbd.data.remote.dto.DoseResponseDto
+import com.example.project_lttbd.data.remote.dto.DoseStatusDto
+import com.example.project_lttbd.data.remote.dto.MedicineDto
+import com.example.project_lttbd.data.repository.MedicineRepository
+import com.example.project_lttbd.notifications.alarm.MedicationAlarmScheduler
+import com.example.project_lttbd.notifications.storage.LocalNotificationStore
+import com.example.project_lttbd.notifications.sync.MedicationReminderSync
+import com.example.project_lttbd.ui.components.MedicineFormSkeleton
+import com.example.project_lttbd.ui.components.ScheduleFormSkeleton
+import com.example.project_lttbd.ui.components.rememberUiNow
 import com.example.project_lttbd.ui.screens.account.AccessibilitySettingsScreen
 import com.example.project_lttbd.ui.screens.account.AvatarDeletedScreen
 import com.example.project_lttbd.ui.screens.account.AvatarOptionsScreen
@@ -60,49 +72,52 @@ import com.example.project_lttbd.ui.screens.account.NotificationSettingsScreen
 import com.example.project_lttbd.ui.screens.account.ReviewCapturedPhotoScreen
 import com.example.project_lttbd.ui.screens.account.SwitchAccountScreen
 import com.example.project_lttbd.ui.screens.account.VoiceGuidanceSettingsScreen
-import com.example.project_lttbd.ui.screens.setup.SetupDisplayPreferenceScreen
-import com.example.project_lttbd.ui.screens.setup.SetupTargetUserScreen
-import com.example.project_lttbd.data.mock.MockCalendar
-import com.example.project_lttbd.data.mock.MockDoseAction
-import com.example.project_lttbd.data.mock.MockDoseActions
-import com.example.project_lttbd.data.mock.MockFamilyData
-import com.example.project_lttbd.data.mock.MockReminderDoses
-import com.example.project_lttbd.ui.components.rememberUiNow
-import com.example.project_lttbd.ui.screens.history.HistoryScreen
-import com.example.project_lttbd.ui.screens.home.HomeScreen
+import com.example.project_lttbd.ui.screens.auth.CompletionScreen
+import com.example.project_lttbd.ui.screens.auth.CreateNewPasswordScreen
+import com.example.project_lttbd.ui.screens.auth.EmailLoginScreen
+import com.example.project_lttbd.ui.screens.auth.ForgotPasswordScreen
+import com.example.project_lttbd.ui.screens.auth.LoginScreen
+import com.example.project_lttbd.ui.screens.auth.PhoneLoginScreen
+import com.example.project_lttbd.ui.screens.auth.RegisterScreen
+import com.example.project_lttbd.ui.screens.auth.VerifyEmailScreen
+import com.example.project_lttbd.ui.screens.auth.VerifyPhoneScreen
+import com.example.project_lttbd.ui.screens.auth.WelcomeScreen
 import com.example.project_lttbd.ui.screens.family.CaregiverMemberDetailScreen
 import com.example.project_lttbd.ui.screens.family.FamilyAlertsScreen
 import com.example.project_lttbd.ui.screens.family.FamilyInviteDetailScreen
 import com.example.project_lttbd.ui.screens.family.FamilyPermissionsScreen
 import com.example.project_lttbd.ui.screens.family.FamilyScreen
 import com.example.project_lttbd.ui.screens.family.InviteFamilyScreen
+import com.example.project_lttbd.ui.screens.history.HistoryScreen
+import com.example.project_lttbd.ui.screens.home.HomeScreen
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineDraft
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineScreen
-import com.example.project_lttbd.ui.screens.medicine.MedicineScreen
+import com.example.project_lttbd.ui.screens.medicine.MedicineDeleteAction
 import com.example.project_lttbd.ui.screens.medicine.MedicineEditFlowScreen
+import com.example.project_lttbd.ui.screens.medicine.MedicineScreen
 import com.example.project_lttbd.ui.screens.notifications.NotificationHistoryScreen
-import com.example.project_lttbd.notifications.storage.LocalNotificationStore
-import com.example.project_lttbd.notifications.sync.MedicationReminderSync
-import com.example.project_lttbd.notifications.alarm.MedicationAlarmScheduler
 import com.example.project_lttbd.ui.screens.reminder.DoseReminderScreen
+import com.example.project_lttbd.ui.screens.reminder.ReminderDoseUiModel
 import com.example.project_lttbd.ui.screens.reminder.ReminderNoticeUiModel
 import com.example.project_lttbd.ui.screens.reminder.rememberReminderSpeech
 import com.example.project_lttbd.ui.screens.scan.ScanScreen
+import com.example.project_lttbd.ui.screens.schedule.MedicineSchedulesScreen
+import com.example.project_lttbd.ui.screens.schedule.ScheduleCreateScreen
+import com.example.project_lttbd.ui.screens.schedule.ScheduleEditScreen
 import com.example.project_lttbd.ui.screens.schedule.ScheduleScreen
 import com.example.project_lttbd.ui.screens.schedule.ScheduleSetupEditor
-import com.example.project_lttbd.data.remote.AuthRepository
-import com.example.project_lttbd.data.remote.UserProfileRepository
-import com.example.project_lttbd.data.device.DeviceManager
+import com.example.project_lttbd.ui.screens.schedule.rememberScheduleOwnerUid
+import com.example.project_lttbd.ui.screens.schedule.toScheduleDoseUiModel
+import com.example.project_lttbd.ui.screens.setup.SetupDisplayPreferenceScreen
+import com.example.project_lttbd.ui.screens.setup.SetupTargetUserScreen
 import com.example.project_lttbd.ui.viewmodel.AuthViewModel
-import androidx.compose.runtime.LaunchedEffect
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import com.example.project_lttbd.ui.screens.medicine.MedicineDeleteAction
-import com.example.project_lttbd.ui.screens.schedule.ScheduleCreateScreen
-import com.example.project_lttbd.ui.screens.schedule.MedicineSchedulesScreen
-import com.example.project_lttbd.ui.screens.schedule.ScheduleEditScreen
-import com.example.project_lttbd.ui.components.MedicineFormSkeleton
 
 private const val MANUAL_MEDICINE_DRAFT_KEY = "manual_medicine_draft"
 
@@ -128,9 +143,7 @@ fun MMRANavHost(
     if (googleAuthViewModel.isLoading) {
         AlertDialog(
             onDismissRequest = {},
-            title = {
-                Text("Đang đăng nhập Google")
-            },
+            title = { Text("Đang đăng nhập Google") },
             text = {
                 Column {
                     CircularProgressIndicator()
@@ -146,12 +159,8 @@ fun MMRANavHost(
             onDismissRequest = {
                 googleAuthViewModel.clearError()
             },
-            title = {
-                Text("Chưa đăng nhập được")
-            },
-            text = {
-                Text(message)
-            },
+            title = { Text("Chưa đăng nhập được") },
+            text = { Text(message) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -419,8 +428,7 @@ fun MMRANavHost(
 
         composable(MMRADestinations.INITIAL_SETUP_DISPLAY) {
             SetupDisplayPreferenceScreen(
-                initialLargeText =
-                    setupPreferences.isLargeTextEnabled,
+                initialLargeText = setupPreferences.isLargeTextEnabled,
                 initialVoiceGuidance =
                     setupPreferences.isVoiceGuidanceEnabled,
                 onBackClick = {
@@ -432,24 +440,16 @@ fun MMRANavHost(
                         isVoiceGuidanceEnabled = isVoiceGuidance
                     )
 
-                    UserProfileManager.setSetupCompleted(
-                        context,
-                        true
-                    )
-
-                    UserProfileManager.setLoggedIn(
-                        context,
-                        true
-                    )
+                    UserProfileManager.setSetupCompleted(context, true)
+                    UserProfileManager.setLoggedIn(context, true)
 
                     val uid = AuthRepository.currentUid
 
                     if (uid != null) {
-                        val roleStr =
-                            setupPreferences.selectedRoles
-                                .joinToString(",") {
-                                    it.name
-                                }
+                        val roleStr = setupPreferences.selectedRoles
+                            .joinToString(",") {
+                                it.name
+                            }
 
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
@@ -474,8 +474,7 @@ fun MMRANavHost(
 
         composable(MMRADestinations.MY_ACCOUNT) {
             MyAccountScreen(
-                avatarBitmap =
-                    UserProfileManager.currentAvatarBitmap,
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
                 onBackClick = {
                     navController.popBackStack()
                 },
@@ -533,8 +532,7 @@ fun MMRANavHost(
 
         composable(MMRADestinations.MY_ACCOUNT_AVATAR_OPTIONS) {
             AvatarOptionsScreen(
-                avatarBitmap =
-                    UserProfileManager.currentAvatarBitmap,
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
                 onTakePhotoClick = {
                     navController.navigate(
                         MMRADestinations.CAPTURE_AVATAR
@@ -547,7 +545,6 @@ fun MMRANavHost(
                 },
                 onDeletePhotoClick = {
                     UserProfileManager.deleteAvatar(context)
-
                     navController.navigate(
                         MMRADestinations.AVATAR_DELETED_SUCCESS
                     )
@@ -565,7 +562,6 @@ fun MMRANavHost(
                 },
                 onPhotoCaptured = { bitmap ->
                     UserProfileManager.tempCapturedBitmap = bitmap
-
                     navController.navigate(
                         MMRADestinations.REVIEW_CAPTURED_PHOTO
                     )
@@ -578,8 +574,7 @@ fun MMRANavHost(
 
         composable(MMRADestinations.REVIEW_CAPTURED_PHOTO) {
             ReviewCapturedPhotoScreen(
-                capturedBitmap =
-                    UserProfileManager.tempCapturedBitmap,
+                capturedBitmap = UserProfileManager.tempCapturedBitmap,
                 onBackClick = {
                     navController.popBackStack()
                 },
@@ -601,7 +596,6 @@ fun MMRANavHost(
                 },
                 onPhotoSelected = { bitmap ->
                     UserProfileManager.tempCapturedBitmap = bitmap
-
                     navController.navigate(
                         MMRADestinations.CROP_AVATAR
                     )
@@ -614,8 +608,7 @@ fun MMRANavHost(
 
         composable(MMRADestinations.CROP_AVATAR) {
             CropAvatarScreen(
-                inputBitmap =
-                    UserProfileManager.tempCapturedBitmap,
+                inputBitmap = UserProfileManager.tempCapturedBitmap,
                 onBackClick = {
                     navController.popBackStack()
                 },
@@ -624,7 +617,6 @@ fun MMRANavHost(
                         context,
                         croppedBitmap
                     )
-
                     navController.navigate(
                         MMRADestinations.AVATAR_UPDATED_SUCCESS
                     )
@@ -634,8 +626,7 @@ fun MMRANavHost(
 
         composable(MMRADestinations.AVATAR_UPDATED_SUCCESS) {
             AvatarUpdatedScreen(
-                updatedBitmap =
-                    UserProfileManager.currentAvatarBitmap,
+                updatedBitmap = UserProfileManager.currentAvatarBitmap,
                 onBackToAccountClick = {
                     navController.popBackStack(
                         MMRADestinations.MY_ACCOUNT,
@@ -757,8 +748,7 @@ fun MMRANavHost(
 
         composable(MMRADestinations.MANAGE_USAGE_MODE) {
             ManageUsageModeScreen(
-                initialSelectedRoles =
-                    setupPreferences.selectedRoles,
+                initialSelectedRoles = setupPreferences.selectedRoles,
                 onBackClick = {
                     navController.popBackStack()
                 },
@@ -769,7 +759,6 @@ fun MMRANavHost(
                     setupPreferences = setupPreferences.copy(
                         selectedRoles = updatedRoles
                     )
-
                     navController.popBackStack()
                 }
             )
@@ -785,7 +774,6 @@ fun MMRANavHost(
                         popUpTo(0) {
                             inclusive = true
                         }
-
                         launchSingleTop = true
                     }
                 }
@@ -804,7 +792,6 @@ fun MMRANavHost(
                         popUpTo(0) {
                             inclusive = true
                         }
-
                         launchSingleTop = true
                     }
                 }
@@ -813,8 +800,7 @@ fun MMRANavHost(
 
         composable(MMRADestinations.ACCOUNT) {
             MyAccountScreen(
-                avatarBitmap =
-                    UserProfileManager.currentAvatarBitmap,
+                avatarBitmap = UserProfileManager.currentAvatarBitmap,
                 onBackClick = {
                     navController.popBackStack()
                 },
@@ -837,7 +823,6 @@ fun MMRANavHost(
                         popUpTo(MMRADestinations.HOME) {
                             saveState = true
                         }
-
                         launchSingleTop = true
                         restoreState = true
                     }
@@ -863,15 +848,14 @@ fun MMRANavHost(
         }
 
         composable(MMRADestinations.NOTIFICATIONS) {
-            val context = LocalContext.current
-
+            val notificationContext = LocalContext.current
             val currentUid =
                 FirebaseProvider.auth.currentUser?.uid.orEmpty()
 
             var notifications by remember {
                 mutableStateOf(
                     LocalNotificationStore.getNotifications(
-                        context,
+                        notificationContext,
                         currentUid
                     )
                 )
@@ -881,14 +865,14 @@ fun MMRANavHost(
                 notifications = notifications,
                 onNotificationClick = { item ->
                     LocalNotificationStore.markAsRead(
-                        context,
+                        notificationContext,
                         currentUid,
                         item.id
                     )
 
                     notifications =
                         LocalNotificationStore.getNotifications(
-                            context,
+                            notificationContext,
                             currentUid
                         )
 
@@ -904,22 +888,20 @@ fun MMRANavHost(
                 },
                 onMarkAllAsRead = {
                     LocalNotificationStore.markAllAsRead(
-                        context,
+                        notificationContext,
                         currentUid
                     )
-
                     notifications =
                         LocalNotificationStore.getNotifications(
-                            context,
+                            notificationContext,
                             currentUid
                         )
                 },
                 onClearAll = {
                     LocalNotificationStore.clearAll(
-                        context,
+                        notificationContext,
                         currentUid
                     )
-
                     notifications = emptyList()
                 },
                 onBackClick = {
@@ -1110,25 +1092,20 @@ fun MMRANavHost(
                     ?.get<Bundle>(MANUAL_MEDICINE_DRAFT_KEY)
             }
 
-            val name = saved
-                ?.getString("medicineName")
-                .orEmpty()
+            val name = saved?.getString("medicineName").orEmpty()
 
             if (saved != null && name.isNotBlank()) {
                 ScheduleSetupEditor(
                     medicineId = saved.getString("medicineId"),
                     draft = ManualMedicineDraft(
                         medicineName = name,
-                        strength =
-                            saved.getString("strength").orEmpty(),
+                        strength = saved.getString("strength").orEmpty(),
                         strengthUnit =
                             saved.getString("strengthUnit") ?: "mg",
                         dosageForm =
                             saved.getString("dosageForm").orEmpty(),
-                        note =
-                            saved.getString("note").orEmpty(),
-                        imageUri =
-                            saved.getString("imageUri")
+                        note = saved.getString("note").orEmpty(),
+                        imageUri = saved.getString("imageUri")
                     ),
                     onBackClick = {
                         navController.popBackStack()
@@ -1158,7 +1135,6 @@ fun MMRANavHost(
             } else {
                 Column {
                     Text("Không tìm thấy thông tin thuốc vừa nhập.")
-
                     TextButton(
                         onClick = {
                             navController.popBackStack()
@@ -1189,30 +1165,12 @@ fun MMRANavHost(
                     scanEntry.savedStateHandle[
                         MANUAL_MEDICINE_DRAFT_KEY
                     ] = Bundle().apply {
-                        putString(
-                            "medicineName",
-                            draft.medicineName
-                        )
-                        putString(
-                            "strength",
-                            draft.strength
-                        )
-                        putString(
-                            "strengthUnit",
-                            draft.strengthUnit
-                        )
-                        putString(
-                            "dosageForm",
-                            draft.dosageForm
-                        )
-                        putString(
-                            "note",
-                            draft.note
-                        )
-                        putString(
-                            "imageUri",
-                            draft.imageUri
-                        )
+                        putString("medicineName", draft.medicineName)
+                        putString("strength", draft.strength)
+                        putString("strengthUnit", draft.strengthUnit)
+                        putString("dosageForm", draft.dosageForm)
+                        putString("note", draft.note)
+                        putString("imageUri", draft.imageUri)
                     }
 
                     navController.navigate(
@@ -1258,9 +1216,7 @@ fun MMRANavHost(
             FamilyScreen(
                 onMemberClick = { memberId ->
                     navController.navigate(
-                        MMRADestinations.familyMemberDetail(
-                            memberId
-                        )
+                        MMRADestinations.familyMemberDetail(memberId)
                     )
                 },
                 onInviteClick = {
@@ -1323,8 +1279,7 @@ fun MMRANavHost(
             )
         ) { entry ->
             ReminderDestination(
-                doseId =
-                    entry.arguments?.getString("doseId"),
+                doseId = entry.arguments?.getString("doseId"),
                 readOnly =
                     entry.arguments?.getBoolean("readOnly") ?: false,
                 onBackClick = {
@@ -1361,8 +1316,7 @@ fun MMRANavHost(
                 onBackClick = {
                     navController.popBackStack()
                 },
-                memberName =
-                    member?.fullName ?: "Nguyễn Minh Anh",
+                memberName = member?.fullName ?: "Nguyễn Minh Anh",
                 memberRole = if (member != null) {
                     "${member.relationship} • Hồ sơ theo dõi"
                 } else {
@@ -1395,9 +1349,7 @@ fun MMRANavHost(
                 },
                 onPermissionsClick = {
                     navController.navigate(
-                        MMRADestinations.familyPermissions(
-                            memberId
-                        )
+                        MMRADestinations.familyPermissions(memberId)
                     )
                 }
             )
@@ -1430,14 +1382,12 @@ private fun authenticateAndProceed(
             "Vui lòng đăng nhập bằng email hoặc Google trước khi tiếp tục.",
             Toast.LENGTH_LONG
         ).show()
-
         return
     }
 
     UserProfileManager.setLoggedIn(context, true)
 
-    val setupDone =
-        UserProfileManager.isSetupCompleted(context)
+    val setupDone = UserProfileManager.isSetupCompleted(context)
 
     if (setupDone) {
         navController.navigate(MMRADestinations.HOME) {
@@ -1480,47 +1430,36 @@ private fun MedicineEntryDestination(
     var userId by remember(entry) {
         mutableStateOf<String?>(null)
     }
-
     var initialDraft by remember(entry) {
         mutableStateOf<ManualMedicineDraft?>(null)
     }
-
     var savedImageUrl by remember(entry) {
         mutableStateOf<String?>(null)
     }
-
     var loading by remember(entry) {
         mutableStateOf(true)
     }
-
     var signedIn by remember(entry) {
         mutableStateOf(false)
     }
-
     var loadError by remember(entry) {
         mutableStateOf<String?>(null)
     }
-
     var saveError by remember(entry) {
         mutableStateOf<String?>(null)
     }
-
     var saving by remember(entry) {
         mutableStateOf(false)
     }
-
     var pendingDraft by remember(entry) {
         mutableStateOf<ManualMedicineDraft?>(null)
     }
-
     var retryVersion by remember(entry) {
         mutableStateOf(0)
     }
-
     var requestVersion by remember(entry) {
         mutableStateOf(0)
     }
-
     var listening by remember(entry) {
         mutableStateOf(false)
     }
@@ -1572,7 +1511,6 @@ private fun MedicineEntryDestination(
                             auth.currentUser?.uid == uid
                         ) {
                             loading = false
-
                             loadError =
                                 "Không thể mở thuốc. Thuốc có thể đã bị xóa " +
                                         "hoặc kết nối đang gặp lỗi."
@@ -1602,7 +1540,6 @@ private fun MedicineEntryDestination(
         !signedIn -> {
             Column {
                 Text("Vui lòng đăng nhập để quản lý thuốc.")
-
                 TextButton(
                     onClick = {
                         navController.navigate(
@@ -1614,7 +1551,6 @@ private fun MedicineEntryDestination(
                 ) {
                     Text("Đăng nhập")
                 }
-
                 TextButton(
                     onClick = {
                         navController.popBackStack()
@@ -1628,7 +1564,6 @@ private fun MedicineEntryDestination(
         loadError != null -> {
             Column {
                 Text(loadError.orEmpty())
-
                 TextButton(
                     onClick = {
                         retryVersion++
@@ -1636,7 +1571,6 @@ private fun MedicineEntryDestination(
                 ) {
                     Text("Thử lại")
                 }
-
                 TextButton(
                     onClick = {
                         navController.popBackStack()
@@ -1653,7 +1587,6 @@ private fun MedicineEntryDestination(
                     initialDraft = initialDraft,
                     isEditing = medicineId != null,
                     saveMedicineOnly = true,
-
                     deleteAction = if (medicineId != null) {
                         {
                             MedicineDeleteAction(
@@ -1674,7 +1607,6 @@ private fun MedicineEntryDestination(
                                             popUpTo(
                                                 MMRADestinations.HOME
                                             )
-
                                             launchSingleTop = true
                                         }
                                     }
@@ -1684,13 +1616,11 @@ private fun MedicineEntryDestination(
                     } else {
                         null
                     },
-
                     onBackClick = {
                         if (!saving) {
                             navController.popBackStack()
                         }
                     },
-
                     onContinue = { draft ->
                         if (!saving) {
                             pendingDraft = draft
@@ -1710,7 +1640,6 @@ private fun MedicineEntryDestination(
             onDismissRequest = {
                 pendingDraft = null
             },
-
             title = {
                 Text(
                     if (medicineId == null) {
@@ -1720,7 +1649,6 @@ private fun MedicineEntryDestination(
                     }
                 )
             },
-
             text = {
                 Column {
                     Text(
@@ -1739,7 +1667,6 @@ private fun MedicineEntryDestination(
                     }
                 }
             },
-
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1751,7 +1678,6 @@ private fun MedicineEntryDestination(
                             !listening
                         ) {
                             pendingDraft = null
-
                             saveError =
                                 "Tài khoản đã thay đổi. " +
                                         "Vui lòng mở lại màn hình thuốc."
@@ -1819,7 +1745,6 @@ private fun MedicineEntryDestination(
                                                 ) {
                                                     inclusive = true
                                                 }
-
                                                 launchSingleTop = true
                                             }
                                         }
@@ -1835,7 +1760,6 @@ private fun MedicineEntryDestination(
                                             popUpTo(
                                                 MMRADestinations.HOME
                                             )
-
                                             launchSingleTop = true
                                         }
                                     }
@@ -1847,7 +1771,6 @@ private fun MedicineEntryDestination(
                                     auth.currentUser?.uid == uid
                                 ) {
                                     saving = false
-
                                     saveError =
                                         "Chưa lưu được thuốc. " +
                                                 "Vui lòng kiểm tra kết nối và thử lại."
@@ -1859,7 +1782,6 @@ private fun MedicineEntryDestination(
                     Text("Lưu")
                 }
             },
-
             dismissButton = {
                 TextButton(
                     onClick = {
@@ -1875,9 +1797,7 @@ private fun MedicineEntryDestination(
     if (saving) {
         AlertDialog(
             onDismissRequest = {},
-            title = {
-                Text("Đang lưu thuốc")
-            },
+            title = { Text("Đang lưu thuốc") },
             text = {
                 Column {
                     CircularProgressIndicator()
@@ -1893,12 +1813,8 @@ private fun MedicineEntryDestination(
             onDismissRequest = {
                 saveError = null
             },
-            title = {
-                Text("Chưa lưu được")
-            },
-            text = {
-                Text(message)
-            },
+            title = { Text("Chưa lưu được") },
+            text = { Text(message) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1918,6 +1834,440 @@ private fun ReminderDestination(
     readOnly: Boolean,
     onBackClick: () -> Unit
 ) {
+    val ownerUid = rememberScheduleOwnerUid()
+
+    if (ownerUid == null) {
+        Column(Modifier.padding(20.dp)) {
+            Text("Vui lòng đăng nhập để xem liều thuốc.")
+            TextButton(onClick = onBackClick) {
+                Text("Quay lại")
+            }
+        }
+        return
+    }
+
+    if (
+        !doseId.isNullOrBlank() &&
+        Regex("[0-9a-f]{64}").matches(doseId)
+    ) {
+        key(ownerUid, doseId) {
+            ApiReminderDestination(
+                ownerUid = ownerUid,
+                doseId = doseId,
+                readOnly = readOnly,
+                onBackClick = onBackClick
+            )
+        }
+    } else {
+        // Trang chủ và Lịch sử sẽ được chuyển sang API ở bước sau.
+        LegacyReminderDestination(
+            doseId = doseId,
+            readOnly = readOnly,
+            onBackClick = onBackClick
+        )
+    }
+}
+
+private enum class ReminderApiAction {
+    TAKEN,
+    SKIPPED,
+    SNOOZE
+}
+
+@Composable
+private fun ApiReminderDestination(
+    ownerUid: String,
+    doseId: String,
+    readOnly: Boolean,
+    onBackClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val repository = remember { DoseRepository() }
+    val scope = rememberCoroutineScope()
+
+    var dose by remember {
+        mutableStateOf<DoseResponseDto?>(null)
+    }
+    var loading by remember {
+        mutableStateOf(true)
+    }
+    var loadError by remember {
+        mutableStateOf<String?>(null)
+    }
+    var retry by remember {
+        mutableStateOf(0)
+    }
+    var busy by remember {
+        mutableStateOf(false)
+    }
+    var mustReload by remember {
+        mutableStateOf(false)
+    }
+    var confirmation by remember {
+        mutableStateOf<ReminderApiAction?>(null)
+    }
+    var actionError by remember {
+        mutableStateOf<String?>(null)
+    }
+    var outcome by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    fun ensureOwner() {
+        if (FirebaseProvider.auth.currentUser?.uid != ownerUid) {
+            throw CancellationException(
+                "Tài khoản đã thay đổi."
+            )
+        }
+    }
+
+    LaunchedEffect(retry) {
+        loading = true
+        loadError = null
+        dose = null
+
+        try {
+            ensureOwner()
+
+            val result = repository.getDose(doseId)
+
+            currentCoroutineContext().ensureActive()
+            ensureOwner()
+
+            if (result.doseId != doseId) {
+                throw DoseException(
+                    "Máy chủ trả về liều thuốc chưa khớp. Vui lòng thử lại.",
+                    "invalid_response"
+                )
+            }
+
+            dose = result
+            mustReload = false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            currentCoroutineContext().ensureActive()
+            ensureOwner()
+
+            loadError = (error as? DoseException)?.message
+                ?: "Chưa mở được liều thuốc. Vui lòng thử lại."
+        } finally {
+            loading = false
+        }
+    }
+
+    BackHandler {
+        if (!busy) {
+            onBackClick()
+        }
+    }
+
+    if (loading) {
+        ScheduleFormSkeleton()
+        return
+    }
+
+    val current = dose
+
+    if (loadError != null || current == null) {
+        Column(Modifier.padding(20.dp)) {
+            Text("Chưa mở được liều thuốc")
+            Text(loadError ?: "Không tìm thấy liều thuốc.")
+
+            TextButton(
+                onClick = {
+                    retry++
+                }
+            ) {
+                Text("Thử lại")
+            }
+
+            TextButton(onClick = onBackClick) {
+                Text("Quay lại")
+            }
+        }
+        return
+    }
+
+    val ui = current.toScheduleDoseUiModel()
+    val now = rememberUiNow()
+
+    val today = java.text.SimpleDateFormat(
+        "yyyy-MM-dd",
+        java.util.Locale.ROOT
+    ).apply {
+        timeZone = java.util.TimeZone.getTimeZone(
+            current.timeZone
+        )
+    }.format(java.util.Date(now))
+
+    val canAct = !readOnly &&
+            current.localDate == today &&
+            current.status == DoseStatusDto.PENDING &&
+            !busy &&
+            !mustReload &&
+            outcome == null
+
+    val reminder = ReminderDoseUiModel(
+        doseId = current.doseId,
+        medicineId = current.medicineId,
+        timeLabel = "${ui.time} • ${current.localDate}",
+        medicineName = ui.medicineName,
+        quantityText = ui.quantityText,
+        mealInstruction = ui.instruction,
+        scheduledAtMillis = MedicationReminderSync.parseIsoToMillis(
+            current.scheduledAt
+        )
+    )
+
+    val playInstructions = rememberReminderSpeech(
+        "${ui.medicineName}. ${ui.quantityText}. ${ui.instruction}."
+    )
+
+    fun submit(action: ReminderApiAction) {
+        if (busy || mustReload || !canAct) {
+            return
+        }
+
+        busy = true
+
+        scope.launch {
+            try {
+                ensureOwner()
+
+                val updated = when (action) {
+                    ReminderApiAction.TAKEN ->
+                        repository.updateDoseAction(
+                            doseId,
+                            DoseActionDto.TAKEN
+                        )
+
+                    ReminderApiAction.SKIPPED ->
+                        repository.updateDoseAction(
+                            doseId,
+                            DoseActionDto.SKIPPED
+                        )
+
+                    ReminderApiAction.SNOOZE ->
+                        repository.snoozeDose(
+                            doseId,
+                            minutes = 10
+                        )
+                }
+
+                currentCoroutineContext().ensureActive()
+                ensureOwner()
+
+                if (updated.doseId != doseId) {
+                    throw DoseException(
+                        "Chưa nhận được kết quả hợp lệ. " +
+                                "Vui lòng tải lại liều thuốc.",
+                        "invalid_response"
+                    )
+                }
+
+                dose = updated
+
+                outcome = when (action) {
+                    ReminderApiAction.TAKEN ->
+                        "Đã ghi nhận bạn uống liều thuốc này."
+
+                    ReminderApiAction.SKIPPED ->
+                        "Đã ghi nhận bỏ qua liều thuốc này."
+
+                    ReminderApiAction.SNOOZE ->
+                        "Đã lưu yêu cầu nhắc lại sau 10 phút."
+                }
+
+                runCatching {
+                    MedicationReminderSync.syncDoses(
+                        context = context,
+                        uid = ownerUid,
+                        doses = listOf(updated)
+                    )
+                }.onFailure {
+                    android.util.Log.w(
+                        "MMRA_API_ERROR",
+                        "Đã lưu thao tác nhưng chưa đồng bộ được báo thức cục bộ.",
+                        it
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                currentCoroutineContext().ensureActive()
+                ensureOwner()
+
+                mustReload = true
+
+                actionError = (error as? DoseException)?.message
+                    ?: "Chưa xác nhận được kết quả thao tác. " +
+                            "Vui lòng tải lại liều thuốc trước khi thử lại."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    val notice = when {
+        busy -> ReminderNoticeUiModel(
+            "Đang lưu",
+            "Vui lòng chờ máy chủ xác nhận."
+        )
+
+        mustReload -> ReminderNoticeUiModel(
+            "Cần tải lại liều thuốc",
+            "Vui lòng kiểm tra kết quả đã lưu trước khi thao tác tiếp."
+        )
+
+        current.status != DoseStatusDto.PENDING ->
+            ReminderNoticeUiModel(
+                ui.status.label,
+                "Đây là trạng thái đã được ghi nhận trên máy chủ."
+            )
+
+        readOnly || current.localDate != today ->
+            ReminderNoticeUiModel(
+                "Xem chi tiết",
+                "Thao tác xác nhận được thực hiện với liều hôm nay."
+            )
+
+        !current.nextReminderAt.isNullOrBlank() ->
+            ReminderNoticeUiModel(
+                "Đã chọn nhắc lại",
+                "Liều này vẫn đang chờ xác nhận đã uống."
+            )
+
+        else -> null
+    }
+
+    DoseReminderScreen(
+        dose = reminder,
+        actionsEnabled = canAct,
+        notice = notice,
+        onClose = {
+            if (!busy) {
+                onBackClick()
+            }
+        },
+        onTaken = {
+            if (canAct) {
+                confirmation = ReminderApiAction.TAKEN
+            }
+        },
+        onSkip = {
+            if (canAct) {
+                confirmation = ReminderApiAction.SKIPPED
+            }
+        },
+        onSnooze = {
+            submit(ReminderApiAction.SNOOZE)
+        },
+        onPlayInstructions = playInstructions
+    )
+
+    confirmation?.let { action ->
+        val taken = action == ReminderApiAction.TAKEN
+
+        AlertDialog(
+            onDismissRequest = {
+                confirmation = null
+            },
+            title = {
+                Text(
+                    if (taken) {
+                        "Xác nhận đã uống?"
+                    } else {
+                        "Bỏ qua liều này?"
+                    }
+                )
+            },
+            text = {
+                Text(
+                    if (taken) {
+                        "Bạn đã uống ${ui.quantityText} ${ui.medicineName} " +
+                                "cho liều ${ui.time}?"
+                    } else {
+                        "Liều ${ui.medicineName} lúc ${ui.time} " +
+                                "sẽ được đánh dấu bỏ qua."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmation = null
+                        submit(action)
+                    }
+                ) {
+                    Text("Xác nhận")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        confirmation = null
+                    }
+                ) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
+    actionError?.let { message ->
+        AlertDialog(
+            onDismissRequest = {
+                actionError = null
+            },
+            title = {
+                Text("Kiểm tra kết quả")
+            },
+            text = {
+                Text(message)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        actionError = null
+                        retry++
+                    }
+                ) {
+                    Text("Tải lại liều thuốc")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onBackClick) {
+                    Text("Quay lại")
+                }
+            }
+        )
+    }
+
+    outcome?.let { message ->
+        AlertDialog(
+            onDismissRequest = onBackClick,
+            title = {
+                Text("Đã lưu")
+            },
+            text = {
+                Text(message)
+            },
+            confirmButton = {
+                TextButton(onClick = onBackClick) {
+                    Text("Quay lại")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun LegacyReminderDestination(
+    doseId: String?,
+    readOnly: Boolean,
+    onBackClick: () -> Unit
+) {
     val context = LocalContext.current
     val dose = MockReminderDoses.findById(doseId)
 
@@ -1928,14 +2278,10 @@ private fun ReminderDestination(
     if (dose == null) {
         Column {
             Text("Không tìm thấy liều thuốc.")
-
-            TextButton(
-                onClick = onBackClick
-            ) {
+            TextButton(onClick = onBackClick) {
                 Text("Quay lại")
             }
         }
-
         return
     }
 
@@ -1955,7 +2301,7 @@ private fun ReminderDestination(
         readOnly || !today -> ReminderNoticeUiModel(
             "Chế độ xem chi tiết",
             "Bạn đang xem liều của ngày đã chọn. " +
-                    "Các thao tác xác nhận được thực hiện tại lịch uống hôm hôm nay."
+                    "Các thao tác xác nhận được thực hiện tại lịch uống hôm nay."
         )
 
         finished -> ReminderNoticeUiModel(
@@ -1975,19 +2321,16 @@ private fun ReminderDestination(
         actionsEnabled = canAct,
         notice = notice,
         onClose = onBackClick,
-
         onTaken = {
             if (canAct) {
                 dialog = "CONFIRM_TAKEN"
             }
         },
-
         onSkip = {
             if (canAct) {
                 dialog = "CONFIRM_SKIP"
             }
         },
-
         onSnooze = {
             if (canAct) {
                 MockDoseActions.record(
@@ -2005,15 +2348,13 @@ private fun ReminderDestination(
                     snoozeMinutes = 10,
                     title = "Nhắc lại: ${dose.medicineName}",
                     message =
-                        "${dose.quantityText}. ${dose.mealInstruction}"
-                            .trim(),
+                        "${dose.quantityText}. ${dose.mealInstruction}".trim(),
                     medicineName = dose.medicineName
                 )
 
                 dialog = "SNOOZED"
             }
         },
-
         onPlayInstructions = playInstructions
     )
 
@@ -2034,7 +2375,8 @@ private fun ReminderDestination(
 
         val message = when (current) {
             "CONFIRM_TAKEN" ->
-                "Bạn đã uống ${dose.quantityText} ${dose.medicineName} cho liều ${dose.timeLabel}?"
+                "Bạn đã uống ${dose.quantityText} ${dose.medicineName} " +
+                        "cho liều ${dose.timeLabel}?"
 
             "CONFIRM_SKIP" ->
                 "Liều ${dose.medicineName} sẽ được đánh dấu bỏ qua."
@@ -2046,22 +2388,20 @@ private fun ReminderDestination(
                 "Liều này đã được đánh dấu bỏ qua."
 
             else ->
-                "Đã chọn nhắc lại sau 10 phút. Liều này chưa được đánh dấu đã uống."
+                "Đã chọn nhắc lại sau 10 phút. " +
+                        "Liều này chưa được đánh dấu đã uống."
         }
 
         AlertDialog(
             onDismissRequest = {
                 dialog = null
             },
-
             title = {
                 Text(title)
             },
-
             text = {
                 Text(message)
             },
-
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -2071,12 +2411,10 @@ private fun ReminderDestination(
                                     dose.doseId,
                                     MockDoseAction.TAKEN
                                 )
-
                                 MedicationReminderSync.onDoseAction(
                                     context,
                                     dose.doseId
                                 )
-
                                 dialog = "TAKEN"
                             }
 
@@ -2085,12 +2423,10 @@ private fun ReminderDestination(
                                     dose.doseId,
                                     MockDoseAction.SKIPPED
                                 )
-
                                 MedicationReminderSync.onDoseAction(
                                     context,
                                     dose.doseId
                                 )
-
                                 dialog = "SKIPPED"
                             }
 
@@ -2110,7 +2446,6 @@ private fun ReminderDestination(
                     )
                 }
             },
-
             dismissButton = {
                 if (confirming) {
                     TextButton(

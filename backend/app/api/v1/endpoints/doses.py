@@ -1,9 +1,17 @@
 from datetime import date, datetime, timezone
+from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    Path,
+    Query,
+    Response,
+    status,
+)
 
-from app.api.deps import AuthenticatedUser, CurrentUser
+from app.api.deps import AuthenticatedUser
 from app.repositories.medication_repository import MedicationRepository
 from app.schemas.medication import (
     DoseActionRequest,
@@ -16,7 +24,9 @@ from app.schemas.medication import (
 from app.services.dose_service import DoseService
 
 
-router = APIRouter(tags=["Medication Schedules and Doses"])
+router = APIRouter(
+    tags=["Medication Schedules and Doses"],
+)
 
 
 # =============================================================
@@ -33,7 +43,6 @@ def create_schedule(
     user: AuthenticatedUser,
 ):
     """Tạo lịch uống thuốc mới."""
-
     medicine = MedicationRepository.get_medicine(
         user,
         payload.medicineId,
@@ -81,13 +90,10 @@ def get_schedules(
     enabled_only: bool = Query(default=False),
 ):
     """Lấy danh sách lịch uống thuốc."""
-
-    schedules = MedicationRepository.list_schedules(
+    return MedicationRepository.list_schedules(
         user,
         enabled_only=enabled_only,
     )
-
-    return schedules
 
 
 @router.get(
@@ -99,7 +105,6 @@ def get_schedule(
     user: AuthenticatedUser,
 ):
     """Lấy thông tin một lịch uống thuốc."""
-
     schedule = MedicationRepository.get_schedule(
         user,
         schedule_id,
@@ -124,7 +129,6 @@ def update_schedule(
     user: AuthenticatedUser,
 ):
     """Cập nhật lịch uống thuốc theo phiên bản hiện tại."""
-
     existing = MedicationRepository.get_schedule(
         user,
         schedule_id,
@@ -173,7 +177,6 @@ def update_schedule(
         "updatedAt": now,
     })
 
-
     result = MedicationRepository.update_schedule_if_version(
         user=user,
         schedule_id=schedule_id,
@@ -199,7 +202,6 @@ def update_schedule(
     return result
 
 
-
 # =============================================================
 # DOSE ENDPOINTS
 # =============================================================
@@ -213,24 +215,56 @@ def get_doses(
     target_date: date = Query(alias="date"),
 ):
     """
-    Lấy danh sách Dose theo ngày.
+    Lấy danh sách liều theo ngày.
 
-    Dose còn thiếu sẽ được sinh tự động từ lịch uống thuốc.
+    Liều còn thiếu được sinh từ lịch uống đang có hiệu lực.
     """
-
     try:
-        doses = DoseService.get_doses_for_date(
+        return DoseService.get_doses_for_date(
             user,
             target_date,
         )
-
-        return doses
-
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
+        ) from exc
+
+
+@router.get(
+    "/doses/{dose_id}",
+    response_model=DoseResponse,
+)
+def get_dose(
+    dose_id: Annotated[
+        str,
+        Path(pattern=r"^[0-9a-f]{64}$"),
+    ],
+    user: AuthenticatedUser,
+    response: Response,
+):
+    """Lấy liều đã lưu theo ID khi mở từ thông báo."""
+    response.headers["Cache-Control"] = "no-store"
+
+    # Repository chỉ đọc trong users/{uid}/doses,
+    # không tìm liều thuộc tài khoản khác.
+    dose = MedicationRepository.get_dose(
+        user,
+        dose_id,
+    )
+
+    if dose is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "dose_not_found",
+                "message": (
+                    "Không tìm thấy liều thuốc trong tài khoản của bạn."
+                ),
+            },
         )
+
+    return dose
 
 
 @router.patch(
@@ -242,26 +276,23 @@ def update_dose_action(
     payload: DoseActionRequest,
     user: AuthenticatedUser,
 ):
-    """Đánh dấu Dose đã uống hoặc bỏ qua."""
-
+    """Đánh dấu liều đã uống hoặc bỏ qua."""
     try:
         return DoseService.update_dose_action(
             user,
             dose_id,
             payload.action,
         )
-
     except LookupError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
-        )
-
+        ) from exc
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
-        )
+        ) from exc
 
 
 @router.post(
@@ -274,22 +305,19 @@ def snooze_dose(
     user: AuthenticatedUser,
 ):
     """Hoãn thời gian nhắc uống thuốc."""
-
     try:
         return DoseService.snooze_dose(
             user,
             dose_id,
             payload.minutes,
         )
-
     except LookupError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
-        )
-
+        ) from exc
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
-        )
+        ) from exc

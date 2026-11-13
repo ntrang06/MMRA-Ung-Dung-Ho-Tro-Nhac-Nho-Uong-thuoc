@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +20,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.data.remote.dto.DoseResponseDto
+import com.example.project_lttbd.data.remote.dto.DoseStatusDto
+import com.example.project_lttbd.data.remote.dto.DoseUnitDto
 
 enum class ScheduleDoseStatus(
     val label: String,
@@ -62,6 +65,18 @@ enum class ScheduleDoseStatus(
         "−",
         Color(0xFF526565),
         Color(0xFFEEF5F3)
+    ),
+    MISSED(
+        "BỎ LỠ",
+        "!",
+        Color(0xFFBA3028),
+        Color(0xFFFBE6E3)
+    ),
+    CANCELLED(
+        "ĐÃ HỦY",
+        "−",
+        Color(0xFF526565),
+        Color(0xFFEEF5F3)
     )
 }
 
@@ -75,6 +90,97 @@ data class ScheduleDoseUiModel(
     val status: ScheduleDoseStatus
 )
 
+/**
+ * Chuyển liều thuốc từ API sang dữ liệu hiển thị.
+ * Trạng thái đã uống, bỏ qua, bỏ lỡ và hủy lấy từ máy chủ.
+ */
+internal fun DoseResponseDto.toScheduleDoseUiModel(): ScheduleDoseUiModel {
+    val snapshot = medicineSnapshot
+
+    val strengthText = listOf(
+        snapshot.strength.trim(),
+        snapshot.strengthUnit.trim()
+    )
+        .filter { it.isNotEmpty() }
+        .joinToString(" ")
+        .takeIf {
+            snapshot.strength.isNotBlank()
+        }
+        .orEmpty()
+
+    val displayName = listOf(
+        snapshot.medicineName.trim(),
+        strengthText
+    )
+        .filter { it.isNotEmpty() }
+        .joinToString(" ")
+        .ifBlank { "Thuốc" }
+
+    val unitText = when (doseUnit) {
+        DoseUnitDto.TABLET -> "viên"
+        DoseUnitDto.SACHET -> "gói"
+        DoseUnitDto.ML -> "ml"
+        DoseUnitDto.DROP -> "giọt"
+        DoseUnitDto.DOSE -> "liều"
+    }
+
+    val quantity = doseQuantity.trim()
+
+    val displayQuantity = quantity
+        .replace(',', '.')
+        .toBigDecimalOrNull()
+        ?.stripTrailingZeros()
+        ?.toPlainString()
+        ?.replace('.', ',')
+        ?: quantity
+
+    val displayTime = if (minuteOfDay in 0..1439) {
+        val hour = (minuteOfDay / 60)
+            .toString()
+            .padStart(2, '0')
+
+        val minute = (minuteOfDay % 60)
+            .toString()
+            .padStart(2, '0')
+
+        "$hour:$minute"
+    } else {
+        "—"
+    }
+
+    val displayStatus = when (status) {
+        DoseStatusDto.TAKEN ->
+            ScheduleDoseStatus.TAKEN
+
+        DoseStatusDto.SKIPPED ->
+            ScheduleDoseStatus.SKIPPED
+
+        DoseStatusDto.MISSED ->
+            ScheduleDoseStatus.MISSED
+
+        DoseStatusDto.CANCELLED ->
+            ScheduleDoseStatus.CANCELLED
+
+        DoseStatusDto.PENDING -> {
+            if (!nextReminderAt.isNullOrBlank()) {
+                ScheduleDoseStatus.SNOOZED
+            } else {
+                ScheduleDoseStatus.PENDING
+            }
+        }
+    }
+
+    return ScheduleDoseUiModel(
+        doseId = doseId,
+        medicineId = medicineId,
+        time = displayTime,
+        medicineName = displayName,
+        quantityText = "$displayQuantity $unitText",
+        instruction = mealInstruction.trim(),
+        status = displayStatus
+    )
+}
+
 @Composable
 fun ScheduleDoseCard(
     dose: ScheduleDoseUiModel,
@@ -83,14 +189,19 @@ fun ScheduleDoseCard(
 ) {
     val status = dose.status
 
+    val highlighted = status == ScheduleDoseStatus.OVERDUE ||
+            status == ScheduleDoseStatus.MISSED
+
     Surface(
-        onClick = { onClick(dose.doseId) },
+        onClick = {
+            onClick(dose.doseId)
+        },
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         color = Color.White,
         border = BorderStroke(
             width = 1.dp,
-            color = if (status == ScheduleDoseStatus.OVERDUE) {
+            color = if (highlighted) {
                 status.foreground
             } else {
                 Color(0xFFD7E2DF)
@@ -165,15 +276,17 @@ fun ScheduleDoseCard(
                     color = Color(0xFF526565)
                 )
 
-                Text(
-                    text = dose.instruction,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp,
-                        letterSpacing = 0.sp
-                    ),
-                    color = Color(0xFF526565)
-                )
+                if (dose.instruction.isNotBlank()) {
+                    Text(
+                        text = dose.instruction,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp,
+                            letterSpacing = 0.sp
+                        ),
+                        color = Color(0xFF526565)
+                    )
+                }
             }
 
             Surface(
@@ -196,7 +309,9 @@ fun ScheduleDoseCard(
                 )
             }
 
-            Box(contentAlignment = Alignment.Center) {
+            Box(
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
                     text = "›",
                     fontSize = 24.sp,
