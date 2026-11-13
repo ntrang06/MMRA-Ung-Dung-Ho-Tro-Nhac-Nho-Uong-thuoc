@@ -6,15 +6,16 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import org.json.JSONObject
 
-/**
- * Đặt và quản lý báo thức chính xác bằng Android AlarmManager.
- * Hỗ trợ setExactAndAllowWhileIdle để đảm bảo nổ chuông ngay cả trong chế độ Doze / tiết kiệm pin.
- */
 object MedicationAlarmScheduler {
 
     private const val TAG = "MedicationAlarmSched"
-    const val ACTION_MEDICATION_ALARM = "com.example.project_lttbd.ACTION_MEDICATION_ALARM"
+    private const val PREFS_NAME = "mmra_scheduled_doses_prefs"
+    private const val PAYLOAD_PREFIX = "alarm_payload_"
+
+    const val ACTION_MEDICATION_ALARM =
+        "com.example.project_lttbd.ACTION_MEDICATION_ALARM"
 
     const val EXTRA_UID = "extra_alarm_uid"
     const val EXTRA_DOSE_ID = "extra_alarm_dose_id"
@@ -22,25 +23,46 @@ object MedicationAlarmScheduler {
     const val EXTRA_MESSAGE = "extra_alarm_message"
     const val EXTRA_MEDICINE_NAME = "extra_alarm_medicine_name"
 
-    private const val PREFS_NAME = "mmra_scheduled_doses_prefs"
+    private val apiDosePattern = Regex("^[0-9a-f]{64}$")
 
-    fun requestCodeForDose(doseId: String): Int {
-        // Sử dụng mã hash dương ổn định
+    private val demoDosePattern = Regex(
+        """^medicine_0[123]\|\d{4}-\d{2}-\d{2}\|\d{1,4}$"""
+    )
+
+    private data class SavedAlarm(
+        val uid: String,
+        val doseId: String,
+        val triggerAtMillis: Long,
+        val title: String,
+        val message: String,
+        val medicineName: String
+    )
+
+    fun requestCodeForDose(
+        doseId: String
+    ): Int {
         val hash = doseId.hashCode()
-        return if (hash == Int.MIN_VALUE) 0 else Math.abs(hash)
+        return if (hash == Int.MIN_VALUE) {
+            0
+        } else {
+            Math.abs(hash)
+        }
     }
 
-    fun isValidScheduleTime(triggerAtMillis: Long, nowMillis: Long = System.currentTimeMillis()): Boolean {
+    fun isValidScheduleTime(
+        triggerAtMillis: Long,
+        nowMillis: Long = System.currentTimeMillis()
+    ): Boolean {
         return triggerAtMillis > nowMillis
     }
 
-    fun computeSnoozeTriggerMillis(nowMillis: Long, snoozeMinutes: Int): Long {
-        return nowMillis + (snoozeMinutes * 60 * 1000L)
+    fun computeSnoozeTriggerMillis(
+        nowMillis: Long,
+        snoozeMinutes: Int
+    ): Long {
+        return nowMillis + snoozeMinutes * 60 * 1000L
     }
 
-    /**
-     * Lập lịch hoãn báo thức (Snooze) sau [snoozeMinutes] phút (hỗ trợ 5, 10, 15, 30 phút theo chuẩn BE2/BE3).
-     */
     fun scheduleSnooze(
         context: Context,
         uid: String,
@@ -51,18 +73,21 @@ object MedicationAlarmScheduler {
         medicineName: String = "",
         nowMillis: Long = System.currentTimeMillis()
     ) {
-        val triggerAtMillis = computeSnoozeTriggerMillis(nowMillis, snoozeMinutes)
         schedule(
             context = context,
             uid = uid,
             doseId = doseId,
-            triggerAtMillis = triggerAtMillis,
+            triggerAtMillis = computeSnoozeTriggerMillis(
+                nowMillis,
+                snoozeMinutes
+            ),
             title = title,
             message = message,
             medicineName = medicineName
         )
     }
 
+    @Synchronized
     fun schedule(
         context: Context,
         uid: String,
@@ -72,130 +97,342 @@ object MedicationAlarmScheduler {
         message: String,
         medicineName: String = ""
     ) {
-        if (!isValidScheduleTime(triggerAtMillis)) {
-            Log.d(TAG, "Bỏ qua đặt báo thức vì thời gian đã qua: doseId=$doseId")
-            return
-        }
-        if (uid.isBlank() || doseId.isBlank()) return
-
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-
-        val intent = Intent(context, MedicationAlarmReceiver::class.java).apply {
-            action = ACTION_MEDICATION_ALARM
-            putExtra(EXTRA_UID, uid)
-            putExtra(EXTRA_DOSE_ID, doseId)
-            putExtra(EXTRA_TITLE, title)
-            putExtra(EXTRA_MESSAGE, message)
-            putExtra(EXTRA_MEDICINE_NAME, medicineName)
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
+        scheduleSavedAlarm(
             context,
-            requestCodeForDose(doseId),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            SavedAlarm(
+                uid = uid,
+                doseId = doseId,
+                triggerAtMillis = triggerAtMillis,
+                title = title,
+                message = message,
+                medicineName = medicineName
+            )
         )
+    }
 
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (alarmManager.canScheduleExactAlarms()) {
-                        alarmManager.setExactAndAllowWhileIdle(
-                            AlarmManager.RTC_WAKEUP,
-                            triggerAtMillis,
-                            pendingIntent
-                        )
-                    } else {
-                        alarmManager.setAndAllowWhileIdle(
-                            AlarmManager.RTC_WAKEUP,
-                            triggerAtMillis,
-                            pendingIntent
-                        )
-                    }
-                } else {
-                    alarmManager.setExactAndAllowWhileIdle(
+    private fun scheduleSavedAlarm(
+        context: Context,
+        alarm: SavedAlarm
+    ): Boolean {
+        if (alarm.uid.isBlank() || alarm.doseId.isBlank()) {
+            return false
+        }
+
+        if (!isValidScheduleTime(alarm.triggerAtMillis)) {
+            return false
+        }
+
+        // Chặn các báo thức thuốc mẫu cũ.
+        if (demoDosePattern.matches(alarm.doseId)) {
+            cancel(context, alarm.doseId)
+            return false
+        }
+
+        val manager = context.getSystemService(
+            Context.ALARM_SERVICE
+        ) as? AlarmManager ?: return false
+
+        return try {
+            val intent = Intent(
+                context,
+                MedicationAlarmReceiver::class.java
+            ).apply {
+                action = ACTION_MEDICATION_ALARM
+
+                putExtra(EXTRA_UID, alarm.uid)
+                putExtra(EXTRA_DOSE_ID, alarm.doseId)
+                putExtra(EXTRA_TITLE, alarm.title)
+                putExtra(EXTRA_MESSAGE, alarm.message)
+                putExtra(
+                    EXTRA_MEDICINE_NAME,
+                    alarm.medicineName
+                )
+            }
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestCodeForDose(alarm.doseId),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                        PendingIntent.FLAG_IMMUTABLE
+            )
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (manager.canScheduleExactAlarms()) {
+                    manager.setExactAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
-                        triggerAtMillis,
+                        alarm.triggerAtMillis,
+                        pendingIntent
+                    )
+                } else {
+                    manager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        alarm.triggerAtMillis,
                         pendingIntent
                     )
                 }
-            } else {
-                alarmManager.setExact(
+            } else if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+            ) {
+                manager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
-                    triggerAtMillis,
+                    alarm.triggerAtMillis,
+                    pendingIntent
+                )
+            } else {
+                manager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    alarm.triggerAtMillis,
                     pendingIntent
                 )
             }
 
-            trackScheduledDose(context, uid, doseId)
-            Log.d(TAG, "Đã đặt báo thức cho liều $doseId lúc $triggerAtMillis (UID: $uid)")
-        } catch (e: Exception) {
-            Log.e(TAG, "Lỗi khi đặt báo thức cho liều $doseId", e)
+            saveAlarm(context, alarm)
+
+            Log.d(
+                TAG,
+                "Đã đặt và lưu báo thức liều thuốc."
+            )
+
+            true
+        } catch (error: Exception) {
+            Log.e(
+                TAG,
+                "Chưa đặt được báo thức liều thuốc.",
+                error
+            )
+
+            false
         }
     }
 
-    fun cancel(context: Context, doseId: String) {
+    @Synchronized
+    fun cancel(
+        context: Context,
+        doseId: String
+    ) {
         if (doseId.isBlank()) return
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
 
-        val intent = Intent(context, MedicationAlarmReceiver::class.java).apply {
-            action = ACTION_MEDICATION_ALARM
-        }
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            requestCodeForDose(doseId),
-            intent,
-            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-        )
+        try {
+            val manager = context.getSystemService(
+                Context.ALARM_SERVICE
+            ) as? AlarmManager
 
-        if (pendingIntent != null) {
-            alarmManager.cancel(pendingIntent)
-            pendingIntent.cancel()
-            Log.d(TAG, "Đã hủy báo thức cho liều $doseId")
-        }
-
-        untrackScheduledDose(context, doseId)
-    }
-
-    fun cancelAll(context: Context, uid: String) {
-        if (uid.isBlank()) return
-        val activeDoseIds = getScheduledDosesForUid(context, uid)
-        for (doseId in activeDoseIds) {
-            cancel(context, doseId)
-        }
-        clearTrackingForUid(context, uid)
-        Log.d(TAG, "Đã hủy toàn bộ (${activeDoseIds.size}) báo thức của UID: $uid")
-    }
-
-    // --- Tracking helper methods ---
-
-    private fun getPrefs(context: Context) =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-    private fun trackScheduledDose(context: Context, uid: String, doseId: String) {
-        val prefs = getPrefs(context)
-        val currentSet = prefs.getStringSet("doses_$uid", emptySet()) ?: emptySet()
-        prefs.edit().putStringSet("doses_$uid", currentSet + doseId).apply()
-    }
-
-    private fun untrackScheduledDose(context: Context, doseId: String) {
-        val prefs = getPrefs(context)
-        val allKeys = prefs.all.keys.filter { it.startsWith("doses_") }
-        val editor = prefs.edit()
-        for (key in allKeys) {
-            val currentSet = prefs.getStringSet(key, emptySet()) ?: emptySet()
-            if (doseId in currentSet) {
-                editor.putStringSet(key, currentSet - doseId)
+            val intent = Intent(
+                context,
+                MedicationAlarmReceiver::class.java
+            ).apply {
+                action = ACTION_MEDICATION_ALARM
             }
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestCodeForDose(doseId),
+                intent,
+                PendingIntent.FLAG_NO_CREATE or
+                        PendingIntent.FLAG_IMMUTABLE
+            )
+
+            if (pendingIntent != null) {
+                manager?.cancel(pendingIntent)
+                pendingIntent.cancel()
+            }
+        } catch (error: Exception) {
+            Log.e(
+                TAG,
+                "Chưa hủy được báo thức trên hệ thống.",
+                error
+            )
         }
+
+        // Xóa cả dữ liệu khôi phục để liều đã xử lý
+        // không được đặt báo thức lại sau khi khởi động máy.
+        val prefs = getPrefs(context)
+
+        val editor = prefs.edit()
+            .remove(PAYLOAD_PREFIX + doseId)
+
+        prefs.all.keys
+            .filter {
+                it.startsWith("doses_")
+            }
+            .forEach { key ->
+                val ids = prefs.getStringSet(
+                    key,
+                    emptySet()
+                ).orEmpty()
+
+                if (doseId in ids) {
+                    editor.putStringSet(
+                        key,
+                        ids - doseId
+                    )
+                }
+            }
+
         editor.apply()
     }
 
-    fun getScheduledDosesForUid(context: Context, uid: String): Set<String> {
-        return getPrefs(context).getStringSet("doses_$uid", emptySet()) ?: emptySet()
+    @Synchronized
+    fun cancelAll(
+        context: Context,
+        uid: String
+    ) {
+        if (uid.isBlank()) return
+
+        getScheduledDosesForUid(
+            context,
+            uid
+        ).forEach { doseId ->
+            cancel(context, doseId)
+        }
+
+        getPrefs(context).edit()
+            .remove("doses_$uid")
+            .apply()
     }
 
-    private fun clearTrackingForUid(context: Context, uid: String) {
-        getPrefs(context).edit().remove("doses_$uid").apply()
+    @Synchronized
+    fun getScheduledDosesForUid(
+        context: Context,
+        uid: String
+    ): Set<String> {
+        if (uid.isBlank()) return emptySet()
+
+        return getPrefs(context)
+            .getStringSet(
+                "doses_$uid",
+                emptySet()
+            )
+            .orEmpty()
+            .toSet()
+    }
+
+    @Synchronized
+    fun restoreSavedAlarms(
+        context: Context,
+        uid: String,
+        nowMillis: Long = System.currentTimeMillis()
+    ): Int {
+        if (uid.isBlank()) return 0
+
+        var restoredCount = 0
+
+        getScheduledDosesForUid(
+            context,
+            uid
+        ).forEach { doseId ->
+            // Chỉ khôi phục ID liều đúng cấu trúc API.
+            if (!apiDosePattern.matches(doseId)) {
+                return@forEach
+            }
+
+            val alarm = readAlarm(
+                context,
+                uid,
+                doseId
+            ) ?: return@forEach
+
+            if (
+                !isValidScheduleTime(
+                    alarm.triggerAtMillis,
+                    nowMillis
+                )
+            ) {
+                cancel(context, doseId)
+                return@forEach
+            }
+
+            if (scheduleSavedAlarm(context, alarm)) {
+                restoredCount++
+            }
+        }
+
+        return restoredCount
+    }
+
+    private fun getPrefs(
+        context: Context
+    ) = context.getSharedPreferences(
+        PREFS_NAME,
+        Context.MODE_PRIVATE
+    )
+
+    private fun saveAlarm(
+        context: Context,
+        alarm: SavedAlarm
+    ) {
+        val prefs = getPrefs(context)
+
+        val ids = prefs.getStringSet(
+            "doses_${alarm.uid}",
+            emptySet()
+        )
+            .orEmpty()
+            .toSet()
+
+        val payload = JSONObject()
+            .put("uid", alarm.uid)
+            .put("doseId", alarm.doseId)
+            .put("triggerAtMillis", alarm.triggerAtMillis)
+            .put("title", alarm.title)
+            .put("message", alarm.message)
+            .put("medicineName", alarm.medicineName)
+
+        prefs.edit()
+            .putStringSet(
+                "doses_${alarm.uid}",
+                ids + alarm.doseId
+            )
+            .putString(
+                PAYLOAD_PREFIX + alarm.doseId,
+                payload.toString()
+            )
+            .apply()
+    }
+
+    private fun readAlarm(
+        context: Context,
+        uid: String,
+        doseId: String
+    ): SavedAlarm? {
+        val text = getPrefs(context)
+            .getString(
+                PAYLOAD_PREFIX + doseId,
+                null
+            )
+            ?: return null
+
+        return runCatching {
+            val payload = JSONObject(text)
+
+            if (
+                payload.optString("uid") != uid ||
+                payload.optString("doseId") != doseId
+            ) {
+                return@runCatching null
+            }
+
+            SavedAlarm(
+                uid = uid,
+                doseId = doseId,
+                triggerAtMillis = payload.optLong(
+                    "triggerAtMillis",
+                    0L
+                ),
+                title = payload.optString(
+                    "title",
+                    "Nhắc uống thuốc"
+                ),
+                message = payload.optString(
+                    "message",
+                    ""
+                ),
+                medicineName = payload.optString(
+                    "medicineName",
+                    ""
+                )
+            )
+        }.getOrNull()
     }
 }
