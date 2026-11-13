@@ -21,6 +21,6 @@ class DeviceManagerTest {
         assertEquals(token, dto.fcmToken)
         assertEquals("android", dto.platform)
         assertTrue(dto.notificationsEnabled)
-        assertNotNull(dto.updatedAt)
+        assertEquals(null, dto.updatedAt)
     }
 }

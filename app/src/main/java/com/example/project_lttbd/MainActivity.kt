@@ -31,6 +31,7 @@ import com.example.project_lttbd.ui.navigation.MMRADestinations
 import com.example.project_lttbd.ui.navigation.MMRANavHost
 import com.example.project_lttbd.ui.navigation.mmraBottomNavItems
 import com.example.project_lttbd.ui.theme.MMRATheme
+import com.example.project_lttbd.data.debug.FirebaseAuthDebug
 
 class MainActivity : ComponentActivity() {
 
@@ -45,7 +46,7 @@ class MainActivity : ComponentActivity() {
 
         // Kiểm tra Firebase ID token với backend ở bản debug.
         BackendSessionCheck.run(this)
-
+        FirebaseAuthDebug.printIdTokenForLocalTesting()
         // Thông tin phục vụ kiểm thử Firebase Cloud Messaging.
         android.util.Log.d(
             "MMRA_FCM_TEST",
@@ -215,7 +216,18 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        val explicitDoseId = intent.getStringExtra(NotificationHelper.EXTRA_DOSE_ID)?.trim()
+        val notifUid = intent.getStringExtra(NotificationHelper.EXTRA_UID)?.trim()
+        val currentUid = FirebaseProvider.auth.currentUser?.uid
+
+        // Nếu thông báo gắn với UID cụ thể nhưng tài khoản hiện tại không khớp -> hủy điều hướng
+        if (!notifUid.isNullOrEmpty() && !currentUid.isNullOrEmpty() && notifUid != currentUid) {
+            pendingDestination.value = null
+            return
+        }
+
         val requestedRoute = sequenceOf(
+            if (!explicitDoseId.isNullOrEmpty()) "reminder/$explicitDoseId?readOnly=false" else null,
             intent.getStringExtra(
                 NotificationHelper.EXTRA_DESTINATION
             ),
@@ -242,12 +254,14 @@ class MainActivity : ComponentActivity() {
             MMRADestinations.HISTORY,
             MMRADestinations.FAMILY,
             MMRADestinations.ACCOUNT,
-            MMRADestinations.MY_ACCOUNT
+            MMRADestinations.MY_ACCOUNT,
+            MMRADestinations.NOTIFICATIONS
         )
 
-        pendingDestination.value = requestedRoute
-            ?.takeIf { it in allowedRoutes }
-            ?: MMRADestinations.HOME
+        val isReminderRoute = requestedRoute?.startsWith("reminder/") == true
+        val isAllowed = requestedRoute != null && (requestedRoute in allowedRoutes || isReminderRoute)
+
+        pendingDestination.value = if (isAllowed) requestedRoute else MMRADestinations.HOME
 
         // Đánh dấu đã nhận đích đến,
         // giữ dữ liệu Firebase cho Analytics.

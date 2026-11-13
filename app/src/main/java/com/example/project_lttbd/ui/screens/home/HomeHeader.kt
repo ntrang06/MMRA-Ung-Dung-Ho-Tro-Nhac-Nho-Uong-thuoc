@@ -3,6 +3,7 @@ package com.example.project_lttbd.ui.screens.home
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -39,7 +41,8 @@ fun HomeHeader(
     onNotificationsClick: () -> Unit,
     onAccountClick: () -> Unit,
     modifier: Modifier = Modifier,
-    avatarBitmap: Bitmap? = null
+    avatarBitmap: Bitmap? = null,
+    hasUnreadNotifications: Boolean = false
 ) {
     Row(
         modifier = modifier
@@ -78,15 +81,31 @@ fun HomeHeader(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                onClick = onNotificationsClick,
+            Box(
                 modifier = Modifier.size(44.dp),
-                shape = CircleShape,
-                color = Color(0xFFEEF5F3)
+                contentAlignment = Alignment.Center
             ) {
-                NotificationBell(
-                    modifier = Modifier.padding(11.dp)
-                )
+                Surface(
+                    onClick = onNotificationsClick,
+                    modifier = Modifier.fillMaxSize(),
+                    shape = CircleShape,
+                    color = Color(0xFFEEF5F3)
+                ) {
+                    NotificationBell(
+                        modifier = Modifier.padding(11.dp)
+                    )
+                }
+
+                if (hasUnreadNotifications) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 9.dp, end = 9.dp)
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE53935))
+                    )
+                }
             }
 
             Surface(

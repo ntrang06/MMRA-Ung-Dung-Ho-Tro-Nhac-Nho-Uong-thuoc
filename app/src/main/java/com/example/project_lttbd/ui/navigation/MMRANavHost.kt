@@ -79,6 +79,10 @@ import com.example.project_lttbd.ui.screens.family.InviteFamilyScreen
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineDraft
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineScreen
 import com.example.project_lttbd.ui.screens.medicine.MedicineScreen
+import com.example.project_lttbd.ui.screens.notifications.NotificationHistoryScreen
+import com.example.project_lttbd.notifications.storage.LocalNotificationStore
+import com.example.project_lttbd.notifications.sync.MedicationReminderSync
+import com.example.project_lttbd.notifications.alarm.MedicationAlarmScheduler
 import com.example.project_lttbd.ui.screens.reminder.DoseReminderScreen
 import com.example.project_lttbd.ui.screens.reminder.ReminderNoticeUiModel
 import com.example.project_lttbd.ui.screens.reminder.rememberReminderSpeech
@@ -784,6 +788,45 @@ fun MMRANavHost(
                     navController.navigate(MMRADestinations.MY_ACCOUNT) {
                         launchSingleTop = true
                     }
+                },
+                onNotificationsClick = {
+                    navController.navigate(MMRADestinations.NOTIFICATIONS) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable(MMRADestinations.NOTIFICATIONS) {
+            val context = LocalContext.current
+            val currentUid = FirebaseProvider.auth.currentUser?.uid.orEmpty()
+            var notifications by remember {
+                mutableStateOf(LocalNotificationStore.getNotifications(context, currentUid))
+            }
+
+            NotificationHistoryScreen(
+                notifications = notifications,
+                onNotificationClick = { item ->
+                    LocalNotificationStore.markAsRead(context, currentUid, item.id)
+                    notifications = LocalNotificationStore.getNotifications(context, currentUid)
+                    if (item.destinationRoute.isNotBlank()) {
+                        navController.navigate(item.destinationRoute) {
+                            launchSingleTop = true
+                        }
+                    } else if (item.doseId.isNotBlank()) {
+                        navController.openReminder(item.doseId)
+                    }
+                },
+                onMarkAllAsRead = {
+                    LocalNotificationStore.markAllAsRead(context, currentUid)
+                    notifications = LocalNotificationStore.getNotifications(context, currentUid)
+                },
+                onClearAll = {
+                    LocalNotificationStore.clearAll(context, currentUid)
+                    notifications = emptyList()
+                },
+                onBackClick = {
+                    navController.popBackStack()
                 }
             )
         }
@@ -1569,6 +1612,7 @@ private fun ReminderDestination(
     readOnly: Boolean,
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val dose = MockReminderDoses.findById(doseId)
 
     var dialog by rememberSaveable(doseId) {
@@ -1642,6 +1686,17 @@ private fun ReminderDestination(
                     MockDoseAction.SNOOZED
                 )
 
+                val currentUid = FirebaseProvider.auth.currentUser?.uid.orEmpty()
+                MedicationAlarmScheduler.scheduleSnooze(
+                    context = context,
+                    uid = currentUid,
+                    doseId = dose.doseId,
+                    snoozeMinutes = 10,
+                    title = "Nhắc lại: ${dose.medicineName}",
+                    message = "${dose.quantityText}. ${dose.mealInstruction}".trim(),
+                    medicineName = dose.medicineName
+                )
+
                 dialog = "SNOOZED"
             }
         },
@@ -1699,7 +1754,7 @@ private fun ReminderDestination(
                                     dose.doseId,
                                     MockDoseAction.TAKEN
                                 )
-
+                                MedicationReminderSync.onDoseAction(context, dose.doseId)
                                 dialog = "TAKEN"
                             }
 
@@ -1708,7 +1763,7 @@ private fun ReminderDestination(
                                     dose.doseId,
                                     MockDoseAction.SKIPPED
                                 )
-
+                                MedicationReminderSync.onDoseAction(context, dose.doseId)
                                 dialog = "SKIPPED"
                             }
 
