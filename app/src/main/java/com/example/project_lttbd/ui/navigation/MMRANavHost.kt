@@ -98,6 +98,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.project_lttbd.ui.screens.medicine.MedicineDeleteAction
+import com.example.project_lttbd.ui.screens.schedule.ScheduleCreateScreen
+
 private const val MANUAL_MEDICINE_DRAFT_KEY = "manual_medicine_draft"
 
 @Composable
@@ -869,7 +871,46 @@ fun MMRANavHost(
                 entry.arguments?.getString("medicineId")
             )
         }
+        composable(
+            route = "${MMRADestinations.SCHEDULE_SETUP}/{medicineId}",
+            arguments = listOf(
+                navArgument("medicineId") {
+                    type = NavType.StringType
+                }
+            )
+        ) { entry ->
+            ScheduleCreateScreen(
+                medicineId = entry.arguments
+                    ?.getString("medicineId")
+                    .orEmpty(),
 
+                onBackClick = {
+                    navController.popBackStack()
+                },
+
+                onSaved = {
+                    Toast.makeText(
+                        context,
+                        "Đã lưu lịch uống",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    if (
+                        !navController.popBackStack(
+                            MMRADestinations.MEDICINE,
+                            false
+                        )
+                    ) {
+                        navController.navigate(
+                            MMRADestinations.MEDICINE
+                        ) {
+                            popUpTo(MMRADestinations.HOME)
+                            launchSingleTop = true
+                        }
+                    }
+                }
+            )
+        }
         composable(MMRADestinations.SCHEDULE_SETUP) { entry ->
             val saved = remember(entry) {
                 navController.previousBackStackEntry
@@ -1447,8 +1488,11 @@ private fun MedicineEntryDestination(
             text = {
                 Column {
                     Text(
-                        "Lưu thông tin ${draft.medicineName}. " +
-                                "Bước này chưa thiết lập lịch uống."
+                        if (medicineId == null) {
+                            "Lưu ${draft.medicineName} rồi tiếp tục thiết lập lịch uống."
+                        } else {
+                            "Lưu thay đổi thông tin ${draft.medicineName}."
+                        }
                     )
 
                     if (hasLocalImage) {
@@ -1521,7 +1565,28 @@ private fun MedicineEntryDestination(
                                         Toast.LENGTH_SHORT
                                     ).show()
 
-                                    if (
+                                    saving = false
+
+                                    if (medicineId == null) {
+                                        val newId = task.result as? String
+
+                                        if (newId.isNullOrBlank()) {
+                                            saveError =
+                                                "Chưa nhận được mã thuốc vừa lưu."
+                                        } else {
+                                            navController.navigate(
+                                                "${MMRADestinations.SCHEDULE_SETUP}/${Uri.encode(newId)}"
+                                            ) {
+                                                popUpTo(
+                                                    MMRADestinations.MANUAL_MEDICINE
+                                                ) {
+                                                    inclusive = true
+                                                }
+
+                                                launchSingleTop = true
+                                            }
+                                        }
+                                    } else if (
                                         !navController.popBackStack(
                                             MMRADestinations.MEDICINE,
                                             false

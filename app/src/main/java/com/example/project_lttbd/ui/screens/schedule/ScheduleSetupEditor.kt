@@ -20,6 +20,10 @@ import com.example.project_lttbd.ui.components.MMRATextField
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineDraft
 import java.util.Calendar
 import kotlin.math.roundToInt
+import androidx.activity.compose.BackHandler
+import com.example.project_lttbd.data.remote.ScheduleException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 data class ScheduleSharingOption(
     val id: String,
@@ -85,9 +89,17 @@ fun ScheduleSetupEditor(
     modifier: Modifier = Modifier,
     linkedPeople: List<ScheduleSharingOption> = emptyList(),
     onBackClick: () -> Unit = {},
-    onSaved: (String) -> Unit = {}
+    onSaved: (String) -> Unit = {},
+    saveAction: (suspend (MockMedicineSchedule) -> String)? = null,
+    stepLabel: String = "Bước 3/3 • Kiểm tra và lưu"
 ) {
-    val previous = MockMedicines.findById(medicineId)
+    val scope = rememberCoroutineScope()
+
+    val previous = if (saveAction == null) {
+        MockMedicines.findById(medicineId)
+    } else {
+        null
+    }
 
     var schedule by rememberSaveable(medicineId) {
         mutableStateOf(
@@ -111,6 +123,8 @@ fun ScheduleSetupEditor(
         mutableStateOf(false)
     }
 
+    BackHandler(enabled = saving) {}
+
     val fullName = listOf(
         draft.medicineName,
         if (draft.strength.isBlank()) {
@@ -133,19 +147,23 @@ fun ScheduleSetupEditor(
     ScheduleSetupScreen(
         state = ScheduleSetupUiModel(
             medicineName = fullName,
+            stepLabel = stepLabel,
             dosageForm = draft.dosageForm,
             medicineCode = previous?.medicineCode.orEmpty(),
             confirmed = false,
+
             quantityText = if (schedule.quantity.isBlank()) {
                 "Chưa thiết lập"
             } else {
                 schedule.quantityText
             },
+
             frequencyText = if (schedule.times.isEmpty()) {
                 "Chưa thiết lập"
             } else {
                 frequencyLabel(schedule)
             },
+
             timesText = if (schedule.times.isEmpty()) {
                 "Chưa chọn giờ"
             } else {
@@ -155,58 +173,117 @@ fun ScheduleSetupEditor(
                         MockCalendar.time(it)
                     }
             },
+
             reminderText = if (schedule.reminderMinutes == 0) {
                 "Nhắc đúng giờ"
             } else {
                 "Nhắc trước ${schedule.reminderMinutes} phút"
             },
+
             mealInstruction = schedule.meal.ifBlank {
                 "Không có ghi chú về thức ăn"
             },
+
             periodText = period,
+
             stockText = schedule.stock?.let {
                 "$it ${schedule.unit}"
             } ?: "Chưa nhập",
+
             stockReminderText = schedule.lowStock?.let {
                 "Nhắc mua thêm khi còn $it ${schedule.unit}"
             }.orEmpty(),
+
             sharingText = schedule.sharingName.ifBlank {
                 "Không chia sẻ"
             },
+
             sharingDescription = if (schedule.sharingId == null) {
                 ""
             } else {
                 "Theo quyền chia sẻ của kết nối hiện có"
             }
         ),
+
         modifier = modifier,
-        onBackClick = onBackClick,
-        onFieldClick = {
-            fieldName = it.name
+
+        onBackClick = {
+            if (!saving) onBackClick()
         },
+
+        onFieldClick = {
+            if (!saving) {
+                if (
+                    saveAction != null &&
+                    it in setOf(
+                        ScheduleSetupField.STOCK,
+                        ScheduleSetupField.SHARING
+                    )
+                ) {
+                    error =
+                        "Theo dõi số lượng và chia sẻ lịch " +
+                                "chưa được hỗ trợ ở bước này."
+                } else {
+                    fieldName = it.name
+                }
+            }
+        },
+
         onSaveClick = {
             if (!saving) {
                 error = scheduleError(schedule)
 
                 if (error == null) {
                     saving = true
+                    val pending = schedule
 
-                    try {
-                        val id = MockMedicines.save(
-                            draft = draft,
-                            schedule = schedule,
-                            id = medicineId
-                        )
-                        onSaved(id)
-                    } catch (_: IllegalArgumentException) {
-                        saving = false
-                        error =
-                            "Chưa lưu được. Hãy kiểm tra thông tin thuốc và lịch uống."
+                    scope.launch {
+                        try {
+                            val id = if (saveAction != null) {
+                                saveAction(pending)
+                            } else {
+                                MockMedicines.save(
+                                    draft = draft,
+                                    schedule = pending,
+                                    id = medicineId
+                                )
+                            }
+
+                            onSaved(id)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (exception: ScheduleException) {
+                            error = exception.message
+                        } catch (exception: IllegalArgumentException) {
+                            error = exception.message
+                                ?: "Chưa lưu được lịch uống. Vui lòng thử lại."
+                        } catch (_: Exception) {
+                            error =
+                                "Chưa lưu được lịch uống. Vui lòng thử lại."
+                        } finally {
+                            saving = false
+                        }
                     }
                 }
             }
         }
     )
+
+    if (saving) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = {
+                Text("Đang lưu lịch uống")
+            },
+            text = {
+                Column {
+                    CircularProgressIndicator()
+                    Text("Vui lòng chờ máy chủ xác nhận…")
+                }
+            },
+            confirmButton = {}
+        )
+    }
 
     fieldName?.let { value ->
         ScheduleFieldDialog(

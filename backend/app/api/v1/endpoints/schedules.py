@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Response
@@ -14,6 +15,8 @@ from app.schemas.medication import (
 from app.services import schedule_service
 
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(
     prefix="/schedules",
     tags=["Schedules"],
@@ -23,6 +26,11 @@ router = APIRouter(
 def _unavailable(
     message: str = "Chưa tải được lịch uống. Vui lòng thử lại.",
 ) -> HTTPException:
+    # In lỗi gốc ra terminal chạy Uvicorn.
+    logger.exception(
+        "Lỗi khi xử lý lịch uống trên Firestore"
+    )
+
     return HTTPException(
         status_code=503,
         detail={

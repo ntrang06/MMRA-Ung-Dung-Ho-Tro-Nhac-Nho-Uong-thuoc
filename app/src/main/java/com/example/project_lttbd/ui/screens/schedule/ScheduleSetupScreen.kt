@@ -55,7 +55,8 @@ fun ScheduleSetupScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             ScheduleSetupHeader(
-                onBackClick = onBackClick
+                onBackClick = onBackClick,
+                stepLabel = state.stepLabel
             )
 
             ScheduleMedicineSummary(
@@ -174,7 +175,8 @@ fun ScheduleSetupScreen(
 
 @Composable
 private fun ScheduleSetupHeader(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    stepLabel: String
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -217,7 +219,7 @@ private fun ScheduleSetupHeader(
             )
 
             Text(
-                text = "Bước 3/3 • Kiểm tra và lưu",
+                text = stepLabel,
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontSize = 13.sp,
                     lineHeight = 19.5.sp,
