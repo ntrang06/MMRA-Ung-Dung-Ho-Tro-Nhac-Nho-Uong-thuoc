@@ -48,6 +48,16 @@ class MedicineListState(
     var ownerName by mutableStateOf("bạn")
         private set
 
+    var hasLoadedMedicines by mutableStateOf(false)
+        private set
+
+    var hasLoadedSchedules by mutableStateOf(false)
+        private set
+
+    var hasFinishedInitialLoad by mutableStateOf(false)
+        private set
+
+    private var ownerUid: String? = null
     private var authListener: FirebaseAuth.AuthStateListener? = null
     private var scope: CoroutineScope? = null
     private var requestJob: Job? = null
@@ -56,7 +66,9 @@ class MedicineListState(
     fun start() {
         if (authListener != null) return
 
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        scope = CoroutineScope(
+            SupervisorJob() + Dispatchers.Main.immediate
+        )
 
         val listener = FirebaseAuth.AuthStateListener {
             refresh()
@@ -89,8 +101,15 @@ class MedicineListState(
         }
 
         val uid = user.uid
-        val version = ++requestVersion
 
+        if (ownerUid != uid) {
+            clearUserData()
+            ownerUid = uid
+        }
+
+        if (isLoading || isSchedulesLoading) return
+
+        val version = ++requestVersion
         requestJob?.cancel()
 
         isSignedIn = true
@@ -99,8 +118,6 @@ class MedicineListState(
             ?.takeIf { it.isNotEmpty() }
             ?: "bạn"
 
-        medicines = emptyList()
-        schedules = emptyList()
         errorMessage = null
         scheduleErrorMessage = null
         isLoading = true
@@ -113,6 +130,7 @@ class MedicineListState(
 
                     if (isCurrentRequest(version, uid)) {
                         medicines = result
+                        hasLoadedMedicines = true
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -124,6 +142,7 @@ class MedicineListState(
                 } finally {
                     if (isCurrentRequest(version, uid)) {
                         isLoading = false
+                        finishInitialLoadIfReady()
                     }
                 }
             }
@@ -134,6 +153,7 @@ class MedicineListState(
 
                     if (isCurrentRequest(version, uid)) {
                         schedules = result
+                        hasLoadedSchedules = true
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -146,9 +166,16 @@ class MedicineListState(
                 } finally {
                     if (isCurrentRequest(version, uid)) {
                         isSchedulesLoading = false
+                        finishInitialLoadIfReady()
                     }
                 }
             }
+        }
+    }
+
+    private fun finishInitialLoadIfReady() {
+        if (!isLoading && !isSchedulesLoading) {
+            hasFinishedInitialLoad = true
         }
     }
 
@@ -166,6 +193,7 @@ class MedicineListState(
 
         requestJob?.cancel()
         requestJob = null
+        ownerUid = null
 
         medicines = emptyList()
         schedules = emptyList()
@@ -175,5 +203,9 @@ class MedicineListState(
         errorMessage = null
         scheduleErrorMessage = null
         ownerName = "bạn"
+
+        hasLoadedMedicines = false
+        hasLoadedSchedules = false
+        hasFinishedInitialLoad = false
     }
 }

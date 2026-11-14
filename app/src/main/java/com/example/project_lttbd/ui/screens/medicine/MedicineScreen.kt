@@ -8,10 +8,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -75,10 +77,14 @@ fun MedicineScreen(
     val medicines = state.medicines.map { record ->
         record.toMedicineUiModel(
             schedules = state.schedules,
-            schedulesLoading = state.isSchedulesLoading,
-            schedulesFailed = state.scheduleErrorMessage != null
+            schedulesLoading = state.isSchedulesLoading &&
+                    !state.hasLoadedSchedules,
+            schedulesFailed = state.scheduleErrorMessage != null &&
+                    !state.hasLoadedSchedules
         )
     }
+
+    val busy = state.isLoading || state.isSchedulesLoading
 
     MedicineScreenContent(
         modifier = modifier,
@@ -86,7 +92,12 @@ fun MedicineScreen(
         ownerName = UserProfileManager.name.ifBlank {
             state.ownerName
         },
-        isLoading = state.isLoading || state.isSchedulesLoading,
+        isLoading = busy &&
+                (!state.hasFinishedInitialLoad || !state.hasLoadedMedicines),
+        isRefreshing = busy &&
+                state.hasFinishedInitialLoad &&
+                state.hasLoadedMedicines,
+        hasLoadedMedicines = state.hasLoadedMedicines,
         isSignedIn = state.isSignedIn,
         errorMessage = state.errorMessage,
         scheduleErrorMessage = state.scheduleErrorMessage,
@@ -99,6 +110,7 @@ fun MedicineScreen(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MedicineScreenContent(
     medicines: List<MedicineUiModel>,
@@ -111,7 +123,9 @@ private fun MedicineScreenContent(
     onAddMedicineClick: () -> Unit,
     onAccountClick: () -> Unit,
     modifier: Modifier = Modifier,
-    scheduleErrorMessage: String? = null
+    scheduleErrorMessage: String? = null,
+    isRefreshing: Boolean = false,
+    hasLoadedMedicines: Boolean = true
 ) {
     var searchQuery by rememberSaveable {
         mutableStateOf("")
@@ -136,144 +150,149 @@ private fun MedicineScreenContent(
         }
         .uppercase()
 
-    Column(
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            if (isSignedIn && !isLoading && !isRefreshing) {
+                onRetry()
+            }
+        },
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFF7FAF9))
             .imePadding()
-            .verticalScroll(rememberScrollState())
     ) {
-        MedicineHeader(
-            ownerName = ownerName,
-            initials = initials,
-            onAccountClick = onAccountClick
-        )
-
         Column(
-            modifier = Modifier.padding(
-                start = 20.dp,
-                top = 6.dp,
-                end = 20.dp,
-                bottom = 20.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
         ) {
-            when {
-                isLoading -> {
-                    MedicineListSkeleton()
-                }
+            MedicineHeader(
+                ownerName = ownerName,
+                initials = initials,
+                onAccountClick = onAccountClick
+            )
 
-                !isSignedIn -> {
-                    Text(
-                        text = "Vui lòng đăng nhập để xem danh sách thuốc.",
-                        modifier = Modifier.padding(top = 16.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF526565)
-                    )
-
-                    TextButton(
-                        onClick = onAccountClick
-                    ) {
-                        Text(
-                            text = "Mở tài khoản",
-                            color = Color(0xFF126B62)
-                        )
+            Column(
+                modifier = Modifier.padding(
+                    start = 20.dp,
+                    top = 6.dp,
+                    end = 20.dp,
+                    bottom = 20.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                when {
+                    isLoading -> {
+                        MedicineListSkeleton()
                     }
-                }
 
-                errorMessage != null -> {
-                    Text(
-                        text = errorMessage,
-                        modifier = Modifier.padding(top = 16.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
-
-                    TextButton(
-                        onClick = onRetry
-                    ) {
+                    !isSignedIn -> {
                         Text(
-                            text = "Thử lại",
-                            color = Color(0xFF126B62)
-                        )
-                    }
-                }
-
-                else -> {
-                    if (scheduleErrorMessage != null) {
-                        Text(
-                            text = "Chưa tải được lịch uống. " +
-                                    scheduleErrorMessage,
+                            text = "Vui lòng đăng nhập để xem danh sách thuốc.",
+                            modifier = Modifier.padding(top = 16.dp),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
+                            color = Color(0xFF526565)
                         )
 
-                        TextButton(
-                            onClick = onRetry
-                        ) {
+                        TextButton(onClick = onAccountClick) {
                             Text(
-                                text = "Tải lại lịch uống",
+                                text = "Mở tài khoản",
                                 color = Color(0xFF126B62)
                             )
                         }
                     }
 
-                    MMRASearchField(
-                        value = searchQuery,
-                        onValueChange = {
-                            searchQuery = it
-                        },
-                        placeholder = "Tìm tên thuốc"
-                    )
-
-                    Text(
-                        text = if (query.isEmpty()) {
-                            "${medicines.size} thuốc"
-                        } else {
-                            "${visibleMedicines.size} kết quả"
-                        },
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 17.sp,
-                            lineHeight = 22.sp,
-                            letterSpacing = 0.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = Color(0xFF102A2A)
-                    )
-
-                    if (visibleMedicines.isEmpty()) {
+                    errorMessage != null && !hasLoadedMedicines -> {
                         Text(
-                            text = if (medicines.isEmpty()) {
-                                "Bạn chưa thêm thuốc nào."
-                            } else {
-                                "Không tìm thấy thuốc phù hợp."
-                            },
-                            modifier = Modifier.padding(vertical = 16.dp),
+                            text = errorMessage,
+                            modifier = Modifier.padding(top = 16.dp),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF526565)
+                            color = MaterialTheme.colorScheme.error
                         )
-                    } else {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            visibleMedicines.forEach { medicine ->
-                                MedicineCard(
-                                    medicine = medicine,
-                                    onClick = onMedicineClick
-                                )
+
+                        TextButton(onClick = onRetry) {
+                            Text(
+                                text = "Thử lại",
+                                color = Color(0xFF126B62)
+                            )
+                        }
+                    }
+
+                    else -> {
+                        if (errorMessage != null) {
+                            Text(
+                                text = errorMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+
+                        if (scheduleErrorMessage != null) {
+                            Text(
+                                text = scheduleErrorMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+
+                        MMRASearchField(
+                            value = searchQuery,
+                            onValueChange = {
+                                searchQuery = it
+                            },
+                            placeholder = "Tìm tên thuốc"
+                        )
+
+                        Text(
+                            text = if (query.isEmpty()) {
+                                "${medicines.size} thuốc"
+                            } else {
+                                "${visibleMedicines.size} kết quả"
+                            },
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontSize = 17.sp,
+                                lineHeight = 22.sp,
+                                letterSpacing = 0.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = Color(0xFF102A2A)
+                        )
+
+                        if (visibleMedicines.isEmpty()) {
+                            Text(
+                                text = if (medicines.isEmpty()) {
+                                    "Bạn chưa thêm thuốc nào."
+                                } else {
+                                    "Không tìm thấy thuốc phù hợp."
+                                },
+                                modifier = Modifier.padding(vertical = 16.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF526565)
+                            )
+                        } else {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                visibleMedicines.forEach { medicine ->
+                                    MedicineCard(
+                                        medicine = medicine,
+                                        onClick = onMedicineClick
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            if (isSignedIn && !isLoading) {
-                AddMedicineButton(
-                    onClick = onAddMedicineClick
-                )
-            }
+                if (isSignedIn && !isLoading) {
+                    AddMedicineButton(
+                        onClick = onAddMedicineClick
+                    )
+                }
 
-            MedicineNotice()
+                MedicineNotice()
+            }
         }
     }
 }

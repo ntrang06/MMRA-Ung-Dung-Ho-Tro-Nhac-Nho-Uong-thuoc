@@ -16,10 +16,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -63,6 +65,7 @@ import kotlinx.coroutines.launch
 
 private data class DailyDoseLoad(
     val loading: Boolean = true,
+    val hasLoaded: Boolean = false,
     val doses: List<DoseResponseDto> = emptyList(),
     val error: String? = null
 )
@@ -113,7 +116,6 @@ fun ScheduleScreen(
 
     val ownerUid = rememberScheduleOwnerUid()
 
-    // Đổi tài khoản sẽ tạo lại toàn bộ trạng thái của màn này.
     key(ownerUid) {
         DailyScheduleContent(
             ownerUid = ownerUid,
@@ -131,7 +133,6 @@ private fun DailyScheduleContent(
 ) {
     val context = LocalContext.current
     val now = rememberUiNow()
-
     val todayMillis = scheduleDayMillis(now)
 
     var selectedDateMillis by rememberSaveable {
@@ -157,7 +158,10 @@ private fun DailyScheduleContent(
     }
 
     LaunchedEffect(ownerUid, dateKey, revision) {
-        loaded = DailyDoseLoad()
+        loaded = loaded.copy(
+            loading = true,
+            error = null
+        )
 
         if (ownerUid == null) {
             loaded = DailyDoseLoad(loading = false)
@@ -174,6 +178,7 @@ private fun DailyScheduleContent(
 
             loaded = DailyDoseLoad(
                 loading = false,
+                hasLoaded = true,
                 doses = result
                     .filter {
                         it.localDate == dateKey &&
@@ -188,8 +193,6 @@ private fun DailyScheduleContent(
                     )
             )
 
-            // Đồng bộ báo thức bằng kết quả thật từ máy chủ.
-            // Lỗi báo thức cục bộ không biến thành lỗi tải API.
             runCatching {
                 MedicationReminderSync.syncDoses(
                     context = context,
@@ -209,7 +212,7 @@ private fun DailyScheduleContent(
             currentCoroutineContext().ensureActive()
             ensureDailyDoseOwner(ownerUid)
 
-            loaded = DailyDoseLoad(
+            loaded = loaded.copy(
                 loading = false,
                 error = (error as? DoseException)?.message
                     ?: "Chưa tải được lịch uống. Vui lòng thử lại."
@@ -254,6 +257,7 @@ private fun DailyScheduleContent(
             it.toScheduleDoseUiModel()
         },
         loading = loaded.loading,
+        hasLoaded = loaded.hasLoaded,
         signedIn = ownerUid != null,
         error = loaded.error,
         onDateSelected = {
@@ -261,8 +265,13 @@ private fun DailyScheduleContent(
             selectedDateMillis = it
         },
         onRefresh = {
-            selectedDoseId = null
-            revision++
+            if (ownerUid != null && !loaded.loading) {
+                loaded = loaded.copy(
+                    loading = true,
+                    error = null
+                )
+                revision++
+            }
         },
         onDoseClick = {
             selectedDoseId = it
@@ -271,6 +280,7 @@ private fun DailyScheduleContent(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ScheduleListContent(
     selectedDateMillis: Long,
@@ -283,98 +293,110 @@ private fun ScheduleListContent(
     onRefresh: () -> Unit,
     onDoseClick: (String) -> Unit,
     onAccountClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hasLoaded: Boolean = true
 ) {
     val context = LocalContext.current
 
-    Column(
+    PullToRefreshBox(
+        isRefreshing = loading && hasLoaded,
+        onRefresh = {
+            if (signedIn && !loading) {
+                onRefresh()
+            }
+        },
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFF7FAF9))
-            .verticalScroll(rememberScrollState())
     ) {
-        ScheduleHeader(
-            initials = UserProfileManager.getInitials(),
-            onCalendarClick = {
-                val selected = Calendar.getInstance().apply {
-                    timeInMillis = selectedDateMillis
-                }
-
-                DatePickerDialog(
-                    context,
-                    { _, year, month, day ->
-                        val date = Calendar.getInstance().apply {
-                            clear()
-                            set(year, month, day, 12, 0, 0)
-                        }
-
-                        onDateSelected(date.timeInMillis)
-                    },
-                    selected.get(Calendar.YEAR),
-                    selected.get(Calendar.MONTH),
-                    selected.get(Calendar.DAY_OF_MONTH)
-                ).show()
-            },
-            onAccountClick = onAccountClick
-        )
-
         Column(
-            modifier = Modifier.padding(
-                start = 20.dp,
-                top = 6.dp,
-                end = 20.dp,
-                bottom = 20.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
         ) {
-            ScheduleWeekPicker(
-                selectedDateMillis = selectedDateMillis,
-                todayMillis = todayMillis,
-                onDateSelected = onDateSelected
+            ScheduleHeader(
+                initials = UserProfileManager.getInitials(),
+                onCalendarClick = {
+                    val selected = Calendar.getInstance().apply {
+                        timeInMillis = selectedDateMillis
+                    }
+
+                    DatePickerDialog(
+                        context,
+                        { _, year, month, day ->
+                            val date = Calendar.getInstance().apply {
+                                clear()
+                                set(year, month, day, 12, 0, 0)
+                            }
+
+                            onDateSelected(date.timeInMillis)
+                        },
+                        selected.get(Calendar.YEAR),
+                        selected.get(Calendar.MONTH),
+                        selected.get(Calendar.DAY_OF_MONTH)
+                    ).show()
+                },
+                onAccountClick = onAccountClick
             )
 
-            when {
-                !signedIn -> {
-                    Text(
-                        text = "Vui lòng đăng nhập để xem lịch uống.",
-                        color = Color(0xFF526565)
-                    )
+            Column(
+                modifier = Modifier.padding(
+                    start = 20.dp,
+                    top = 6.dp,
+                    end = 20.dp,
+                    bottom = 20.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                ScheduleWeekPicker(
+                    selectedDateMillis = selectedDateMillis,
+                    todayMillis = todayMillis,
+                    onDateSelected = onDateSelected
+                )
 
-                    TextButton(onClick = onAccountClick) {
+                when {
+                    !signedIn -> {
                         Text(
-                            text = "Mở tài khoản",
-                            color = Color(0xFF126B62)
+                            text = "Vui lòng đăng nhập để xem lịch uống.",
+                            color = Color(0xFF526565)
                         )
+
+                        TextButton(onClick = onAccountClick) {
+                            Text(
+                                text = "Mở tài khoản",
+                                color = Color(0xFF126B62)
+                            )
+                        }
                     }
-                }
 
-                loading -> {
-                    DailyDoseListSkeleton()
-                }
+                    loading && !hasLoaded -> {
+                        DailyDoseListSkeleton()
+                    }
 
-                error != null -> {
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error
-                    )
-
-                    TextButton(onClick = onRefresh) {
+                    error != null && !hasLoaded -> {
                         Text(
-                            text = "Thử lại",
-                            color = Color(0xFF126B62)
+                            text = error,
+                            color = MaterialTheme.colorScheme.error
                         )
-                    }
-                }
 
-                else -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                        TextButton(onClick = onRefresh) {
+                            Text(
+                                text = "Thử lại",
+                                color = Color(0xFF126B62)
+                            )
+                        }
+                    }
+
+                    else -> {
+                        if (error != null) {
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+
                         Text(
                             text = "${doses.size} liều thuốc",
-                            modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontSize = 17.sp,
                                 lineHeight = 22.sp,
@@ -384,34 +406,27 @@ private fun ScheduleListContent(
                             color = Color(0xFF102A2A)
                         )
 
-                        TextButton(onClick = onRefresh) {
+                        if (doses.isEmpty()) {
                             Text(
-                                text = "Tải lại",
-                                color = Color(0xFF126B62)
+                                text = "Chưa có liều thuốc cho ngày này.",
+                                modifier = Modifier.padding(vertical = 16.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF526565)
                             )
-                        }
-                    }
+                        } else {
+                            Text(
+                                text = "Chạm vào liều thuốc để xem chi tiết",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF526565)
+                            )
 
-                    if (doses.isEmpty()) {
-                        Text(
-                            text = "Chưa có liều thuốc cho ngày này.",
-                            modifier = Modifier.padding(vertical = 16.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF526565)
-                        )
-                    } else {
-                        Text(
-                            text = "Chạm vào liều thuốc để xem chi tiết",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF526565)
-                        )
-
-                        doses.forEach { dose ->
-                            key(dose.doseId) {
-                                ScheduleDoseCard(
-                                    dose = dose,
-                                    onClick = onDoseClick
-                                )
+                            doses.forEach { dose ->
+                                key(dose.doseId) {
+                                    ScheduleDoseCard(
+                                        dose = dose,
+                                        onClick = onDoseClick
+                                    )
+                                }
                             }
                         }
                     }
@@ -495,23 +510,26 @@ private fun DailyDoseDetail(
                 ensureDailyDoseOwner(ownerUid)
 
                 val updated = when (action) {
-                    DailyDoseAction.TAKEN ->
+                    DailyDoseAction.TAKEN -> {
                         repository.updateDoseAction(
                             doseId = dose.doseId,
                             action = DoseActionDto.TAKEN
                         )
+                    }
 
-                    DailyDoseAction.SKIPPED ->
+                    DailyDoseAction.SKIPPED -> {
                         repository.updateDoseAction(
                             doseId = dose.doseId,
                             action = DoseActionDto.SKIPPED
                         )
+                    }
 
-                    DailyDoseAction.SNOOZE ->
+                    DailyDoseAction.SNOOZE -> {
                         repository.snoozeDose(
                             doseId = dose.doseId,
                             minutes = 10
                         )
+                    }
                 }
 
                 currentCoroutineContext().ensureActive()
@@ -557,7 +575,6 @@ private fun DailyDoseDetail(
                 currentCoroutineContext().ensureActive()
                 ensureDailyDoseOwner(ownerUid)
 
-                // Không gửi lại thao tác khi chưa biết kết quả lần trước.
                 mustReload = true
 
                 errorMessage = (error as? DoseException)?.message
@@ -768,7 +785,10 @@ private fun DailyDoseListSkeleton() {
             modifier = Modifier
                 .width(120.dp)
                 .height(22.dp)
-                .background(brush, RoundedCornerShape(8.dp))
+                .background(
+                    brush,
+                    RoundedCornerShape(8.dp)
+                )
         )
 
         repeat(3) {

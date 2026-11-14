@@ -14,6 +14,12 @@ import retrofit2.http.Query
 
 interface DoseApi {
 
+    @GET("api/v1/history/doses")
+    suspend fun listDoseHistory(
+        @Header("Authorization") authorization: String,
+        @Query("month") month: String
+    ): Response<List<DoseResponseDto>>
+
     @GET("api/v1/doses")
     suspend fun listDoses(
         @Header("Authorization") authorization: String,

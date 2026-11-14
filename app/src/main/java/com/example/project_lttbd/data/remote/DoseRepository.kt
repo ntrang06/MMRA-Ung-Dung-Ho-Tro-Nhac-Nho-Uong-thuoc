@@ -22,6 +22,27 @@ class DoseException(
 class DoseRepository(
     private val api: DoseApi = ScheduleApiClient.doseApi
 ) {
+    suspend fun listDoseHistory(
+        month: String
+    ): List<DoseResponseDto> {
+        require(
+            Regex("[0-9]{4}-(0[1-9]|1[0-2])").matches(month)
+        ) {
+            "Tháng cần có định dạng yyyy-MM."
+        }
+
+        return requireBody(
+            execute(
+                operation = "GET /api/v1/history/doses"
+            ) { authorization ->
+                api.listDoseHistory(
+                    authorization = authorization,
+                    month = month
+                )
+            }
+        )
+    }
+
     suspend fun listDoses(
         date: String
     ): List<DoseResponseDto> {
@@ -155,7 +176,6 @@ class DoseRepository(
         try {
             val response = call(authorization)
 
-            // Bỏ kết quả nếu đã đăng xuất hoặc đổi tài khoản.
             ensureSameUser(uid, response)
 
             if (!response.isSuccessful) {
