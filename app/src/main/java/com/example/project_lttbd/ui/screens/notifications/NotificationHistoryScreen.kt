@@ -17,6 +17,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -46,6 +48,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationHistoryScreen(
     modifier: Modifier = Modifier,
@@ -53,15 +56,20 @@ fun NotificationHistoryScreen(
     onNotificationClick: (LocalNotificationItem) -> Unit,
     onMarkAllAsRead: () -> Unit,
     onClearAll: () -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    isLoading: Boolean = false,
+    isRefreshing: Boolean = false,
+    actionsEnabled: Boolean = true,
+    errorMessage: String? = null,
+    onRefresh: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MmraBackground)
     ) {
-        // Top App Bar
         NotificationTopBar(
+            actionsEnabled = actionsEnabled,
             hasItems = notifications.isNotEmpty(),
             hasUnread = notifications.any { !it.isRead },
             onBackClick = onBackClick,
@@ -69,20 +77,66 @@ fun NotificationHistoryScreen(
             onClearAll = onClearAll
         )
 
-        if (notifications.isEmpty()) {
-            NotificationEmptyState()
-        } else {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                if (!isLoading && actionsEnabled) {
+                    onRefresh()
+                }
+            },
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding =
+                    androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 16.dp,
+                        vertical = 12.dp
+                    ),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(notifications, key = { it.id }) { item ->
-                    NotificationItemRow(
-                        item = item,
-                        onClick = { onNotificationClick(item) }
-                    )
+                if (errorMessage != null) {
+                    item(key = "error") {
+                        Text(
+                            text = errorMessage,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+
+                when {
+                    isLoading -> {
+                        items(3) {
+                            NotificationSkeletonRow()
+                        }
+                    }
+
+                    notifications.isEmpty() && errorMessage == null -> {
+                        item(key = "empty") {
+                            Box(Modifier.fillParentMaxSize()) {
+                                NotificationEmptyState()
+                            }
+                        }
+                    }
+
+                    else -> {
+                        items(
+                            items = notifications,
+                            key = { "notification_${it.id}" }
+                        ) { item ->
+                            NotificationItemRow(
+                                item = item,
+                                enabled = actionsEnabled,
+                                onClick = {
+                                    onNotificationClick(item)
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -91,6 +145,7 @@ fun NotificationHistoryScreen(
 
 @Composable
 private fun NotificationTopBar(
+    actionsEnabled: Boolean,
     hasItems: Boolean,
     hasUnread: Boolean,
     onBackClick: () -> Unit,
@@ -106,7 +161,7 @@ private fun NotificationTopBar(
     ) {
         IconButton(onClick = onBackClick) {
             Icon(
-                painter = painterResource(id = R.drawable.ic_arrow_back),
+                painter = painterResource(R.drawable.ic_arrow_back),
                 contentDescription = "Quay lại",
                 tint = MmraTextPrimary,
                 modifier = Modifier.size(24.dp)
@@ -124,7 +179,10 @@ private fun NotificationTopBar(
         )
 
         if (hasUnread) {
-            TextButton(onClick = onMarkAllAsRead) {
+            TextButton(
+                onClick = onMarkAllAsRead,
+                enabled = actionsEnabled
+            ) {
                 Text(
                     text = "Đã đọc tất cả",
                     fontSize = 13.sp,
@@ -133,7 +191,10 @@ private fun NotificationTopBar(
                 )
             }
         } else if (hasItems) {
-            TextButton(onClick = onClearAll) {
+            TextButton(
+                onClick = onClearAll,
+                enabled = actionsEnabled
+            ) {
                 Text(
                     text = "Xóa hết",
                     fontSize = 13.sp,
@@ -147,17 +208,29 @@ private fun NotificationTopBar(
 @Composable
 private fun NotificationItemRow(
     item: LocalNotificationItem,
+    enabled: Boolean,
     onClick: () -> Unit
 ) {
-    val cardBg = if (item.isRead) MmraSurface else MmraPrimaryContainer.copy(alpha = 0.45f)
+    val cardBackground = if (item.isRead) {
+        MmraSurface
+    } else {
+        MmraPrimaryContainer.copy(alpha = 0.45f)
+    }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(
+                enabled = enabled,
+                onClick = onClick
+            ),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (item.isRead) 1.dp else 2.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = cardBackground
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (item.isRead) 1.dp else 2.dp
+        )
     ) {
         Row(
             modifier = Modifier
@@ -165,26 +238,34 @@ private fun NotificationItemRow(
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon
             Box(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(CircleShape)
-                    .background(if (item.isRead) Color(0xFFE0E0E0) else MmraPrimary),
+                    .background(
+                        if (item.isRead) {
+                            Color(0xFFE0E0E0)
+                        } else {
+                            MmraPrimary
+                        }
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    painter = painterResource(id = R.drawable.chuong),
+                    painter = painterResource(R.drawable.chuong),
                     contentDescription = null,
-                    tint = if (item.isRead) MmraTextSecondary else Color.White,
+                    tint = if (item.isRead) {
+                        MmraTextSecondary
+                    } else {
+                        Color.White
+                    },
                     modifier = Modifier.size(20.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(Modifier.width(12.dp))
 
-            // Text info
-            Column(modifier = Modifier.weight(1f)) {
+            Column(Modifier.weight(1f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -194,7 +275,11 @@ private fun NotificationItemRow(
                         text = item.title,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontSize = 15.sp,
-                            fontWeight = if (item.isRead) FontWeight.SemiBold else FontWeight.Bold,
+                            fontWeight = if (item.isRead) {
+                                FontWeight.SemiBold
+                            } else {
+                                FontWeight.Bold
+                            },
                             color = MmraTextPrimary
                         ),
                         maxLines = 1,
@@ -203,7 +288,9 @@ private fun NotificationItemRow(
                     )
 
                     Text(
-                        text = formatNotificationTime(item.timestampMillis),
+                        text = formatNotificationTime(
+                            item.timestampMillis
+                        ),
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 11.sp,
                             color = MmraTextSecondary
@@ -211,7 +298,7 @@ private fun NotificationItemRow(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(Modifier.height(4.dp))
 
                 Text(
                     text = item.body,
@@ -224,9 +311,9 @@ private fun NotificationItemRow(
                 )
             }
 
-            // Dot indicating unread
             if (!item.isRead) {
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(Modifier.width(8.dp))
+
                 Box(
                     modifier = Modifier
                         .size(8.dp)
@@ -234,6 +321,57 @@ private fun NotificationItemRow(
                         .background(MmraPrimary)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun NotificationSkeletonRow() {
+    val placeholder = Color(0xFFE3E8E6)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MmraSurface)
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(placeholder)
+        )
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(0.8f)
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(placeholder)
+            )
+
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(placeholder)
+            )
+
+            Box(
+                Modifier
+                    .fillMaxWidth(0.5f)
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(placeholder)
+            )
         }
     }
 }
@@ -255,14 +393,14 @@ private fun NotificationEmptyState() {
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                painter = painterResource(id = R.drawable.chuong),
+                painter = painterResource(R.drawable.chuong),
                 contentDescription = null,
                 tint = MmraPrimary,
                 modifier = Modifier.size(36.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp))
 
         Text(
             text = "Bạn chưa có thông báo nào",
@@ -273,7 +411,7 @@ private fun NotificationEmptyState() {
             )
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(Modifier.height(6.dp))
 
         Text(
             text = "Các thông báo nhắc giờ uống thuốc và cảnh báo sức khỏe sẽ xuất hiện tại đây.",
@@ -287,7 +425,8 @@ private fun NotificationEmptyState() {
 }
 
 private fun formatNotificationTime(timestampMillis: Long): String {
-    val date = Date(timestampMillis)
-    val sdf = SimpleDateFormat("HH:mm - dd/MM", Locale.getDefault())
-    return sdf.format(date)
+    return SimpleDateFormat(
+        "HH:mm - dd/MM",
+        Locale.getDefault()
+    ).format(Date(timestampMillis))
 }

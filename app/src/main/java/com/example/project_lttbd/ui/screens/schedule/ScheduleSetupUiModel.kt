@@ -18,7 +18,9 @@ data class ScheduleSetupUiModel(
     val stockReminderText: String = "",
 
     val sharingText: String = "Không chia sẻ",
-    val sharingDescription: String = ""
+    val sharingDescription: String = "",
+
+    val stepLabel: String = "Bước 3/3 • Kiểm tra và lưu"
 )
 
 enum class ScheduleSetupField {

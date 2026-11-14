@@ -37,7 +37,10 @@ fun ScheduleSetupScreen(
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit = {},
     onFieldClick: (ScheduleSetupField) -> Unit = {},
-    onSaveClick: () -> Unit = {}
+    onSaveClick: () -> Unit = {},
+    saveButtonText: String = "Lưu lịch uống",
+    saveEnabled: Boolean = true,
+    footerContent: (@Composable () -> Unit)? = null
 ) {
     Column(
         modifier = modifier
@@ -45,17 +48,20 @@ fun ScheduleSetupScreen(
             .background(Color(0xFFF7FAF9))
             .imePadding()
     ) {
-        // Vùng cuộn chỉ chiếm phần còn lại sau khi chừa chỗ cho nút Lưu.
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+                .padding(
+                    horizontal = 20.dp,
+                    vertical = 14.dp
+                ),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             ScheduleSetupHeader(
-                onBackClick = onBackClick
+                onBackClick = onBackClick,
+                stepLabel = state.stepLabel
             )
 
             ScheduleMedicineSummary(
@@ -149,24 +155,27 @@ fun ScheduleSetupScreen(
             MedicineNotice()
         }
 
-        // Nút Lưu là phần riêng, không nằm trong nội dung cuộn.
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = Color(0xFFF7FAF9)
         ) {
-            Box(
+            Column(
                 modifier = Modifier.padding(
                     start = 20.dp,
                     top = 10.dp,
                     end = 20.dp,
                     bottom = 14.dp
-                )
+                ),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 MMRAButton(
-                    text = "Lưu lịch uống",
+                    text = saveButtonText,
                     onClick = onSaveClick,
+                    enabled = saveEnabled,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                footerContent?.invoke()
             }
         }
     }
@@ -174,7 +183,8 @@ fun ScheduleSetupScreen(
 
 @Composable
 private fun ScheduleSetupHeader(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    stepLabel: String
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -217,7 +227,7 @@ private fun ScheduleSetupHeader(
             )
 
             Text(
-                text = "Bước 3/3 • Kiểm tra và lưu",
+                text = stepLabel,
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontSize = 13.sp,
                     lineHeight = 19.5.sp,
@@ -586,8 +596,17 @@ private fun ScheduleSetupChevron(
         val color = Color(0xFF526565)
         val strokeWidth = 1.8.dp.toPx()
 
-        val outerX = if (pointsLeft) 0.65f else 0.35f
-        val middleX = if (pointsLeft) 0.35f else 0.65f
+        val outerX = if (pointsLeft) {
+            0.65f
+        } else {
+            0.35f
+        }
+
+        val middleX = if (pointsLeft) {
+            0.35f
+        } else {
+            0.65f
+        }
 
         drawLine(
             color = color,

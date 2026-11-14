@@ -17,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -33,7 +34,9 @@ enum class HomeDoseStatus {
     NEXT,
     UPCOMING,
     SNOOZED,
-    SKIPPED
+    SKIPPED,
+    MISSED,
+    UNCONFIRMED
 }
 
 data class HomeDoseUiModel(
@@ -100,10 +103,14 @@ fun TodayScheduleSection(
             )
         } else {
             doses.forEach { dose ->
-                TodayDoseRow(
-                    dose = dose,
-                    onClick = { onDoseClick(dose.doseId) }
-                )
+                key(dose.doseId) {
+                    TodayDoseRow(
+                        dose = dose,
+                        onClick = {
+                            onDoseClick(dose.doseId)
+                        }
+                    )
+                }
             }
         }
     }
@@ -115,11 +122,24 @@ private fun TodayDoseRow(
     onClick: () -> Unit
 ) {
     val statusColor = when (dose.status) {
-        HomeDoseStatus.TAKEN -> Color(0xFF287A4D)
-        HomeDoseStatus.NEXT -> Color(0xFF126B62)
-        HomeDoseStatus.UPCOMING -> Color(0xFF526565)
-        HomeDoseStatus.SNOOZED -> Color(0xFFAA5B00)
-        HomeDoseStatus.SKIPPED -> Color(0xFF526565)
+        HomeDoseStatus.TAKEN ->
+            Color(0xFF287A4D)
+
+        HomeDoseStatus.NEXT ->
+            Color(0xFF126B62)
+
+        HomeDoseStatus.UPCOMING ->
+            Color(0xFF526565)
+
+        HomeDoseStatus.SNOOZED,
+        HomeDoseStatus.UNCONFIRMED ->
+            Color(0xFFAA5B00)
+
+        HomeDoseStatus.SKIPPED ->
+            Color(0xFF526565)
+
+        HomeDoseStatus.MISSED ->
+            Color(0xFFBA3028)
     }
 
     val statusText = when (dose.status) {
@@ -128,14 +148,27 @@ private fun TodayDoseRow(
         HomeDoseStatus.UPCOMING -> "Sắp tới"
         HomeDoseStatus.SNOOZED -> "Nhắc lại"
         HomeDoseStatus.SKIPPED -> "Đã bỏ qua"
+        HomeDoseStatus.MISSED -> "Bỏ lỡ"
+        HomeDoseStatus.UNCONFIRMED -> "Chờ xác nhận"
     }
 
     val iconBackground = when (dose.status) {
-        HomeDoseStatus.TAKEN -> Color(0xFFE3F4E9)
-        HomeDoseStatus.NEXT -> Color(0xFF126B62)
-        HomeDoseStatus.UPCOMING -> Color(0xFFEEF5F3)
-        HomeDoseStatus.SNOOZED -> Color(0xFFFFF1D6)
-        HomeDoseStatus.SKIPPED -> Color(0xFFEEF5F3)
+        HomeDoseStatus.TAKEN ->
+            Color(0xFFE3F4E9)
+
+        HomeDoseStatus.NEXT ->
+            Color(0xFF126B62)
+
+        HomeDoseStatus.UPCOMING,
+        HomeDoseStatus.SKIPPED ->
+            Color(0xFFEEF5F3)
+
+        HomeDoseStatus.SNOOZED,
+        HomeDoseStatus.UNCONFIRMED ->
+            Color(0xFFFFF1D6)
+
+        HomeDoseStatus.MISSED ->
+            Color(0xFFFBE6E3)
     }
 
     Row(
@@ -166,25 +199,44 @@ private fun TodayDoseRow(
         Box(
             modifier = Modifier
                 .size(26.dp)
-                .background(iconBackground, CircleShape),
+                .background(
+                    color = iconBackground,
+                    shape = CircleShape
+                ),
             contentAlignment = Alignment.Center
         ) {
-            if (dose.status == HomeDoseStatus.TAKEN) {
-                TakenCheckIcon(
-                    modifier = Modifier.size(14.dp),
-                    color = statusColor
-                )
-            } else {
-                Icon(
-                    painter = painterResource(R.drawable.thuoc),
-                    contentDescription = null,
-                    modifier = Modifier.size(15.dp),
-                    tint = if (dose.status == HomeDoseStatus.NEXT) {
-                        Color.White
-                    } else {
-                        statusColor
-                    }
-                )
+            when (dose.status) {
+                HomeDoseStatus.TAKEN -> {
+                    TakenCheckIcon(
+                        modifier = Modifier.size(14.dp),
+                        color = statusColor
+                    )
+                }
+
+                HomeDoseStatus.MISSED -> {
+                    Text(
+                        text = "!",
+                        fontSize = 16.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor
+                    )
+                }
+
+                else -> {
+                    Icon(
+                        painter = painterResource(R.drawable.thuoc),
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp),
+                        tint = if (
+                            dose.status == HomeDoseStatus.NEXT
+                        ) {
+                            Color.White
+                        } else {
+                            statusColor
+                        }
+                    )
+                }
             }
         }
 
@@ -235,16 +287,28 @@ private fun TakenCheckIcon(
     Canvas(modifier = modifier) {
         drawLine(
             color = color,
-            start = Offset(size.width * 0.2f, size.height * 0.5f),
-            end = Offset(size.width * 0.42f, size.height * 0.72f),
+            start = Offset(
+                size.width * 0.2f,
+                size.height * 0.5f
+            ),
+            end = Offset(
+                size.width * 0.42f,
+                size.height * 0.72f
+            ),
             strokeWidth = 1.8.dp.toPx(),
             cap = StrokeCap.Round
         )
 
         drawLine(
             color = color,
-            start = Offset(size.width * 0.42f, size.height * 0.72f),
-            end = Offset(size.width * 0.8f, size.height * 0.28f),
+            start = Offset(
+                size.width * 0.42f,
+                size.height * 0.72f
+            ),
+            end = Offset(
+                size.width * 0.8f,
+                size.height * 0.28f
+            ),
             strokeWidth = 1.8.dp.toPx(),
             cap = StrokeCap.Round
         )

@@ -2,13 +2,23 @@ package com.example.project_lttbd.ui.screens.medicine
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.example.project_lttbd.data.remote.DoseException
 import com.example.project_lttbd.data.remote.FirebaseProvider
-import com.example.project_lttbd.data.repository.MedicineRepository
+import com.example.project_lttbd.data.remote.MedicationOverviewRepository
+import com.example.project_lttbd.notifications.NotificationHelper
+import com.example.project_lttbd.notifications.alarm.MedicationAlarmScheduler
+import com.example.project_lttbd.ui.screens.schedule.rememberScheduleOwnerUid
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun MedicineDeleteAction(
@@ -16,89 +26,115 @@ fun MedicineDeleteAction(
     medicineName: String,
     onDeleted: () -> Unit
 ) {
+    val uid = rememberScheduleOwnerUid()
     val context = LocalContext.current.applicationContext
-    val auth = FirebaseProvider.auth
-    val uid = auth.currentUser?.uid
-    val repository = remember { MedicineRepository() }
-
-    var confirming by remember(uid, medicineId) {
-        mutableStateOf(false)
-    }
-    var deleting by remember(uid, medicineId) {
-        mutableStateOf(false)
-    }
-    var errorMessage by remember(uid, medicineId) {
-        mutableStateOf<String?>(null)
-    }
-
     val latestOnDeleted by rememberUpdatedState(onDeleted)
 
-    // Bỏ qua kết quả cũ nếu đã rời màn hình hoặc đổi tài khoản.
-    val active = remember(uid, medicineId) {
-        booleanArrayOf(true)
-    }
-
-    DisposableEffect(active) {
-        active[0] = true
-        onDispose { active[0] = false }
-    }
-
-    TextButton(
-        modifier = Modifier.fillMaxWidth(),
-        enabled = uid != null && !deleting,
-        onClick = {
-            errorMessage = null
-            confirming = true
+    key(uid, medicineId) {
+        val repository = remember {
+            MedicationOverviewRepository()
         }
-    ) {
-        Text(
-            text = "Xóa thuốc",
-            color = Color(0xFFB3261E)
-        )
-    }
 
-    if (confirming || deleting) {
-        AlertDialog(
-            onDismissRequest = {
-                if (!deleting) confirming = false
-            },
-            title = {
-                Text(
-                    if (deleting) "Đang xóa thuốc…"
-                    else "Xóa thuốc?"
+        val scope = rememberCoroutineScope()
+
+        var confirming by remember {
+            mutableStateOf(false)
+        }
+
+        var deleting by remember {
+            mutableStateOf(false)
+        }
+
+        var errorMessage by remember {
+            mutableStateOf<String?>(null)
+        }
+
+        fun ensureOwner() {
+            if (
+                uid == null ||
+                FirebaseProvider.auth.currentUser?.uid != uid
+            ) {
+                throw CancellationException(
+                    "Tài khoản đã thay đổi."
                 )
-            },
-            text = {
-                Text(
-                    if (deleting) {
-                        "Đang chờ xác nhận xóa. Vui lòng giữ kết nối Internet."
-                    } else {
-                        "Bạn muốn xóa $medicineName khỏi danh sách thuốc?"
+            }
+        }
+
+        TextButton(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = uid != null && !deleting,
+            onClick = {
+                errorMessage = null
+                confirming = true
+            }
+        ) {
+            Text(
+                text = "Xóa thuốc",
+                color = Color(0xFFB3261E)
+            )
+        }
+
+        if (confirming) {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!deleting) {
+                        confirming = false
                     }
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = !deleting,
-                    onClick = {
-                        if (
-                            uid == null ||
-                            auth.currentUser?.uid != uid
-                        ) {
-                            confirming = false
-                            errorMessage =
-                                "Tài khoản đã thay đổi. " +
-                                        "Vui lòng mở lại danh sách thuốc."
-                        } else if (!deleting) {
-                            deleting = true
+                },
+                title = {
+                    Text(
+                        if (deleting) {
+                            "Đang xóa thuốc…"
+                        } else {
+                            "Xóa thuốc?"
+                        }
+                    )
+                },
+                text = {
+                    Text(
+                        if (deleting) {
+                            "Vui lòng giữ kết nối Internet."
+                        } else {
+                            "Xóa $medicineName và dừng các lịch uống liên quan? " +
+                                    "Lịch sử đã ghi nhận vẫn được giữ lại."
+                        }
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = !deleting,
+                        onClick = {
+                            if (!deleting) {
+                                deleting = true
 
-                            repository.deleteMedicine(medicineId)
-                                .addOnSuccessListener {
-                                    if (
-                                        active[0] &&
-                                        auth.currentUser?.uid == uid
-                                    ) {
-                                        deleting = false
+                                scope.launch {
+                                    try {
+                                        ensureOwner()
+
+                                        val result =
+                                            repository.deleteMedicine(
+                                                medicineId
+                                            )
+
+                                        ensureOwner()
+
+                                        withContext(Dispatchers.IO) {
+                                            result.doseIdsToCancel.forEach { doseId ->
+                                                ensureOwner()
+
+                                                MedicationAlarmScheduler.cancel(
+                                                    context,
+                                                    doseId
+                                                )
+
+                                                NotificationHelper.cancelNotification(
+                                                    context,
+                                                    doseId
+                                                )
+                                            }
+                                        }
+
+                                        ensureOwner()
                                         confirming = false
 
                                         Toast.makeText(
@@ -108,50 +144,63 @@ fun MedicineDeleteAction(
                                         ).show()
 
                                         latestOnDeleted()
-                                    }
-                                }
-                                .addOnFailureListener {
-                                    if (
-                                        active[0] &&
-                                        auth.currentUser?.uid == uid
-                                    ) {
-                                        deleting = false
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (error: Exception) {
+                                        ensureOwner()
                                         confirming = false
+
                                         errorMessage =
-                                            "Chưa xóa được thuốc. " +
-                                                    "Vui lòng kiểm tra kết nối và thử lại."
+                                            (error as? DoseException)?.message
+                                                ?: "Chưa hoàn tất thao tác. " +
+                                                        "Vui lòng tải lại danh sách để kiểm tra."
+                                    } finally {
+                                        deleting = false
                                     }
                                 }
+                            }
+                        }
+                    ) {
+                        Text(
+                            if (deleting) "Đang xóa…" else "Xóa"
+                        )
+                    }
+                },
+                dismissButton = {
+                    if (!deleting) {
+                        TextButton(
+                            onClick = {
+                                confirming = false
+                            }
+                        ) {
+                            Text("Hủy")
                         }
                     }
-                ) {
-                    Text(if (deleting) "Đang xóa…" else "Xóa")
                 }
-            },
-            dismissButton = {
-                if (!deleting) {
+            )
+        }
+
+        errorMessage?.let { message ->
+            AlertDialog(
+                onDismissRequest = {
+                    errorMessage = null
+                },
+                title = {
+                    Text("Cần kiểm tra lại danh sách thuốc")
+                },
+                text = {
+                    Text(message)
+                },
+                confirmButton = {
                     TextButton(
-                        onClick = { confirming = false }
+                        onClick = {
+                            errorMessage = null
+                        }
                     ) {
-                        Text("Hủy")
+                        Text("Đóng")
                     }
                 }
-            }
-        )
-    }
-
-    errorMessage?.let { message ->
-        AlertDialog(
-            onDismissRequest = { errorMessage = null },
-            title = { Text("Chưa xóa được thuốc") },
-            text = { Text(message) },
-            confirmButton = {
-                TextButton(
-                    onClick = { errorMessage = null }
-                ) {
-                    Text("Đóng")
-                }
-            }
-        )
+            )
+        }
     }
 }

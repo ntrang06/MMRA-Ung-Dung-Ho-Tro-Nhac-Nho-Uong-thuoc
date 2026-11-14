@@ -2,6 +2,7 @@ package com.example.project_lttbd.ui.screens.schedule
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -16,8 +17,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.project_lttbd.data.mock.*
+import com.example.project_lttbd.data.remote.ScheduleException
 import com.example.project_lttbd.ui.components.MMRATextField
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineDraft
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import kotlin.math.roundToInt
 
@@ -43,8 +47,12 @@ internal fun frequencyLabel(
         "mỗi ngày"
     } else {
         scheduleWeekdays
-            .filter { it.first in schedule.weekdays }
-            .joinToString(", ") { it.second }
+            .filter {
+                it.first in schedule.weekdays
+            }
+            .joinToString(", ") {
+                it.second
+            }
     }
 
     return "${schedule.times.size} lần • $days"
@@ -85,17 +93,32 @@ fun ScheduleSetupEditor(
     modifier: Modifier = Modifier,
     linkedPeople: List<ScheduleSharingOption> = emptyList(),
     onBackClick: () -> Unit = {},
-    onSaved: (String) -> Unit = {}
+    onSaved: (String) -> Unit = {},
+    saveAction: (suspend (MockMedicineSchedule) -> String)? = null,
+    stepLabel: String = "Bước 3/3 • Kiểm tra và lưu",
+    initialSchedule: MockMedicineSchedule? = null,
+    saveButtonText: String = "Lưu lịch uống",
+    footerContent: (@Composable () -> Unit)? = null,
+    onDraftChange: (MockMedicineSchedule) -> Unit = {},
+    actionsEnabled: Boolean = true
 ) {
-    val previous = MockMedicines.findById(medicineId)
+    val scope = rememberCoroutineScope()
+
+    val previous = if (saveAction == null) {
+        MockMedicines.findById(medicineId)
+    } else {
+        null
+    }
 
     var schedule by rememberSaveable(medicineId) {
         mutableStateOf(
-            previous?.schedule ?: MockMedicineSchedule(
-                quantity = "",
-                unit = "",
-                times = emptyList()
-            )
+            initialSchedule
+                ?: previous?.schedule
+                ?: MockMedicineSchedule(
+                    quantity = "",
+                    unit = "",
+                    times = emptyList()
+                )
         )
     }
 
@@ -111,6 +134,12 @@ fun ScheduleSetupEditor(
         mutableStateOf(false)
     }
 
+    LaunchedEffect(schedule) {
+        onDraftChange(schedule)
+    }
+
+    BackHandler(enabled = saving) {}
+
     val fullName = listOf(
         draft.medicineName,
         if (draft.strength.isBlank()) {
@@ -119,13 +148,15 @@ fun ScheduleSetupEditor(
             "${draft.strength} ${draft.strengthUnit}"
         }
     )
-        .filter { it.isNotBlank() }
+        .filter {
+            it.isNotBlank()
+        }
         .joinToString(" ")
 
     val period = schedule.endDay?.let { end ->
-        val days =
-            ((end - schedule.startDay) / 86_400_000.0)
-                .roundToInt() + 1
+        val days = (
+                (end - schedule.startDay) / 86_400_000.0
+                ).roundToInt() + 1
 
         "$days ngày • ${MockCalendar.date(schedule.startDay)}–${MockCalendar.date(end)}"
     } ?: "Từ ${MockCalendar.date(schedule.startDay)} • Chưa có ngày kết thúc"
@@ -133,19 +164,23 @@ fun ScheduleSetupEditor(
     ScheduleSetupScreen(
         state = ScheduleSetupUiModel(
             medicineName = fullName,
+            stepLabel = stepLabel,
             dosageForm = draft.dosageForm,
             medicineCode = previous?.medicineCode.orEmpty(),
             confirmed = false,
+
             quantityText = if (schedule.quantity.isBlank()) {
                 "Chưa thiết lập"
             } else {
                 schedule.quantityText
             },
+
             frequencyText = if (schedule.times.isEmpty()) {
                 "Chưa thiết lập"
             } else {
                 frequencyLabel(schedule)
             },
+
             timesText = if (schedule.times.isEmpty()) {
                 "Chưa chọn giờ"
             } else {
@@ -155,58 +190,129 @@ fun ScheduleSetupEditor(
                         MockCalendar.time(it)
                     }
             },
+
             reminderText = if (schedule.reminderMinutes == 0) {
                 "Nhắc đúng giờ"
             } else {
                 "Nhắc trước ${schedule.reminderMinutes} phút"
             },
+
             mealInstruction = schedule.meal.ifBlank {
                 "Không có ghi chú về thức ăn"
             },
+
             periodText = period,
+
             stockText = schedule.stock?.let {
                 "$it ${schedule.unit}"
             } ?: "Chưa nhập",
+
             stockReminderText = schedule.lowStock?.let {
                 "Nhắc mua thêm khi còn $it ${schedule.unit}"
             }.orEmpty(),
+
             sharingText = schedule.sharingName.ifBlank {
                 "Không chia sẻ"
             },
+
             sharingDescription = if (schedule.sharingId == null) {
                 ""
             } else {
                 "Theo quyền chia sẻ của kết nối hiện có"
             }
         ),
+
         modifier = modifier,
-        onBackClick = onBackClick,
-        onFieldClick = {
-            fieldName = it.name
+        saveButtonText = saveButtonText,
+        saveEnabled = !saving && actionsEnabled,
+        footerContent = if (saving) {
+            null
+        } else {
+            footerContent
         },
-        onSaveClick = {
+
+        onBackClick = {
             if (!saving) {
+                onDraftChange(schedule)
+                onBackClick()
+            }
+        },
+
+        onFieldClick = { field ->
+            if (!saving && actionsEnabled) {
+                if (
+                    saveAction != null &&
+                    field in setOf(
+                        ScheduleSetupField.STOCK,
+                        ScheduleSetupField.SHARING
+                    )
+                ) {
+                    error =
+                        "Theo dõi số lượng và chia sẻ lịch " +
+                                "chưa được hỗ trợ ở bước này."
+                } else {
+                    fieldName = field.name
+                }
+            }
+        },
+
+        onSaveClick = {
+            if (!saving && actionsEnabled) {
                 error = scheduleError(schedule)
 
                 if (error == null) {
                     saving = true
+                    val pending = schedule
 
-                    try {
-                        val id = MockMedicines.save(
-                            draft = draft,
-                            schedule = schedule,
-                            id = medicineId
-                        )
-                        onSaved(id)
-                    } catch (_: IllegalArgumentException) {
-                        saving = false
-                        error =
-                            "Chưa lưu được. Hãy kiểm tra thông tin thuốc và lịch uống."
+                    scope.launch {
+                        try {
+                            val id = if (saveAction != null) {
+                                saveAction(pending)
+                            } else {
+                                MockMedicines.save(
+                                    draft = draft,
+                                    schedule = pending,
+                                    id = medicineId
+                                )
+                            }
+
+                            onSaved(id)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (exception: ScheduleException) {
+                            error = exception.message
+                        } catch (exception: IllegalArgumentException) {
+                            error = exception.message
+                                ?: "Chưa lưu được lịch uống. Vui lòng thử lại."
+                        } catch (_: Exception) {
+                            error =
+                                "Chưa lưu được lịch uống. Vui lòng thử lại."
+                        } finally {
+                            saving = false
+                        }
                     }
                 }
             }
         }
     )
+
+    if (saving) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = {
+                Text("Đang lưu lịch uống")
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    CircularProgressIndicator()
+                    Text("Vui lòng chờ máy chủ xác nhận…")
+                }
+            },
+            confirmButton = {}
+        )
+    }
 
     fieldName?.let { value ->
         ScheduleFieldDialog(
@@ -218,6 +324,7 @@ fun ScheduleSetupEditor(
             },
             onConfirm = {
                 schedule = it
+                onDraftChange(it)
                 fieldName = null
             }
         )
@@ -235,7 +342,11 @@ fun ScheduleSetupEditor(
                 Text(message)
             },
             confirmButton = {
-                TextButton(onClick = { error = null }) {
+                TextButton(
+                    onClick = {
+                        error = null
+                    }
+                ) {
                     Text("Đã hiểu")
                 }
             }
@@ -323,7 +434,9 @@ private fun ScheduleFieldDialog(
                     times[index] = selectedMinute
                 }
 
-                working = working.copy(times = times)
+                working = working.copy(
+                    times = times
+                )
             },
             minute / 60,
             minute % 60,
@@ -333,9 +446,11 @@ private fun ScheduleFieldDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+
         title = {
             Text(title)
         },
+
         text = {
             Column(
                 modifier = Modifier
@@ -349,7 +464,9 @@ private fun ScheduleFieldDialog(
                         MMRATextField(
                             value = working.quantity,
                             onValueChange = {
-                                working = working.copy(quantity = it)
+                                working = working.copy(
+                                    quantity = it
+                                )
                             },
                             label = "Số lượng mỗi lần",
                             labelOutside = true,
@@ -369,16 +486,20 @@ private fun ScheduleFieldDialog(
                         ).forEach { unit ->
                             ScheduleChoice(
                                 text = unit,
-                                selected = working.unit == unit
-                            ) {
-                                working = working.copy(unit = unit)
-                            }
+                                selected = working.unit == unit,
+                                onClick = {
+                                    working = working.copy(
+                                        unit = unit
+                                    )
+                                }
+                            )
                         }
                     }
 
                     ScheduleSetupField.FREQUENCY -> {
                         Text(
-                            "Chọn các ngày uống. Số lần trong ngày được tính theo các giờ đã chọn."
+                            "Chọn các ngày uống. " +
+                                    "Số lần trong ngày được tính theo các giờ đã chọn."
                         )
 
                         Row(
@@ -396,6 +517,7 @@ private fun ScheduleFieldDialog(
                                     )
                                 }
                             )
+
                             Text("Hằng ngày")
                         }
 
@@ -415,6 +537,7 @@ private fun ScheduleFieldDialog(
                                         )
                                     }
                                 )
+
                                 Text(label)
                             }
                         }
@@ -426,10 +549,14 @@ private fun ScheduleFieldDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 OutlinedButton(
-                                    onClick = { pickTime(index) },
+                                    onClick = {
+                                        pickTime(index)
+                                    },
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text(MockCalendar.time(minute))
+                                    Text(
+                                        MockCalendar.time(minute)
+                                    )
                                 }
 
                                 TextButton(
@@ -448,7 +575,9 @@ private fun ScheduleFieldDialog(
                         }
 
                         OutlinedButton(
-                            onClick = { pickTime(null) },
+                            onClick = {
+                                pickTime(null)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("+ Thêm giờ uống")
@@ -456,7 +585,13 @@ private fun ScheduleFieldDialog(
 
                         Text("Thời điểm nhắc")
 
-                        listOf(0, 5, 10, 15, 30).forEach { minutes ->
+                        listOf(
+                            0,
+                            5,
+                            10,
+                            15,
+                            30
+                        ).forEach { minutes ->
                             ScheduleChoice(
                                 text = if (minutes == 0) {
                                     "Đúng giờ"
@@ -464,12 +599,13 @@ private fun ScheduleFieldDialog(
                                     "Trước $minutes phút"
                                 },
                                 selected =
-                                    working.reminderMinutes == minutes
-                            ) {
-                                working = working.copy(
-                                    reminderMinutes = minutes
-                                )
-                            }
+                                    working.reminderMinutes == minutes,
+                                onClick = {
+                                    working = working.copy(
+                                        reminderMinutes = minutes
+                                    )
+                                }
+                            )
                         }
                     }
 
@@ -484,16 +620,21 @@ private fun ScheduleFieldDialog(
                                 text = meal.ifBlank {
                                     "Không có ghi chú"
                                 },
-                                selected = working.meal == meal
-                            ) {
-                                working = working.copy(meal = meal)
-                            }
+                                selected = working.meal == meal,
+                                onClick = {
+                                    working = working.copy(
+                                        meal = meal
+                                    )
+                                }
+                            )
                         }
 
                         MMRATextField(
                             value = working.meal,
                             onValueChange = {
-                                working = working.copy(meal = it)
+                                working = working.copy(
+                                    meal = it
+                                )
                             },
                             label = "Hướng dẫn trên đơn thuốc",
                             labelOutside = true,
@@ -506,13 +647,17 @@ private fun ScheduleFieldDialog(
                         OutlinedButton(
                             onClick = {
                                 pickDate(working.startDay) {
-                                    working = working.copy(startDay = it)
+                                    working = working.copy(
+                                        startDay = it
+                                    )
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                "Bắt đầu: ${MockCalendar.date(working.startDay)}"
+                                "Bắt đầu: ${
+                                    MockCalendar.date(working.startDay)
+                                }"
                             )
                         }
 
@@ -531,6 +676,7 @@ private fun ScheduleFieldDialog(
                                     )
                                 }
                             )
+
                             Text("Chưa có ngày kết thúc")
                         }
 
@@ -540,7 +686,9 @@ private fun ScheduleFieldDialog(
                                     pickDate(
                                         working.endDay ?: working.startDay
                                     ) {
-                                        working = working.copy(endDay = it)
+                                        working = working.copy(
+                                            endDay = it
+                                        )
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth()
@@ -563,7 +711,9 @@ private fun ScheduleFieldDialog(
 
                         MMRATextField(
                             value = stock,
-                            onValueChange = { stock = it },
+                            onValueChange = {
+                                stock = it
+                            },
                             label = "Số lượng hiện có ($unitLabel)",
                             labelOutside = true,
                             keyboardOptions = KeyboardOptions(
@@ -573,7 +723,9 @@ private fun ScheduleFieldDialog(
 
                         MMRATextField(
                             value = lowStock,
-                            onValueChange = { lowStock = it },
+                            onValueChange = {
+                                lowStock = it
+                            },
                             label = "Nhắc mua thêm khi còn",
                             labelOutside = true,
                             keyboardOptions = KeyboardOptions(
@@ -589,13 +741,14 @@ private fun ScheduleFieldDialog(
                     ScheduleSetupField.SHARING -> {
                         ScheduleChoice(
                             text = "Không chia sẻ",
-                            selected = working.sharingId == null
-                        ) {
-                            working = working.copy(
-                                sharingId = null,
-                                sharingName = ""
-                            )
-                        }
+                            selected = working.sharingId == null,
+                            onClick = {
+                                working = working.copy(
+                                    sharingId = null,
+                                    sharingName = ""
+                                )
+                            }
+                        )
 
                         if (linkedPeople.isEmpty()) {
                             Text(
@@ -607,13 +760,14 @@ private fun ScheduleFieldDialog(
                             ScheduleChoice(
                                 text = person.name,
                                 selected =
-                                    working.sharingId == person.id
-                            ) {
-                                working = working.copy(
-                                    sharingId = person.id,
-                                    sharingName = person.name
-                                )
-                            }
+                                    working.sharingId == person.id,
+                                onClick = {
+                                    working = working.copy(
+                                        sharingId = person.id,
+                                        sharingName = person.name
+                                    )
+                                }
+                            )
                         }
                     }
                 }
@@ -626,39 +780,47 @@ private fun ScheduleFieldDialog(
                 }
             }
         },
+
         confirmButton = {
             TextButton(
                 onClick = {
                     error = when (field) {
-                        ScheduleSetupField.QUANTITY -> when {
-                            !isPositiveDoseQuantity(working.quantity) ->
-                                "Nhập số lượng lớn hơn 0."
+                        ScheduleSetupField.QUANTITY -> {
+                            when {
+                                !isPositiveDoseQuantity(
+                                    working.quantity
+                                ) ->
+                                    "Nhập số lượng lớn hơn 0."
 
-                            working.unit.isBlank() ->
-                                "Chọn đơn vị liều dùng."
+                                working.unit.isBlank() ->
+                                    "Chọn đơn vị liều dùng."
 
-                            else -> null
+                                else -> null
+                            }
                         }
 
-                        ScheduleSetupField.TIMES -> when {
-                            working.times.isEmpty() ->
-                                "Chọn ít nhất một giờ uống."
+                        ScheduleSetupField.TIMES -> {
+                            when {
+                                working.times.isEmpty() ->
+                                    "Chọn ít nhất một giờ uống."
 
-                            working.times.distinct().size !=
-                                    working.times.size ->
-                                "Các giờ uống đang bị trùng."
+                                working.times.distinct().size !=
+                                        working.times.size ->
+                                    "Các giờ uống đang bị trùng."
 
-                            else -> null
+                                else -> null
+                            }
                         }
 
-                        ScheduleSetupField.FREQUENCY ->
+                        ScheduleSetupField.FREQUENCY -> {
                             if (working.weekdays.isEmpty()) {
                                 "Chọn ít nhất một ngày."
                             } else {
                                 null
                             }
+                        }
 
-                        ScheduleSetupField.PERIOD ->
+                        ScheduleSetupField.PERIOD -> {
                             if (
                                 working.endDay != null &&
                                 (working.endDay ?: 0) < working.startDay
@@ -667,39 +829,44 @@ private fun ScheduleFieldDialog(
                             } else {
                                 null
                             }
+                        }
 
-                        ScheduleSetupField.STOCK -> when {
-                            stock.isNotBlank() &&
-                                    stock.toIntOrNull()?.let {
-                                        it >= 0
-                                    } != true ->
-                                "Số lượng phải là số nguyên từ 0 trở lên."
+                        ScheduleSetupField.STOCK -> {
+                            when {
+                                stock.isNotBlank() &&
+                                        stock.toIntOrNull()?.let {
+                                            it >= 0
+                                        } != true ->
+                                    "Số lượng phải là số nguyên từ 0 trở lên."
 
-                            lowStock.isNotBlank() &&
-                                    lowStock.toIntOrNull()?.let {
-                                        it >= 0
-                                    } != true ->
-                                "Ngưỡng nhắc phải là số nguyên từ 0 trở lên."
+                                lowStock.isNotBlank() &&
+                                        lowStock.toIntOrNull()?.let {
+                                            it >= 0
+                                        } != true ->
+                                    "Ngưỡng nhắc phải là số nguyên từ 0 trở lên."
 
-                            lowStock.isNotBlank() && stock.isBlank() ->
-                                "Nhập số lượng hiện có trước khi đặt ngưỡng nhắc."
+                                lowStock.isNotBlank() &&
+                                        stock.isBlank() ->
+                                    "Nhập số lượng hiện có trước khi đặt ngưỡng nhắc."
 
-                            else -> null
+                                else -> null
+                            }
                         }
 
                         else -> null
                     }
 
                     if (error == null) {
-                        val updated =
-                            if (field == ScheduleSetupField.STOCK) {
-                                working.copy(
-                                    stock = stock.toIntOrNull(),
-                                    lowStock = lowStock.toIntOrNull()
-                                )
-                            } else {
-                                working
-                            }
+                        val updated = if (
+                            field == ScheduleSetupField.STOCK
+                        ) {
+                            working.copy(
+                                stock = stock.toIntOrNull(),
+                                lowStock = lowStock.toIntOrNull()
+                            )
+                        } else {
+                            working
+                        }
 
                         onConfirm(updated)
                     }
@@ -708,8 +875,11 @@ private fun ScheduleFieldDialog(
                 Text("Xác nhận")
             }
         },
+
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss
+            ) {
                 Text("Hủy")
             }
         }
@@ -736,7 +906,9 @@ private fun ScheduleChoice(
                 onClick = null
             )
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(
+                modifier = Modifier.width(8.dp)
+            )
 
             Text(
                 text = text,

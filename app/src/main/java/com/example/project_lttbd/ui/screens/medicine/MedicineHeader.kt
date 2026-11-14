@@ -1,9 +1,11 @@
 package com.example.project_lttbd.ui.screens.medicine
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,10 +19,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.data.model.UserProfileManager
 import com.example.project_lttbd.ui.theme.MMRATheme
 
 @Composable
@@ -30,6 +36,20 @@ fun MedicineHeader(
     onAccountClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val preview = LocalInspectionMode.current
+
+    val avatar = if (preview) {
+        null
+    } else {
+        UserProfileManager.currentAvatarBitmap
+    }
+
+    val displayInitials = if (preview) {
+        initials
+    } else {
+        UserProfileManager.getInitials()
+    }
+
     Row(
         modifier = modifier.padding(
             horizontal = 20.dp,
@@ -88,16 +108,25 @@ fun MedicineHeader(
                     Box(
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = initials,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontSize = 18.sp,
-                                lineHeight = 22.sp,
-                                letterSpacing = 0.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = Color(0xFF126B62)
-                        )
+                        if (avatar != null) {
+                            Image(
+                                bitmap = avatar.asImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Text(
+                                text = displayInitials,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontSize = 18.sp,
+                                    lineHeight = 22.sp,
+                                    letterSpacing = 0.sp,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = Color(0xFF126B62)
+                            )
+                        }
                     }
                 }
 
@@ -116,7 +145,10 @@ fun MedicineHeader(
     }
 }
 
-@Preview(showBackground = true, widthDp = 390)
+@Preview(
+    showBackground = true,
+    widthDp = 390
+)
 @Composable
 private fun MedicineHeaderPreview() {
     MMRATheme {
