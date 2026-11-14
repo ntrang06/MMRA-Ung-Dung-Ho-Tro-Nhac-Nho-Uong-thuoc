@@ -36,8 +36,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.project_lttbd.data.model.UserProfileManager
 import com.example.project_lttbd.data.remote.DoseException
-import com.example.project_lttbd.data.remote.DoseRepository
 import com.example.project_lttbd.data.remote.FirebaseProvider
+import com.example.project_lttbd.data.remote.HomeResponseDto
+import com.example.project_lttbd.data.remote.MedicationOverviewRepository
 import com.example.project_lttbd.data.remote.dto.DoseResponseDto
 import com.example.project_lttbd.data.remote.dto.DoseStatusDto
 import com.example.project_lttbd.notifications.storage.LocalNotificationStore
@@ -59,13 +60,14 @@ import kotlinx.coroutines.withContext
 private data class HomeLoad(
     val loading: Boolean = true,
     val hasLoaded: Boolean = false,
-    val doses: List<DoseResponseDto> = emptyList(),
+    val home: HomeResponseDto? = null,
     val error: String? = null
 )
 
 private data class HomeSummary(
     val nextDose: NextDoseUiModel?,
     val doses: List<HomeDoseUiModel>,
+    val total: Int,
     val taken: Int,
     val skipped: Int,
     val missed: Int
@@ -83,10 +85,14 @@ fun HomeScreen(
     val context = LocalContext.current
     val preview = LocalInspectionMode.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val ownerUid = if (preview) "preview" else rememberScheduleOwnerUid()
+    val ownerUid = if (preview) {
+        "preview"
+    } else {
+        rememberScheduleOwnerUid()
+    }
 
     val repository = remember(preview) {
-        if (preview) null else DoseRepository()
+        if (preview) null else MedicationOverviewRepository()
     }
 
     var now by remember {
@@ -101,13 +107,18 @@ fun HomeScreen(
         TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
     }
 
-    val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply {
+    val dateKey = SimpleDateFormat(
+        "yyyy-MM-dd",
+        Locale.ROOT
+    ).apply {
         timeZone = zone
     }.format(Date(now))
 
     var loaded by remember(ownerUid, dateKey) {
         mutableStateOf(
-            HomeLoad(loading = preview || ownerUid != null)
+            HomeLoad(
+                loading = preview || ownerUid != null
+            )
         )
     }
 
@@ -129,7 +140,9 @@ fun HomeScreen(
 
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> paused = true
+                Lifecycle.Event.ON_PAUSE -> {
+                    paused = true
+                }
 
                 Lifecycle.Event.ON_RESUME -> {
                     now = System.currentTimeMillis()
@@ -156,11 +169,14 @@ fun HomeScreen(
     }
 
     LaunchedEffect(ownerUid, dateKey, revision) {
-        if (preview || ownerUid == null || repository == null) {
+        if (
+            preview ||
+            ownerUid == null ||
+            repository == null
+        ) {
             return@LaunchedEffect
         }
 
-        // Giữ dữ liệu đang hiển thị trong lúc tải lại.
         loaded = loaded.copy(
             loading = true,
             error = null
@@ -169,21 +185,19 @@ fun HomeScreen(
         try {
             ensureHomeOwner(ownerUid)
 
-            val result = repository.listDoses(dateKey)
+            val result = repository.getHome(dateKey)
 
             currentCoroutineContext().ensureActive()
             ensureHomeOwner(ownerUid)
 
-            val dayDoses = result.filter {
+            val dayDoses = result.doses.filter {
                 it.localDate == dateKey
             }
 
             loaded = HomeLoad(
                 loading = false,
                 hasLoaded = true,
-                doses = dayDoses.filter {
-                    it.status != DoseStatusDto.CANCELLED
-                }
+                home = result
             )
 
             runCatching {
@@ -230,15 +244,17 @@ fun HomeScreen(
         hasUnread = unread
     }
 
-    val summary = remember(loaded.doses, now) {
-        buildHomeSummary(loaded.doses, now)
+    val summary = remember(loaded.home, now) {
+        buildHomeSummary(loaded.home, now)
     }
 
     val calendar = Calendar.getInstance(zone).apply {
         timeInMillis = now
     }
 
-    val greeting = when (calendar.get(Calendar.HOUR_OF_DAY)) {
+    val greeting = when (
+        calendar.get(Calendar.HOUR_OF_DAY)
+    ) {
         in 5..11 -> "Chào buổi sáng"
         in 12..17 -> "Chào buổi chiều"
         else -> "Chào buổi tối"
@@ -247,7 +263,9 @@ fun HomeScreen(
     val showProfile = !preview && ownerUid != null
 
     val displayName = if (showProfile) {
-        UserProfileManager.name.trim().ifBlank { "bạn" }
+        UserProfileManager.name.trim().ifBlank {
+            "bạn"
+        }
     } else {
         "bạn"
     }
@@ -262,7 +280,11 @@ fun HomeScreen(
     }
 
     val refresh: () -> Unit = {
-        if (!preview && ownerUid != null && !loaded.loading) {
+        if (
+            !preview &&
+            ownerUid != null &&
+            !loaded.loading
+        ) {
             loaded = loaded.copy(
                 loading = true,
                 error = null
@@ -383,7 +405,7 @@ fun HomeScreen(
 
                         TodayProgressCard(
                             takenDoses = summary.taken,
-                            totalDoses = summary.doses.size,
+                            totalDoses = summary.total,
                             skippedDoses = summary.skipped,
                             missedDoses = summary.missed
                         )
@@ -402,48 +424,54 @@ fun HomeScreen(
 
 private fun ensureHomeOwner(ownerUid: String) {
     if (FirebaseProvider.auth.currentUser?.uid != ownerUid) {
-        throw CancellationException("Tài khoản đã thay đổi.")
+        throw CancellationException(
+            "Tài khoản đã thay đổi."
+        )
     }
 }
 
 private fun buildHomeSummary(
-    source: List<DoseResponseDto>,
+    source: HomeResponseDto?,
     now: Long
 ): HomeSummary {
-    val doses = source
-        .filter { it.status != DoseStatusDto.CANCELLED }
+    val doses = source?.doses.orEmpty()
+        .filter {
+            it.status != DoseStatusDto.CANCELLED
+        }
         .sortedWith(
-            compareBy<DoseResponseDto> { it.minuteOfDay }
-                .thenBy { it.doseId }
-        )
-
-    val next = doses
-        .filter { it.status == DoseStatusDto.PENDING }
-        .minWithOrNull(
             compareBy<DoseResponseDto> {
-                homeReminderMillis(it)
-            }.thenBy {
                 it.minuteOfDay
             }.thenBy {
                 it.doseId
             }
         )
 
+    val next = source?.nextDose
+
     val rows = doses.mapNotNull { dose ->
         val ui = dose.toScheduleDoseUiModel()
 
         val status = when (dose.status) {
-            DoseStatusDto.TAKEN -> HomeDoseStatus.TAKEN
-            DoseStatusDto.SKIPPED -> HomeDoseStatus.SKIPPED
-            DoseStatusDto.MISSED -> HomeDoseStatus.MISSED
-            DoseStatusDto.CANCELLED -> return@mapNotNull null
+            DoseStatusDto.TAKEN ->
+                HomeDoseStatus.TAKEN
+
+            DoseStatusDto.SKIPPED ->
+                HomeDoseStatus.SKIPPED
+
+            DoseStatusDto.MISSED ->
+                HomeDoseStatus.MISSED
+
+            DoseStatusDto.CANCELLED ->
+                return@mapNotNull null
 
             DoseStatusDto.PENDING -> when {
-                !dose.nextReminderAt.isNullOrBlank() -> {
+                isHomeSnoozed(dose) -> {
                     HomeDoseStatus.SNOOZED
                 }
 
-                homeReminderMillis(dose) <= now -> {
+                MedicationReminderSync.parseIsoToMillis(
+                    dose.scheduledAt
+                ) <= now -> {
                     HomeDoseStatus.UNCONFIRMED
                 }
 
@@ -491,21 +519,36 @@ private fun buildHomeSummary(
     return HomeSummary(
         nextDose = nextCard,
         doses = rows,
-        taken = doses.count {
-            it.status == DoseStatusDto.TAKEN
-        },
-        skipped = doses.count {
-            it.status == DoseStatusDto.SKIPPED
-        },
-        missed = doses.count {
-            it.status == DoseStatusDto.MISSED
-        }
+        total = source?.totalDoses ?: 0,
+        taken = source?.takenDoses ?: 0,
+        skipped = source?.skippedDoses ?: 0,
+        missed = source?.missedDoses ?: 0
     )
 }
 
-private fun homeReminderMillis(dose: DoseResponseDto): Long {
+private fun isHomeSnoozed(
+    dose: DoseResponseDto
+): Boolean {
+    val reminder = dose.nextReminderAt
+        ?.takeIf {
+            it.isNotBlank()
+        }
+        ?: return false
+
+    return MedicationReminderSync.parseIsoToMillis(
+        reminder
+    ) > MedicationReminderSync.parseIsoToMillis(
+        dose.scheduledAt
+    )
+}
+
+private fun homeReminderMillis(
+    dose: DoseResponseDto
+): Long {
     val target = dose.nextReminderAt
-        ?.takeIf { it.isNotBlank() }
+        ?.takeIf {
+            it.isNotBlank()
+        }
         ?: dose.scheduledAt
 
     return MedicationReminderSync.parseIsoToMillis(target)
@@ -518,13 +561,21 @@ private fun homeCountdownText(
     val remaining = homeReminderMillis(dose) - now
 
     if (remaining <= 0L) {
-        return "Chờ xác nhận"
+        return if (
+            MedicationReminderSync.parseIsoToMillis(
+                dose.scheduledAt
+            ) > now
+        ) {
+            "Chưa đến giờ uống"
+        } else {
+            "Chờ xác nhận"
+        }
     }
 
-    val prefix = if (dose.nextReminderAt.isNullOrBlank()) {
-        "Còn"
-    } else {
+    val prefix = if (isHomeSnoozed(dose)) {
         "Nhắc lại sau"
+    } else {
+        "Còn"
     }
 
     if (remaining < 60_000L) {

@@ -38,6 +38,103 @@ def _snapshot_to_dict(
 class MedicationRepository:
     """Quản lý medicines, schedules và doses trong Firestore."""
 
+    @staticmethod
+    def create_dose_if_absent(
+        user: CurrentUser,
+        dose_id: str,
+        data: dict[str, Any],
+    ) -> bool:
+        reference = user_document(
+            user,
+            "doses",
+            dose_id,
+        )
+
+        medicine_ref = user_document(
+            user,
+            "medicines",
+            data["medicineId"],
+        )
+
+        schedule_ref = user_document(
+            user,
+            "schedules",
+            data["scheduleId"],
+        )
+
+        client = firestore.client(
+            app=get_firebase_app()
+        )
+
+        @google_firestore.transactional
+        def create(transaction):
+            medicine = medicine_ref.get(
+                transaction=transaction
+            )
+
+            schedule = schedule_ref.get(
+                transaction=transaction
+            )
+
+            medicine_data = medicine.to_dict() or {}
+            schedule_data = schedule.to_dict() or {}
+
+            if (
+                not medicine.exists
+                or medicine_data.get("deletedAt") is not None
+            ):
+                return False
+
+            if (
+                not schedule.exists
+                or schedule_data.get("deletedAt") is not None
+            ):
+                return False
+
+            if not schedule_data.get("enabled", False):
+                return False
+
+            if (
+                schedule_data.get("medicineId")
+                != data["medicineId"]
+            ):
+                return False
+
+            if (
+                schedule_data.get("version")
+                != data["scheduleVersion"]
+            ):
+                return False
+
+            scheduled_at = data.get("scheduledAt")
+
+            effective_at = (
+                schedule_data.get("updatedAt")
+                or schedule_data.get("createdAt")
+            )
+
+            if (
+                not isinstance(scheduled_at, datetime)
+                or scheduled_at.utcoffset() is None
+            ):
+                return False
+
+            if (
+                not isinstance(effective_at, datetime)
+                or effective_at.utcoffset() is None
+            ):
+                return False
+
+            if scheduled_at < effective_at:
+                return False
+
+            transaction.create(reference, data)
+            return True
+
+        try:
+            return create(client.transaction())
+        except AlreadyExists:
+            return False
     # ---------------------------------------------------------
     # MEDICINES
     # ---------------------------------------------------------
@@ -284,27 +381,110 @@ class MedicationRepository:
             key=lambda dose: dose.get("minuteOfDay", 0),
         )
 
-    @staticmethod
-    def create_dose_if_absent(
-        user: CurrentUser,
-        dose_id: str,
-        data: dict[str, Any],
-    ) -> bool:
-        """
-        Tạo liều nếu chưa tồn tại.
-        Không ghi đè trạng thái liều đã có.
-        """
-        reference = user_document(
-            user,
-            "doses",
-            dose_id,
-        )
+        @staticmethod
+        def create_dose_if_absent(
+            user: CurrentUser,
+            dose_id: str,
+            data: dict[str, Any],
+        ) -> bool:
+            reference = user_document(
+                user,
+                "doses",
+                dose_id,
+            )
 
-        try:
-            reference.create(data)
-            return True
-        except AlreadyExists:
-            return False
+            medicine_ref = user_document(
+                user,
+                "medicines",
+                data["medicineId"],
+            )
+
+            schedule_ref = user_document(
+                user,
+                "schedules",
+                data["scheduleId"],
+            )
+
+            client = firestore.client(
+                app=get_firebase_app()
+            )
+
+            @google_firestore.transactional
+            def create(transaction):
+                medicine = medicine_ref.get(
+                    transaction=transaction
+                )
+
+                schedule = schedule_ref.get(
+                    transaction=transaction
+                )
+
+                medicine_data = medicine.to_dict() or {}
+                schedule_data = schedule.to_dict() or {}
+
+                if (
+                    not medicine.exists
+                    or medicine_data.get("deletedAt") is not None
+                ):
+                    return False
+
+                if (
+                    not schedule.exists
+                    or schedule_data.get("deletedAt") is not None
+                ):
+                    return False
+
+                if not schedule_data.get("enabled", False):
+                    return False
+
+                if (
+                    schedule_data.get("medicineId")
+                    != data["medicineId"]
+                ):
+                    return False
+
+                if (
+                    schedule_data.get("version")
+                    != data["scheduleVersion"]
+                ):
+                    return False
+
+                scheduled_at = data.get("scheduledAt")
+
+                effective_at = (
+                    schedule_data.get("updatedAt")
+                    or schedule_data.get("createdAt")
+                )
+
+                if (
+                    not isinstance(scheduled_at, datetime)
+                    or scheduled_at.utcoffset() is None
+                ):
+                    return False
+
+                if (
+                    not isinstance(effective_at, datetime)
+                    or effective_at.utcoffset() is None
+                ):
+                    return False
+
+                # Không sinh liều trước thời điểm phiên bản
+                # lịch này bắt đầu có hiệu lực.
+                if scheduled_at < effective_at:
+                    return False
+
+                transaction.create(
+                    reference,
+                    data,
+                )
+
+                return True
+
+            try:
+                return create(client.transaction())
+
+            except AlreadyExists:
+                return False
 
     @staticmethod
     def update_dose_status(

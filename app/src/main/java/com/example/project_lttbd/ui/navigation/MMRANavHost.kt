@@ -118,6 +118,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import com.example.project_lttbd.ui.screens.notifications.NotificationHistoryRoute
+
 
 private const val MANUAL_MEDICINE_DRAFT_KEY = "manual_medicine_draft"
 
@@ -848,61 +850,15 @@ fun MMRANavHost(
         }
 
         composable(MMRADestinations.NOTIFICATIONS) {
-            val notificationContext = LocalContext.current
-            val currentUid =
-                FirebaseProvider.auth.currentUser?.uid.orEmpty()
-
-            var notifications by remember {
-                mutableStateOf(
-                    LocalNotificationStore.getNotifications(
-                        notificationContext,
-                        currentUid
-                    )
-                )
-            }
-
-            NotificationHistoryScreen(
-                notifications = notifications,
+            NotificationHistoryRoute(
                 onNotificationClick = { item ->
-                    LocalNotificationStore.markAsRead(
-                        notificationContext,
-                        currentUid,
-                        item.id
-                    )
-
-                    notifications =
-                        LocalNotificationStore.getNotifications(
-                            notificationContext,
-                            currentUid
-                        )
-
                     if (item.destinationRoute.isNotBlank()) {
-                        navController.navigate(
-                            item.destinationRoute
-                        ) {
+                        navController.navigate(item.destinationRoute) {
                             launchSingleTop = true
                         }
                     } else if (item.doseId.isNotBlank()) {
                         navController.openReminder(item.doseId)
                     }
-                },
-                onMarkAllAsRead = {
-                    LocalNotificationStore.markAllAsRead(
-                        notificationContext,
-                        currentUid
-                    )
-                    notifications =
-                        LocalNotificationStore.getNotifications(
-                            notificationContext,
-                            currentUid
-                        )
-                },
-                onClearAll = {
-                    LocalNotificationStore.clearAll(
-                        notificationContext,
-                        currentUid
-                    )
-                    notifications = emptyList()
                 },
                 onBackClick = {
                     navController.popBackStack()

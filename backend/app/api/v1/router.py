@@ -4,6 +4,8 @@ from app.api.v1.endpoints import (
     doses,
     health,
     history,
+    home,
+    medicines,
     password_reset,
     schedules,
     session,
@@ -18,3 +20,5 @@ api_router.include_router(session.router)
 api_router.include_router(schedules.router)
 api_router.include_router(doses.router)
 api_router.include_router(history.router)
+api_router.include_router(home.router)
+api_router.include_router(medicines.router)
