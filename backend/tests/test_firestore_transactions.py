@@ -243,3 +243,148 @@ def test_failed_transaction_does_not_partially_update(test_user):
 
     assert schedule["version"] == 1
     assert dose["status"] == "PENDING"
+
+def test_overdue_pending_dose_is_marked_missed(test_user):
+    now = datetime.now(timezone.utc)
+
+    seed_dose(
+        test_user,
+        "dose-overdue",
+        1,
+        "PENDING",
+        now - timedelta(minutes=31),
+    )
+
+    result = MedicationRepository.mark_dose_missed_if_overdue(
+        user=test_user,
+        dose_id="dose-overdue",
+        now=now,
+    )
+
+    assert result is not None
+    assert result["status"] == "MISSED"
+
+
+def test_pending_dose_within_grace_period_is_preserved(test_user):
+    now = datetime.now(timezone.utc)
+
+    seed_dose(
+        test_user,
+        "dose-within-grace",
+        1,
+        "PENDING",
+        now - timedelta(minutes=29),
+    )
+
+    result = MedicationRepository.mark_dose_missed_if_overdue(
+        user=test_user,
+        dose_id="dose-within-grace",
+        now=now,
+    )
+
+    assert result is not None
+    assert result["status"] == "PENDING"
+
+
+def test_pending_dose_at_exact_grace_deadline_is_preserved(test_user):
+    now = datetime.now(timezone.utc)
+
+    seed_dose(
+        test_user,
+        "dose-exact-deadline",
+        1,
+        "PENDING",
+        now - timedelta(minutes=30),
+    )
+
+    result = MedicationRepository.mark_dose_missed_if_overdue(
+        user=test_user,
+        dose_id="dose-exact-deadline",
+        now=now,
+    )
+
+    assert result is not None
+    assert result["status"] == "PENDING"
+
+
+def test_snoozed_dose_uses_next_reminder_at(test_user):
+    now = datetime.now(timezone.utc)
+
+    data = seed_dose(
+        test_user,
+        "dose-snoozed",
+        1,
+        "PENDING",
+        now - timedelta(hours=2),
+    )
+
+    data["nextReminderAt"] = now - timedelta(minutes=31)
+
+    user_document(
+        test_user,
+        "doses",
+        "dose-snoozed",
+    ).set(data)
+
+    result = MedicationRepository.mark_dose_missed_if_overdue(
+        user=test_user,
+        dose_id="dose-snoozed",
+        now=now,
+    )
+
+    assert result is not None
+    assert result["status"] == "MISSED"
+
+
+def test_snoozed_dose_within_grace_period_is_preserved(test_user):
+    now = datetime.now(timezone.utc)
+
+    data = seed_dose(
+        test_user,
+        "dose-snoozed-within-grace",
+        1,
+        "PENDING",
+        now - timedelta(hours=2),
+    )
+
+    data["nextReminderAt"] = now - timedelta(minutes=29)
+
+    user_document(
+        test_user,
+        "doses",
+        "dose-snoozed-within-grace",
+    ).set(data)
+
+    result = MedicationRepository.mark_dose_missed_if_overdue(
+        user=test_user,
+        dose_id="dose-snoozed-within-grace",
+        now=now,
+    )
+
+    assert result is not None
+    assert result["status"] == "PENDING"
+
+
+@pytest.mark.parametrize(
+    "status",
+    ["TAKEN", "SKIPPED", "CANCELLED", "MISSED"],
+)
+def test_finalized_dose_status_is_preserved(test_user, status):
+    now = datetime.now(timezone.utc)
+
+    seed_dose(
+        test_user,
+        f"dose-{status.lower()}",
+        1,
+        status,
+        now - timedelta(hours=2),
+    )
+
+    result = MedicationRepository.mark_dose_missed_if_overdue(
+        user=test_user,
+        dose_id=f"dose-{status.lower()}",
+        now=now,
+    )
+
+    assert result is not None
+    assert result["status"] == status
