@@ -235,14 +235,39 @@ class DoseService:
         """
         Lấy Dose của một ngày.
 
-        Trước khi đọc danh sách, hệ thống sinh các Dose còn thiếu
-        từ những lịch uống thuốc đang có hiệu lực.
+        Trước khi trả về danh sách:
+        - Sinh các Dose còn thiếu từ lịch uống thuốc.
+        - Kiểm tra các Dose PENDING đã quá hạn 30 phút.
+        - Chuyển Dose quá hạn sang MISSED bằng transaction.
         """
         DoseService.generate_doses_for_date(
             user,
             target_date,
         )
 
+        doses = MedicationRepository.list_doses(
+            user,
+            target_date,
+        )
+
+        now = datetime.now(timezone.utc)
+
+        for dose in doses:
+            if dose.get("status") != "PENDING":
+                continue
+
+            dose_id = dose.get("doseId")
+
+            if not dose_id:
+                continue
+
+            MedicationRepository.mark_dose_missed_if_overdue(
+                user=user,
+                dose_id=dose_id,
+                now=now,
+            )
+
+        # Đọc lại để trả về trạng thái mới nhất sau khi cập nhật.
         return MedicationRepository.list_doses(
             user,
             target_date,
