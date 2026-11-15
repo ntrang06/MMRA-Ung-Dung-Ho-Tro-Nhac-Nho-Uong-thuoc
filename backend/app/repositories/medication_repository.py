@@ -1,3 +1,4 @@
+
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
@@ -26,7 +27,6 @@ def _snapshot_to_dict(
     data = snapshot.to_dict() or {}
 
     if id_field == "doseId":
-        # DoseResponse không cho phép trường metadata "id".
         data.pop("id", None)
         data["doseId"] = snapshot.id
     else:
@@ -44,37 +44,20 @@ class MedicationRepository:
         dose_id: str,
         data: dict[str, Any],
     ) -> bool:
-        reference = user_document(
-            user,
-            "doses",
-            dose_id,
-        )
-
+        reference = user_document(user, "doses", dose_id)
         medicine_ref = user_document(
-            user,
-            "medicines",
-            data["medicineId"],
+            user, "medicines", data["medicineId"]
         )
-
         schedule_ref = user_document(
-            user,
-            "schedules",
-            data["scheduleId"],
+            user, "schedules", data["scheduleId"]
         )
 
-        client = firestore.client(
-            app=get_firebase_app()
-        )
+        client = firestore.client(app=get_firebase_app())
 
         @google_firestore.transactional
         def create(transaction):
-            medicine = medicine_ref.get(
-                transaction=transaction
-            )
-
-            schedule = schedule_ref.get(
-                transaction=transaction
-            )
+            medicine = medicine_ref.get(transaction=transaction)
+            schedule = schedule_ref.get(transaction=transaction)
 
             medicine_data = medicine.to_dict() or {}
             schedule_data = schedule.to_dict() or {}
@@ -94,20 +77,13 @@ class MedicationRepository:
             if not schedule_data.get("enabled", False):
                 return False
 
-            if (
-                schedule_data.get("medicineId")
-                != data["medicineId"]
-            ):
+            if schedule_data.get("medicineId") != data["medicineId"]:
                 return False
 
-            if (
-                schedule_data.get("version")
-                != data["scheduleVersion"]
-            ):
+            if schedule_data.get("version") != data["scheduleVersion"]:
                 return False
 
             scheduled_at = data.get("scheduledAt")
-
             effective_at = (
                 schedule_data.get("updatedAt")
                 or schedule_data.get("createdAt")
@@ -135,6 +111,7 @@ class MedicationRepository:
             return create(client.transaction())
         except AlreadyExists:
             return False
+
     # ---------------------------------------------------------
     # MEDICINES
     # ---------------------------------------------------------
@@ -145,9 +122,7 @@ class MedicationRepository:
         medicine_id: str,
     ) -> dict[str, Any] | None:
         snapshot = user_document(
-            user,
-            "medicines",
-            medicine_id,
+            user, "medicines", medicine_id
         ).get()
 
         return _snapshot_to_dict(snapshot)
@@ -162,9 +137,7 @@ class MedicationRepository:
         schedule_id: str,
     ) -> dict[str, Any] | None:
         snapshot = user_document(
-            user,
-            "schedules",
-            schedule_id,
+            user, "schedules", schedule_id
         ).get()
 
         return _snapshot_to_dict(snapshot)
@@ -174,11 +147,7 @@ class MedicationRepository:
         user: CurrentUser,
         enabled_only: bool = False,
     ) -> list[dict[str, Any]]:
-        snapshots = user_collection(
-            user,
-            "schedules",
-        ).stream()
-
+        snapshots = user_collection(user, "schedules").stream()
         schedules = []
 
         for snapshot in snapshots:
@@ -201,11 +170,8 @@ class MedicationRepository:
         data: dict[str, Any],
     ) -> dict[str, Any]:
         reference = user_document(
-            user,
-            "schedules",
-            schedule_id,
+            user, "schedules", schedule_id
         )
-
         reference.create(data)
 
         return {
@@ -219,10 +185,7 @@ class MedicationRepository:
         current_version: int,
         now: datetime,
     ) -> bool:
-        """
-        Chỉ hủy liều PENDING thuộc phiên bản hiện tại
-        và có giờ uống nằm trong tương lai.
-        """
+        """Chỉ hủy liều PENDING thuộc phiên bản hiện tại và ở tương lai."""
         if dose_data.get("scheduleVersion") != current_version:
             return False
 
@@ -235,9 +198,7 @@ class MedicationRepository:
             return False
 
         if scheduled_at.tzinfo is None:
-            scheduled_at = scheduled_at.replace(
-                tzinfo=timezone.utc,
-            )
+            scheduled_at = scheduled_at.replace(tzinfo=timezone.utc)
 
         if now.tzinfo is None:
             now = now.replace(tzinfo=timezone.utc)
@@ -254,15 +215,9 @@ class MedicationRepository:
         """
         Cập nhật lịch và hủy liều tương lai của phiên bản cũ
         trong cùng transaction.
-
-        None: không tìm thấy lịch.
-        False: phiên bản không khớp.
-        dict: cập nhật thành công.
         """
         schedule_ref = user_document(
-            user,
-            "schedules",
-            schedule_id,
+            user, "schedules", schedule_id
         )
 
         client = firestore.client(app=get_firebase_app())
@@ -271,12 +226,9 @@ class MedicationRepository:
         @google_firestore.transactional
         def _update(transaction: Any):
             schedule_snapshot = schedule_ref.get(
-                transaction=transaction,
+                transaction=transaction
             )
-
-            current_schedule = _snapshot_to_dict(
-                schedule_snapshot,
-            )
+            current_schedule = _snapshot_to_dict(schedule_snapshot)
 
             if current_schedule is None:
                 return None
@@ -287,13 +239,10 @@ class MedicationRepository:
                 return False
 
             doses_query = user_collection(
-                user,
-                "doses",
+                user, "doses"
             ).where(
                 filter=FieldFilter(
-                    "scheduleId",
-                    "==",
-                    schedule_id,
+                    "scheduleId", "==", schedule_id
                 )
             )
 
@@ -304,9 +253,7 @@ class MedicationRepository:
                 dose_data = dose_snapshot.to_dict() or {}
 
                 if not MedicationRepository.should_cancel_future_dose(
-                    dose_data,
-                    current_version,
-                    now,
+                    dose_data, current_version, now
                 ):
                     continue
 
@@ -338,9 +285,7 @@ class MedicationRepository:
         dose_id: str,
     ) -> dict[str, Any] | None:
         snapshot = user_document(
-            user,
-            "doses",
-            dose_id,
+            user, "doses", dose_id
         ).get()
 
         return _snapshot_to_dict(
@@ -381,143 +326,23 @@ class MedicationRepository:
             key=lambda dose: dose.get("minuteOfDay", 0),
         )
 
-        @staticmethod
-        def create_dose_if_absent(
-            user: CurrentUser,
-            dose_id: str,
-            data: dict[str, Any],
-        ) -> bool:
-            reference = user_document(
-                user,
-                "doses",
-                dose_id,
-            )
-
-            medicine_ref = user_document(
-                user,
-                "medicines",
-                data["medicineId"],
-            )
-
-            schedule_ref = user_document(
-                user,
-                "schedules",
-                data["scheduleId"],
-            )
-
-            client = firestore.client(
-                app=get_firebase_app()
-            )
-
-            @google_firestore.transactional
-            def create(transaction):
-                medicine = medicine_ref.get(
-                    transaction=transaction
-                )
-
-                schedule = schedule_ref.get(
-                    transaction=transaction
-                )
-
-                medicine_data = medicine.to_dict() or {}
-                schedule_data = schedule.to_dict() or {}
-
-                if (
-                    not medicine.exists
-                    or medicine_data.get("deletedAt") is not None
-                ):
-                    return False
-
-                if (
-                    not schedule.exists
-                    or schedule_data.get("deletedAt") is not None
-                ):
-                    return False
-
-                if not schedule_data.get("enabled", False):
-                    return False
-
-                if (
-                    schedule_data.get("medicineId")
-                    != data["medicineId"]
-                ):
-                    return False
-
-                if (
-                    schedule_data.get("version")
-                    != data["scheduleVersion"]
-                ):
-                    return False
-
-                scheduled_at = data.get("scheduledAt")
-
-                effective_at = (
-                    schedule_data.get("updatedAt")
-                    or schedule_data.get("createdAt")
-                )
-
-                if (
-                    not isinstance(scheduled_at, datetime)
-                    or scheduled_at.utcoffset() is None
-                ):
-                    return False
-
-                if (
-                    not isinstance(effective_at, datetime)
-                    or effective_at.utcoffset() is None
-                ):
-                    return False
-
-                # Không sinh liều trước thời điểm phiên bản
-                # lịch này bắt đầu có hiệu lực.
-                if scheduled_at < effective_at:
-                    return False
-
-                transaction.create(
-                    reference,
-                    data,
-                )
-
-                return True
-
-            try:
-                return create(client.transaction())
-
-            except AlreadyExists:
-                return False
-
     @staticmethod
     def update_dose_status(
         user: CurrentUser,
         dose_id: str,
         status: str,
     ) -> dict[str, Any] | None:
-        """
-        Chuyển PENDING sang TAKEN hoặc SKIPPED.
-
-        Nếu gửi lại cùng hành động đã lưu,
-        trả về kết quả hiện tại.
-        """
+        """Chuyển PENDING sang TAKEN hoặc SKIPPED."""
         if status not in {"TAKEN", "SKIPPED"}:
             raise ValueError("Trạng thái Dose không hợp lệ.")
 
-        reference = user_document(
-            user,
-            "doses",
-            dose_id,
-        )
-
+        reference = user_document(user, "doses", dose_id)
         client = firestore.client(app=get_firebase_app())
         transaction = client.transaction()
 
         @google_firestore.transactional
-        def _update(
-            transaction: Any,
-        ) -> dict[str, Any] | None:
-            snapshot = reference.get(
-                transaction=transaction,
-            )
-
+        def _update(transaction: Any) -> dict[str, Any] | None:
+            snapshot = reference.get(transaction=transaction)
             current = _snapshot_to_dict(
                 snapshot,
                 id_field="doseId",
@@ -537,7 +362,6 @@ class MedicationRepository:
                 )
 
             now = datetime.now(timezone.utc)
-
             updates = {
                 "status": status,
                 "actionAt": now,
@@ -554,27 +378,94 @@ class MedicationRepository:
         return _update(transaction)
 
     @staticmethod
+    def mark_dose_missed_if_overdue(
+        user: CurrentUser,
+        dose_id: str,
+        now: datetime,
+        grace_minutes: int = 30,
+    ) -> dict[str, Any] | None:
+        """
+        Chuyển PENDING sang MISSED nếu quá thời hạn nhắc
+        thêm grace_minutes.
+
+        Ưu tiên nextReminderAt nếu đã Snooze;
+        nếu chưa Snooze thì dùng scheduledAt.
+        """
+        if grace_minutes < 0:
+            raise ValueError("Thời gian chờ không hợp lệ.")
+
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+
+        reference = user_document(user, "doses", dose_id)
+        client = firestore.client(app=get_firebase_app())
+        transaction = client.transaction()
+
+        @google_firestore.transactional
+        def _mark_missed(
+            transaction: Any,
+        ) -> dict[str, Any] | None:
+            snapshot = reference.get(transaction=transaction)
+            current = _snapshot_to_dict(
+                snapshot,
+                id_field="doseId",
+            )
+
+            if current is None:
+                return None
+
+            if current.get("status") != "PENDING":
+                return current
+
+            reminder_at = (
+                current.get("nextReminderAt")
+                or current.get("scheduledAt")
+            )
+
+            if not isinstance(reminder_at, datetime):
+                return current
+
+            if reminder_at.tzinfo is None:
+                reminder_at = reminder_at.replace(
+                    tzinfo=timezone.utc
+                )
+
+            deadline = reminder_at + timedelta(
+                minutes=grace_minutes
+            )
+
+            if now <= deadline:
+                return current
+
+            updates = {
+                "status": "MISSED",
+                "actionAt": now,
+                "updatedAt": now,
+            }
+
+            transaction.update(reference, updates)
+
+            return {
+                **current,
+                **updates,
+            }
+
+        return _mark_missed(transaction)
+
+    @staticmethod
     def snooze_dose_if_pending(
         user: CurrentUser,
         dose_id: str,
         minutes: int,
     ) -> dict[str, Any] | None:
         """Lưu thời điểm nhắc lại nếu liều vẫn PENDING."""
-        reference = user_document(
-            user,
-            "doses",
-            dose_id,
-        )
-
+        reference = user_document(user, "doses", dose_id)
         client = firestore.client(app=get_firebase_app())
         transaction = client.transaction()
 
         @google_firestore.transactional
         def _snooze(transaction: Any):
-            snapshot = reference.get(
-                transaction=transaction,
-            )
-
+            snapshot = reference.get(transaction=transaction)
             current = _snapshot_to_dict(
                 snapshot,
                 id_field="doseId",
@@ -589,7 +480,6 @@ class MedicationRepository:
                 )
 
             now = datetime.now(timezone.utc)
-
             updates = {
                 "nextReminderAt": now + timedelta(minutes=minutes),
                 "updatedAt": now,
