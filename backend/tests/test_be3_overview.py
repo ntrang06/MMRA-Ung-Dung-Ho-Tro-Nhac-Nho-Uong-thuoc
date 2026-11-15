@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from google.api_core.exceptions import ServiceUnavailable
 
 from app.api.deps import CurrentUser, get_current_user
-from app.api.v1.endpoints import home, medicines
+from app.api.v1.endpoints import home, medicines, history
 from app.repositories.medication_repository import MedicationRepository
 from app.repositories import medication_repository as repository
 
@@ -480,5 +480,272 @@ class DeletionTests(TestCase):
                     dose(1),
                 )
             )
-
             self.transaction.create.assert_not_called()
+
+
+class HistoryTests(TestCase):
+    def setUp(self):
+        self.app = FastAPI()
+        self.app.include_router(
+            history.router,
+            prefix="/api/v1",
+        )
+        self.app.dependency_overrides[get_current_user] = (
+            lambda: CurrentUser("A")
+        )
+
+        self.client = TestClient(self.app)
+
+        self.rows = [
+            dose(1, "TAKEN", minute=480),
+            dose(2, "SKIPPED", minute=540),
+            dose(3, "MISSED", minute=600),
+            dose(4, "PENDING", minute=660),
+            dose(5, "CANCELLED", minute=720),
+            dose(
+                6,
+                "TAKEN",
+                minute=780,
+                localDate="2026-11-15",
+            ),
+            dose(
+                7,
+                "MISSED",
+                minute=840,
+                localDate="2026-10-14",
+            ),
+        ]
+
+        self.snapshots = [
+            snapshot(row["doseId"], row)
+            for row in self.rows
+        ]
+
+        self.query = Mock()
+        self.query.where.return_value = self.query
+        self.query.stream.return_value = iter(self.snapshots)
+
+        self.scopes = []
+
+
+    def collection(self, user, name):
+        self.scopes.append((user.uid, name))
+
+        rows = self.snapshots
+
+        class FakeQuery:
+            def __init__(self):
+                self.filters = []
+
+            def where(self, *, filter):
+                self.filters.append(filter)
+                return self
+
+            def stream(self):
+                result = []
+
+                for item in rows:
+                    data = item.to_dict()
+
+                    matched = True
+
+                    for field, operator, value in self.filters:
+                        actual = data.get(field)
+
+                        if operator == "==":
+                            matched = actual == value
+                        elif operator == ">=":
+                            matched = actual >= value
+                        elif operator == "<=":
+                            matched = actual <= value
+
+                        if not matched:
+                            break
+
+                    if matched:
+                        result.append(item)
+
+                return iter(result)
+
+        return FakeQuery()
+
+    def request_history(self, params):
+        with (
+            patch.object(
+                history,
+                "user_collection",
+                self.collection,
+            ),
+            patch.object(
+                history,
+                "FieldFilter",
+                side_effect=lambda field, operator, value: (
+                    field,
+                    operator,
+                    value,
+                ),
+            ),
+        ):
+            return self.client.get(
+                "/api/v1/history/doses",
+                params=params,
+            )
+
+    def test_get_all_history_in_month(self):
+        response = self.request_history({
+            "month": "2026-11",
+        })
+
+        self.assertEqual(response.status_code, 200)
+
+        body = response.json()
+
+        self.assertEqual(len(body), 5)
+        self.assertEqual(
+            [item["status"] for item in body],
+            [
+                "TAKEN",
+                "SKIPPED",
+                "MISSED",
+                "PENDING",
+                "TAKEN",
+            ],
+        )
+
+        self.assertEqual(
+            self.scopes,
+            [("A", "doses")],
+        )
+
+        self.assertEqual(
+            [item["localDate"] for item in body],
+            [
+                "2026-11-14",
+                "2026-11-14",
+                "2026-11-14",
+                "2026-11-14",
+                "2026-11-15",
+            ],
+        )
+
+    def test_filter_history_by_date(self):
+        response = self.request_history({
+            "month": "2026-11",
+            "date": "2026-11-14",
+        })
+
+        self.assertEqual(response.status_code, 200)
+
+        body = response.json()
+
+        self.assertEqual(len(body), 4)
+        self.assertTrue(
+            all(
+                item["localDate"] == "2026-11-14"
+                for item in body
+            )
+        )
+
+    def test_filter_history_by_each_status(self):
+        for status in [
+            "TAKEN",
+            "SKIPPED",
+            "MISSED",
+            "PENDING",
+        ]:
+            with self.subTest(status=status):
+                response = self.request_history({
+                    "month": "2026-11",
+                    "status": status,
+                })
+
+                self.assertEqual(
+                    response.status_code,
+                    200,
+                )
+
+                body = response.json()
+
+                self.assertTrue(
+                    all(
+                        item["status"] == status
+                        for item in body
+                    )
+                )
+
+    def test_filter_by_date_and_status_together(self):
+        response = self.request_history({
+            "month": "2026-11",
+            "date": "2026-11-14",
+            "status": "MISSED",
+        })
+
+        self.assertEqual(response.status_code, 200)
+
+        body = response.json()
+
+        self.assertEqual(len(body), 1)
+        self.assertEqual(body[0]["status"], "MISSED")
+        self.assertEqual(
+            body[0]["localDate"],
+            "2026-11-14",
+        )
+
+    def test_date_outside_month_returns_422(self):
+        response = self.client.get(
+            "/api/v1/history/doses",
+            params={
+                "month": "2026-11",
+                "date": "2026-10-14",
+            },
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_cancelled_doses_are_excluded(self):
+        response = self.request_history({
+            "month": "2026-11",
+        })
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertNotIn(
+            "CANCELLED",
+            [
+                item["status"]
+                for item in response.json()
+            ],
+        )
+
+    def test_invalid_month_and_status_return_422(self):
+        invalid_month = self.client.get(
+            "/api/v1/history/doses",
+            params={"month": "2026-13"},
+        )
+
+        invalid_status = self.client.get(
+            "/api/v1/history/doses",
+            params={
+                "month": "2026-11",
+                "status": "UNKNOWN",
+            },
+        )
+
+        self.assertEqual(
+            invalid_month.status_code,
+            422,
+        )
+        self.assertEqual(
+            invalid_status.status_code,
+            422,
+        )
+
+    def test_history_requires_authentication(self):
+        self.app.dependency_overrides.clear()
+
+        response = self.client.get(
+            "/api/v1/history/doses",
+            params={"month": "2026-11"},
+        )
+
+        self.assertEqual(response.status_code, 401)
