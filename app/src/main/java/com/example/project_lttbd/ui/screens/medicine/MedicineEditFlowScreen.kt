@@ -184,7 +184,8 @@ fun MedicineEditFlowScreen(
 
                             if (
                                 image != null &&
-                                !image.startsWith("https://")
+                                !com.example.project_lttbd.data.image.MedicinePhotoCodec
+                                    .isStoredSource(image)
                             ) {
                                 pendingImageDraft = updatedDraft
                             } else {

@@ -1,7 +1,5 @@
 package com.example.project_lttbd.ui.screens.medicine
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -25,7 +23,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -52,54 +49,35 @@ fun ManualMedicineScreen(
     var medicineName by rememberSaveable {
         mutableStateOf(initialDraft?.medicineName.orEmpty())
     }
-
     var strength by rememberSaveable {
         mutableStateOf(initialDraft?.strength.orEmpty())
     }
-
     var strengthUnit by rememberSaveable {
         mutableStateOf(initialDraft?.strengthUnit ?: "mg")
     }
-
     var dosageForm by rememberSaveable {
         mutableStateOf(initialDraft?.dosageForm.orEmpty())
     }
-
     var note by rememberSaveable {
         mutableStateOf(initialDraft?.note.orEmpty())
     }
-
     var imageUri by rememberSaveable {
         mutableStateOf<String?>(initialDraft?.imageUri)
     }
-
     var attemptedContinue by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var photoBusy by remember {
         mutableStateOf(false)
     }
 
     val focusManager = LocalFocusManager.current
-    val isPreview = LocalInspectionMode.current
-
-    val imagePicker = if (!isPreview) {
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.GetContent()
-        ) { uri ->
-            if (uri != null) {
-                imageUri = uri.toString()
-            }
-        }
-    } else {
-        null
-    }
-
     val trimmedStrength = strength.trim()
 
     val validStrength = trimmedStrength.isEmpty() || (
             trimmedStrength.matches(Regex("\\d+([.,]\\d+)?")) &&
-                    trimmedStrength
-                        .replace(',', '.')
-                        .toBigDecimalOrNull()
-                        ?.signum() == 1
+                    trimmedStrength.replace(',', '.')
+                        .toBigDecimalOrNull()?.signum() == 1
             )
 
     Column(
@@ -108,10 +86,7 @@ fun ManualMedicineScreen(
             .background(Color(0xFFF7FAF9))
             .imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(
-                horizontal = 20.dp,
-                vertical = 14.dp
-            ),
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Row(
@@ -128,9 +103,7 @@ fun ManualMedicineScreen(
                 shape = CircleShape,
                 color = Color(0xFFEEF5F3)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(contentAlignment = Alignment.Center) {
                     ManualMedicineIcon(
                         kind = ManualIconKind.BACK,
                         modifier = Modifier.size(20.dp),
@@ -162,13 +135,10 @@ fun ManualMedicineScreen(
                     text = when {
                         saveMedicineOnly && isEditing ->
                             "Thông tin thuốc"
-
                         saveMedicineOnly ->
                             "Thông tin thuốc • Chưa thiết lập lịch uống"
-
                         isEditing ->
                             "Kiểm tra thông tin và lịch uống"
-
                         else ->
                             "Bước 1/3 • Nhập thông tin"
                     },
@@ -192,87 +162,18 @@ fun ManualMedicineScreen(
             color = Color(0xFF526565)
         )
 
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            color = Color.White,
-            border = BorderStroke(
-                width = 1.dp,
-                color = Color(0xFFD7E2DF)
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    modifier = Modifier.size(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0xFFD9EEEA)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center
-                    ) {
-                        ManualMedicineIcon(
-                            kind = ManualIconKind.CAMERA,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Text(
-                        text = "Ảnh thuốc",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color(0xFF102A2A)
-                    )
-
-                    Text(
-                        text = if (imageUri == null) {
-                            "Không bắt buộc"
-                        } else {
-                            "Đã chọn ảnh"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF526565)
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        focusManager.clearFocus()
-                        imagePicker?.launch("image/*")
-                    },
-                    modifier = Modifier.heightIn(min = 48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = Color(0xFF126B62)
-                    )
-                ) {
-                    Text(
-                        text = if (imageUri == null) {
-                            "Thêm ảnh"
-                        } else {
-                            "Đổi ảnh"
-                        }
-                    )
-                }
-            }
-        }
+        MedicinePhotoField(
+            source = imageUri,
+            savedSource = initialDraft?.imageUri,
+            onChange = { imageUri = it },
+            onBusyChange = { photoBusy = it }
+        )
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
             color = Color.White,
-            border = BorderStroke(
-                width = 1.dp,
-                color = Color(0xFFD7E2DF)
-            )
+            border = BorderStroke(1.dp, Color(0xFFD7E2DF))
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -280,20 +181,17 @@ fun ManualMedicineScreen(
             ) {
                 MMRATextField(
                     value = medicineName,
-                    onValueChange = {
-                        medicineName = it
-                    },
+                    onValueChange = { medicineName = it },
                     label = "Tên thuốc *",
                     placeholder = "Ví dụ: Metformin",
                     modifier = Modifier.fillMaxWidth(),
                     labelOutside = true,
-                    errorMessage = if (
-                        attemptedContinue && medicineName.isBlank()
-                    ) {
-                        "Vui lòng nhập tên thuốc."
-                    } else {
-                        null
-                    },
+                    errorMessage =
+                        if (attemptedContinue && medicineName.isBlank()) {
+                            "Vui lòng nhập tên thuốc."
+                        } else {
+                            null
+                        },
                     keyboardOptions = KeyboardOptions(
                         imeAction = ImeAction.Next
                     )
@@ -306,20 +204,17 @@ fun ManualMedicineScreen(
                 ) {
                     MMRATextField(
                         value = strength,
-                        onValueChange = {
-                            strength = it
-                        },
+                        onValueChange = { strength = it },
                         label = "Hàm lượng",
                         placeholder = "Ví dụ: 500",
                         modifier = Modifier.weight(1f),
                         labelOutside = true,
-                        errorMessage = if (
-                            attemptedContinue && !validStrength
-                        ) {
-                            "Nhập hàm lượng là số lớn hơn 0."
-                        } else {
-                            null
-                        },
+                        errorMessage =
+                            if (attemptedContinue && !validStrength) {
+                                "Nhập hàm lượng là số lớn hơn 0."
+                            } else {
+                                null
+                            },
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Decimal,
                             imeAction = ImeAction.Next
@@ -331,16 +226,9 @@ fun ManualMedicineScreen(
                         value = strengthUnit,
                         placeholder = "",
                         options = listOf(
-                            "mg",
-                            "g",
-                            "mcg",
-                            "IU",
-                            "mg/ml",
-                            "%"
+                            "mg", "g", "mcg", "IU", "mg/ml", "%"
                         ),
-                        onSelect = {
-                            strengthUnit = it
-                        },
+                        onSelect = { strengthUnit = it },
                         modifier = Modifier.weight(0.55f)
                     )
                 }
@@ -350,23 +238,15 @@ fun ManualMedicineScreen(
                     value = dosageForm,
                     placeholder = "Chọn dạng thuốc",
                     options = listOf(
-                        "Viên nén",
-                        "Viên nang",
-                        "Dung dịch",
-                        "Siro",
-                        "Thuốc nhỏ",
-                        "Khác"
+                        "Viên nén", "Viên nang", "Dung dịch",
+                        "Siro", "Thuốc nhỏ", "Khác"
                     ),
-                    onSelect = {
-                        dosageForm = it
-                    }
+                    onSelect = { dosageForm = it }
                 )
 
                 MMRATextField(
                     value = note,
-                    onValueChange = {
-                        note = it
-                    },
+                    onValueChange = { note = it },
                     label = "Ghi chú",
                     placeholder = "Thông tin bổ sung (nếu có)",
                     modifier = Modifier.fillMaxWidth(),
@@ -402,10 +282,15 @@ fun ManualMedicineScreen(
                 else -> "Tiếp tục"
             },
             modifier = Modifier.fillMaxWidth(),
+            enabled = !photoBusy,
             onClick = {
                 attemptedContinue = true
 
-                if (medicineName.isNotBlank() && validStrength) {
+                if (
+                    !photoBusy &&
+                    medicineName.isNotBlank() &&
+                    validStrength
+                ) {
                     focusManager.clearFocus()
 
                     onContinue(
@@ -463,31 +348,21 @@ private fun ManualMedicineDropdown(
 
         Box {
             Surface(
-                onClick = {
-                    expanded = true
-                },
+                onClick = { expanded = true },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 color = Color.White,
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = Color(0xFFD7E2DF)
-                )
+                border = BorderStroke(1.dp, Color(0xFFD7E2DF))
             ) {
                 Row(
                     modifier = Modifier
                         .heightIn(min = 56.dp)
-                        .padding(
-                            horizontal = 12.dp,
-                            vertical = 10.dp
-                        ),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = value.ifEmpty {
-                            placeholder
-                        },
+                        text = value.ifEmpty { placeholder },
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontSize = 15.sp,
@@ -511,15 +386,11 @@ private fun ManualMedicineDropdown(
 
             DropdownMenu(
                 expanded = expanded,
-                onDismissRequest = {
-                    expanded = false
-                }
+                onDismissRequest = { expanded = false }
             ) {
                 options.forEach { option ->
                     DropdownMenuItem(
-                        text = {
-                            Text(option)
-                        },
+                        text = { Text(option) },
                         onClick = {
                             onSelect(option)
                             expanded = false
@@ -532,10 +403,7 @@ private fun ManualMedicineDropdown(
 }
 
 internal enum class ManualIconKind {
-    BACK,
-    CAMERA,
-    DOWN,
-    FORWARD
+    BACK, CAMERA, DOWN, FORWARD
 }
 
 @Composable
@@ -584,14 +452,8 @@ internal fun ManualMedicineIcon(
             ManualIconKind.CAMERA -> {
                 drawRoundRect(
                     color = color,
-                    topLeft = Offset(
-                        w * 0.1f,
-                        h * 0.3f
-                    ),
-                    size = Size(
-                        w * 0.8f,
-                        h * 0.55f
-                    ),
+                    topLeft = Offset(w * 0.1f, h * 0.3f),
+                    size = Size(w * 0.8f, h * 0.55f),
                     cornerRadius = CornerRadius(w * 0.1f),
                     style = Stroke(stroke)
                 )
@@ -599,10 +461,7 @@ internal fun ManualMedicineIcon(
                 drawCircle(
                     color = color,
                     radius = w * 0.16f,
-                    center = Offset(
-                        w * 0.5f,
-                        h * 0.57f
-                    ),
+                    center = Offset(w * 0.5f, h * 0.57f),
                     style = Stroke(stroke)
                 )
 
@@ -613,21 +472,13 @@ internal fun ManualMedicineIcon(
                     lineTo(w * 0.7f, h * 0.3f)
                 }
 
-                drawPath(
-                    path = top,
-                    color = color,
-                    style = Stroke(stroke)
-                )
+                drawPath(top, color, style = Stroke(stroke))
             }
         }
     }
 }
 
-@Preview(
-    showBackground = true,
-    widthDp = 390,
-    heightDp = 844
-)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun ManualMedicineScreenPreview() {
     MMRATheme {

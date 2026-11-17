@@ -1589,7 +1589,8 @@ private fun MedicineEntryDestination(
 
     pendingDraft?.let { draft ->
         val hasLocalImage = draft.imageUri?.let {
-            !it.startsWith("https://")
+            !com.example.project_lttbd.data.image.MedicinePhotoCodec
+                .isStoredSource(it)
         } == true
 
         AlertDialog(
@@ -1656,10 +1657,6 @@ private fun MedicineEntryDestination(
                                 dosageForm = draft.dosageForm,
                                 note = draft.note,
                                 imageUrl = draft.imageUri
-                                    ?.takeIf {
-                                        it.startsWith("https://")
-                                    }
-                                    ?: savedImageUrl
                             )
 
                             val task: com.google.android.gms.tasks.Task<*> =

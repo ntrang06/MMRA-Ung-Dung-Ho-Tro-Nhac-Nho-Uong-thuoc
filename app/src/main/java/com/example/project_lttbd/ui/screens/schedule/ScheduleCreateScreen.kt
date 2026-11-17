@@ -356,11 +356,10 @@ fun ScheduleCreateScreen(
                                         )
 
                                     require(
-                                        draft.imageUri == null ||
-                                                draft.imageUri.startsWith("https://")
+                                        com.example.project_lttbd.data.image.MedicinePhotoCodec
+                                            .isStoredSource(draft.imageUri)
                                     ) {
-                                        "Ảnh vừa chọn chưa được tải lên. " +
-                                                "Hãy quay lại dùng ảnh đã lưu trước khi tiếp tục."
+                                        "Ảnh thuốc chưa hợp lệ. Vui lòng quay lại chọn ảnh."
                                     }
 
                                     val result = try {
