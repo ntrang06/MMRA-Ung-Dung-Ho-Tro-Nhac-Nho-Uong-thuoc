@@ -1154,10 +1154,10 @@ fun MMRANavHost(
 
         composable(MMRADestinations.HISTORY) {
             HistoryScreen(
-                onDoseClick = {
+                onDoseClick = { doseId ->
                     navController.openReminder(
-                        it,
-                        readOnly = true
+                        doseId,
+                        readOnly = false
                     )
                 },
                 onAccountClick = {
