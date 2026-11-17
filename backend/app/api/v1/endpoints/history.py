@@ -7,7 +7,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.api.deps import AuthenticatedUser
 from app.repositories.user_scope import user_collection
-from app.schemas.medication import DoseResponse
+from app.schemas.medication import DoseResponse, DoseStatus
 
 
 router = APIRouter(tags=["Medication History"])
@@ -27,8 +27,25 @@ def get_dose_history(
             max_length=7,
         ),
     ],
+    target_date: Annotated[
+        date | None,
+        Query(alias="date"),
+    ] = None,
+    status: Annotated[
+        DoseStatus | None,
+        Query(),
+    ] = None,
 ):
-    """Đọc liều đã lưu trong tháng, không sinh hoặc sửa liều."""
+    """
+    Đọc lịch sử Dose trong tháng.
+
+    Hỗ trợ:
+    - Lọc theo tháng.
+    - Lọc theo ngày cụ thể trong tháng.
+    - Lọc theo trạng thái Dose.
+
+    Không sinh hoặc sửa Dose.
+    """
     try:
         year, month_number = map(int, month.split("-"))
 
@@ -38,30 +55,62 @@ def get_dose_history(
             month_number,
             monthrange(year, month_number)[1],
         )
+
     except ValueError as exc:
         raise HTTPException(
             status_code=422,
             detail="Tháng cần có định dạng yyyy-MM hợp lệ.",
         ) from exc
 
-    snapshots = (
-        user_collection(user, "doses")
-        .where(
-            filter=FieldFilter(
-                "localDate",
-                ">=",
-                first.isoformat(),
+    # Ngày được lọc phải thuộc tháng đang truy vấn.
+    if target_date is not None:
+        if target_date < first or target_date > last:
+            raise HTTPException(
+                status_code=422,
+                detail="Ngày lọc phải thuộc tháng được yêu cầu.",
             )
-        )
-        .where(
-            filter=FieldFilter(
-                "localDate",
-                "<=",
-                last.isoformat(),
-            )
-        )
-        .stream()
+
+    query = user_collection(
+        user,
+        "doses",
     )
+
+    if target_date is not None:
+        query = query.where(
+            filter=FieldFilter(
+                "localDate",
+                "==",
+                target_date.isoformat(),
+            )
+        )
+    else:
+        query = (
+            query.where(
+                filter=FieldFilter(
+                    "localDate",
+                    ">=",
+                    first.isoformat(),
+                )
+            )
+            .where(
+                filter=FieldFilter(
+                    "localDate",
+                    "<=",
+                    last.isoformat(),
+                )
+            )
+        )
+
+    if status is not None:
+        query = query.where(
+            filter=FieldFilter(
+                "status",
+                "==",
+                status.value,
+            )
+        )
+
+    snapshots = query.stream()
 
     result = []
 
@@ -71,7 +120,8 @@ def get_dose_history(
 
         data = snapshot.to_dict() or {}
 
-        if data.get("status") == "CANCELLED":
+        # Không hiển thị các Dose đã bị hủy trong lịch sử.
+        if data.get("status") == DoseStatus.CANCELLED.value:
             continue
 
         data.pop("id", None)

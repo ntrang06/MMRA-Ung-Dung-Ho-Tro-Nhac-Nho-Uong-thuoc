@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
 
         // Kiểm tra Firebase ID token với backend ở bản debug.
         BackendSessionCheck.run(this)
-        FirebaseAuthDebug.printIdTokenForLocalTesting()
+        FirebaseAuthDebug.copyIdTokenForLocalTesting(this)
         // Thông tin phục vụ kiểm thử Firebase Cloud Messaging.
         android.util.Log.d(
             "MMRA_FCM_TEST",
