@@ -101,4 +101,8 @@ dependencies {
 
     // Gson: chuyển đổi JSON giữa backend và các lớp dữ liệu Kotlin
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
+
+    // OCR hộp/vỉ thuốc: model đi kèm app.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 }

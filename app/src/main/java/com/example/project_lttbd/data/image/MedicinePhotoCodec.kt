@@ -46,7 +46,10 @@ object MedicinePhotoCodec {
         }
 
         return runCatching {
-            val bytes = Base64.decode(encoded, Base64.NO_WRAP)
+            val bytes = Base64.decode(
+                encoded,
+                Base64.NO_WRAP
+            )
 
             bytes.size in 3..MAX_JPEG_BYTES &&
                     bytes[0] == 0xFF.toByte() &&
@@ -58,11 +61,10 @@ object MedicinePhotoCodec {
         context: Context,
         uri: Uri
     ): String = withContext(Dispatchers.IO) {
-        require(uri.scheme == "content") {
-            "Vui lòng chọn ảnh từ thư viện."
-        }
-
-        var bitmap = decode(readContent(context, uri), 1024)
+        var bitmap = decode(
+            bytes = readContent(context, uri),
+            maxSide = 1024
+        )
 
         while (true) {
             for (quality in listOf(85, 70, 55, 40)) {
@@ -141,7 +143,9 @@ object MedicinePhotoCodec {
                 }
             }
 
-            else -> readContent(context, Uri.parse(source))
+            else -> {
+                readContent(context, Uri.parse(source))
+            }
         }
 
         decode(bytes, maxSide)
@@ -151,22 +155,48 @@ object MedicinePhotoCodec {
         context: Context,
         uri: Uri
     ): ByteArray {
-        require(uri.scheme == "content") {
-            "Đường dẫn ảnh không hợp lệ."
+        val input = when (uri.scheme) {
+            "content" -> {
+                context.contentResolver.openInputStream(uri)
+            }
+
+            "file" -> {
+                val file = java.io.File(
+                    requireNotNull(uri.path)
+                ).canonicalFile
+
+                val cache = context.cacheDir.canonicalFile
+
+                require(
+                    file.path.startsWith(
+                        cache.path + java.io.File.separator
+                    )
+                ) {
+                    "Đường dẫn ảnh chụp không hợp lệ. Vui lòng chụp lại."
+                }
+
+                file.inputStream()
+            }
+
+            else -> {
+                error("Đường dẫn ảnh không hợp lệ. Vui lòng chọn lại.")
+            }
         }
 
-        return context.contentResolver
-            .openInputStream(uri)
-            ?.use { readBounded(it) }
-            ?: error("Không mở được ảnh. Vui lòng chọn lại.")
+        return input?.use {
+            readBounded(it)
+        } ?: error("Không mở được ảnh. Vui lòng chọn lại.")
     }
 
-    private fun readBounded(input: InputStream): ByteArray {
+    private fun readBounded(
+        input: InputStream
+    ): ByteArray {
         val output = ByteArrayOutputStream()
         val buffer = ByteArray(8192)
 
         while (true) {
             val read = input.read(buffer)
+
             if (read < 0) break
 
             require(output.size() + read <= MAX_INPUT_BYTES) {
@@ -196,7 +226,10 @@ object MedicinePhotoCodec {
             bounds
         )
 
-        require(bounds.outWidth > 0 && bounds.outHeight > 0) {
+        require(
+            bounds.outWidth > 0 &&
+                    bounds.outHeight > 0
+        ) {
             "Không đọc được ảnh. Vui lòng chọn JPG, PNG hoặc WebP."
         }
 
@@ -274,6 +307,7 @@ object MedicinePhotoCodec {
 
             Canvas(opaque).apply {
                 drawColor(Color.WHITE)
+
                 drawBitmap(
                     bitmap,
                     0f,
