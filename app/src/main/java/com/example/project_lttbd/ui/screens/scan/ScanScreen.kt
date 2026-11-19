@@ -1,3 +1,4 @@
+
 package com.example.project_lttbd.ui.screens.scan
 
 import android.net.Uri
@@ -5,73 +6,68 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.project_lttbd.data.image.MedicinePhotoCodec
+import com.example.project_lttbd.data.remote.mapCatalogDosageForm
+import com.example.project_lttbd.data.remote.parseCatalogStrength
 import com.example.project_lttbd.data.scan.MedicineOcrReader
 import com.example.project_lttbd.data.scan.MedicineScanCrop
 import com.example.project_lttbd.data.scan.ScanCropRegion
-import com.example.project_lttbd.ui.components.MedicinePhoto
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineDraft
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
 enum class ScanFlowState {
-    CAMERA, PREVIEW, PROCESSING, RESULT
+    CAMERA, PREVIEW, PROCESSING, RESULT, LOOKUP
 }
 
-private val OcrDraftSaver = listSaver<ManualMedicineDraft, String>(
-    save = {
-        listOf(
-            it.medicineName,
-            it.strength,
-            it.strengthUnit,
-            it.dosageForm,
-            it.note,
-            it.imageUri.orEmpty()
-        )
-    },
-    restore = {
-        ManualMedicineDraft(
-            medicineName = it[0],
-            strength = it[1],
-            strengthUnit = it[2],
-            dosageForm = it[3],
-            note = it[4],
-            imageUri = it[5].ifBlank { null }
-        )
-    }
-)
+private val OcrDraftSaver =
+    listSaver<ManualMedicineDraft, String>(
+        save = {
+            listOf(
+                it.medicineName,
+                it.strength,
+                it.strengthUnit,
+                it.dosageForm,
+                it.note,
+                it.imageUri.orEmpty()
+            )
+        },
+        restore = {
+            ManualMedicineDraft(
+                it[0],
+                it[1],
+                it[2],
+                it[3],
+                it[4],
+                it[5].ifBlank { null }
+            )
+        }
+    )
 
-private val ScanCropSaver = listSaver<ScanCropRegion, Float>(
-    save = {
-        listOf(it.left, it.top, it.right, it.bottom)
-    },
-    restore = {
-        ScanCropRegion(
-            it[0], it[1], it[2], it[3]
-        ).normalized()
-    }
-)
+private val ScanCropSaver =
+    listSaver<ScanCropRegion, Float>(
+        save = {
+            listOf(it.left, it.top, it.right, it.bottom)
+        },
+        restore = {
+            ScanCropRegion(
+                it[0], it[1], it[2], it[3]
+            ).normalized()
+        }
+    )
 
 @Composable
 fun ScanScreen(
@@ -82,7 +78,7 @@ fun ScanScreen(
 ) {
     val context = LocalContext.current.applicationContext
 
-    var flowState by rememberSaveable {
+    var state by rememberSaveable {
         mutableStateOf(ScanFlowState.CAMERA)
     }
 
@@ -90,7 +86,7 @@ fun ScanScreen(
         mutableStateOf<String?>(null)
     }
 
-    var isFromGallery by rememberSaveable {
+    var fromGallery by rememberSaveable {
         mutableStateOf(false)
     }
 
@@ -98,7 +94,7 @@ fun ScanScreen(
         mutableStateOf<String?>(null)
     }
 
-    var cropRegion by rememberSaveable(
+    var crop by rememberSaveable(
         imageUri,
         stateSaver = ScanCropSaver
     ) {
@@ -113,11 +109,11 @@ fun ScanScreen(
         mutableStateOf<String?>(null)
     }
 
-    var showPhotoInfo by rememberSaveable {
+    var showGalleryInfo by rememberSaveable {
         mutableStateOf(false)
     }
 
-    var photoInfoAccepted by rememberSaveable {
+    var galleryAccepted by rememberSaveable {
         mutableStateOf(false)
     }
 
@@ -125,16 +121,15 @@ fun ScanScreen(
         stateSaver = OcrDraftSaver
     ) {
         mutableStateOf(
-            ManualMedicineDraft("", "", "mg", "", "", null)
+            ManualMedicineDraft(
+                "", "", "mg", "", "", null
+            )
         )
     }
 
-    fun selectImage(
-        uri: Uri,
-        gallery: Boolean
-    ) {
+    fun setImage(uri: Uri, gallery: Boolean) {
         imageUri = uri.toString()
-        isFromGallery = gallery
+        fromGallery = gallery
         rawText = ""
         error = null
 
@@ -142,101 +137,91 @@ fun ScanScreen(
             "", "", "mg", "", "", null
         )
 
-        flowState = ScanFlowState.PREVIEW
+        state = ScanFlowState.PREVIEW
     }
 
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            selectImage(uri, true)
+            setImage(uri, true)
         }
     }
 
-    fun openPhotoPicker() {
-        picker.launch(
-            PickVisualMediaRequest(
-                ActivityResultContracts.PickVisualMedia.ImageOnly
+    fun openGallery() {
+        if (galleryAccepted) {
+            picker.launch(
+                PickVisualMediaRequest(
+                    ActivityResultContracts
+                        .PickVisualMedia.ImageOnly
+                )
             )
-        )
-    }
-
-    fun pickPhoto() {
-        if (photoInfoAccepted) {
-            openPhotoPicker()
         } else {
-            showPhotoInfo = true
+            showGalleryInfo = true
         }
     }
 
     fun goBack() {
-        when (flowState) {
-            ScanFlowState.CAMERA -> {
-                onClose()
-            }
+        when (state) {
+            ScanFlowState.CAMERA -> onClose()
 
-            ScanFlowState.PREVIEW -> {
-                flowState = ScanFlowState.CAMERA
-            }
+            ScanFlowState.PREVIEW ->
+                state = ScanFlowState.CAMERA
 
             ScanFlowState.PROCESSING,
-            ScanFlowState.RESULT -> {
-                flowState = ScanFlowState.PREVIEW
-            }
+            ScanFlowState.RESULT ->
+                state = ScanFlowState.PREVIEW
+
+            ScanFlowState.LOOKUP ->
+                state = ScanFlowState.RESULT
         }
     }
 
     BackHandler(
-        enabled = flowState != ScanFlowState.CAMERA
+        enabled = state != ScanFlowState.CAMERA
     ) {
         goBack()
     }
 
     LaunchedEffect(
-        flowState,
+        state,
         imageUri,
-        cropRegion
+        crop
     ) {
-        if (flowState != ScanFlowState.PROCESSING) {
+        if (state != ScanFlowState.PROCESSING) {
             return@LaunchedEffect
         }
 
         try {
-            val uri = Uri.parse(
-                requireNotNull(imageUri) {
-                    "Vui lòng chọn lại ảnh."
-                }
+            val source = Uri.parse(
+                requireNotNull(imageUri)
             )
 
-            val prepared = withTimeout(30_000) {
+            val pair = withTimeout(30_000) {
                 MedicineScanCrop.useRegion(
-                    context = context,
-                    uri = uri,
-                    region = cropRegion
-                ) { croppedUri ->
+                    context,
+                    source,
+                    crop
+                ) { cropped ->
                     val photo = MedicinePhotoCodec.prepare(
                         context,
-                        croppedUri
+                        cropped
                     )
 
                     withContext(Dispatchers.Main) {
                         processingPhoto = photo
                     }
 
-                    val result = MedicineOcrReader.read(
+                    MedicineOcrReader.read(
                         context,
-                        croppedUri
-                    )
-
-                    result to photo
+                        cropped
+                    ) to photo
                 }
             }
 
-            currentCoroutineContext().ensureActive()
+            val suggestion = pair.first.suggestion
 
-            val suggestion = prepared.first.suggestion
-
-            rawText = prepared.first.rawText
+            rawText = pair.first.rawText
 
             draft = ManualMedicineDraft(
                 medicineName = suggestion.medicineName,
@@ -244,41 +229,37 @@ fun ScanScreen(
                 strengthUnit = suggestion.strengthUnit,
                 dosageForm = suggestion.dosageForm,
                 note = "",
-                imageUri = prepared.second
+                imageUri = pair.second
             )
 
-            flowState = ScanFlowState.RESULT
-        } catch (_: TimeoutCancellationException) {
-            error =
-                "Đọc ảnh quá lâu. Vui lòng chọn ảnh khác hoặc thử lại."
+            state = ScanFlowState.RESULT
 
-            flowState = ScanFlowState.PREVIEW
+        } catch (_: TimeoutCancellationException) {
+            error = "Đọc ảnh quá lâu. Hãy thử lại."
+            state = ScanFlowState.PREVIEW
+
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (exception: Exception) {
-            error = if (
-                exception is IllegalArgumentException ||
-                exception is IllegalStateException
-            ) {
-                exception.message
-                    ?: "Chưa xử lý được ảnh. Vui lòng chọn lại."
-            } else {
-                "Chưa đọc được ảnh. Hãy thử lại hoặc chọn ảnh khác."
-            }
 
-            flowState = ScanFlowState.PREVIEW
+        } catch (exception: Exception) {
+            error = exception.message
+                ?: "Không đọc được ảnh thuốc."
+            state = ScanFlowState.PREVIEW
         }
     }
 
-    Box(modifier.fillMaxSize()) {
-        when (flowState) {
+    Box(
+        modifier.fillMaxSize()
+    ) {
+        when (state) {
+
             ScanFlowState.CAMERA -> {
                 ScanCameraScreen(
                     onCaptureClick = {
-                        selectImage(it, false)
+                        setImage(it, false)
                     },
                     onPickImageClick = {
-                        pickPhoto()
+                        openGallery()
                     },
                     onManualInputClick = onNavigateToManualInput,
                     onCloseClick = onClose
@@ -288,22 +269,22 @@ fun ScanScreen(
             ScanFlowState.PREVIEW -> {
                 ScanPreviewScreen(
                     imageUri = imageUri?.let(Uri::parse),
-                    isFromGallery = isFromGallery,
-                    cropRegion = cropRegion,
+                    isFromGallery = fromGallery,
+                    cropRegion = crop,
                     onCropRegionChange = {
-                        cropRegion = it
+                        crop = it
                     },
                     onRetakeClick = {
-                        if (isFromGallery) {
-                            pickPhoto()
+                        if (fromGallery) {
+                            openGallery()
                         } else {
-                            flowState = ScanFlowState.CAMERA
+                            state = ScanFlowState.CAMERA
                         }
                     },
                     onUsePhotoClick = {
-                        processingPhoto = null
                         error = null
-                        flowState = ScanFlowState.PROCESSING
+                        processingPhoto = null
+                        state = ScanFlowState.PROCESSING
                     },
                     onBackClick = {
                         goBack()
@@ -321,43 +302,143 @@ fun ScanScreen(
             }
 
             ScanFlowState.RESULT -> {
-                OcrResultContent(
-                    rawText = rawText,
-                    draft = draft,
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(20.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Đọc chữ từ ảnh thuốc",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+
+                    Text(
+                        "Thông tin OCR chỉ là gợi ý. " +
+                                "Bước tiếp theo sẽ tìm sản phẩm thật."
+                    )
+
+                    Text(
+                        "Tên gợi ý: " +
+                                draft.medicineName.ifBlank {
+                                    "Chưa xác định"
+                                }
+                    )
+
+                    Text(
+                        "Hàm lượng gợi ý: " +
+                                draft.strength.ifBlank {
+                                    "Chưa xác định"
+                                }
+                    )
+
+                    Text(
+                        "Dạng bào chế sẽ lấy từ sản phẩm " +
+                                "tìm được, không đoán từ OCR."
+                    )
+
+                    Text("Nội dung đọc từ ảnh:")
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(
+                                rememberScrollState()
+                            )
+                    ) {
+                        Text(rawText)
+                    }
+
+                    Button(
+                        onClick = {
+                            state = ScanFlowState.LOOKUP
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Tra cứu sản phẩm thuốc")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            goBack()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Quét lại / chọn lại vùng")
+                    }
+                }
+            }
+
+            ScanFlowState.LOOKUP -> {
+                MedicineLookupChooser(
+                    initialQuery = draft.medicineName,
+
                     onBack = {
                         goBack()
                     },
-                    onContinue = {
-                        onMedicineDraftReady(draft)
+
+                    onChoose = { item ->
+                        val strength =
+                            parseCatalogStrength(
+                                item.strength
+                            )
+
+                        onMedicineDraftReady(
+                            draft.copy(
+                                medicineName = item.name,
+                                strength =
+                                    strength?.amount.orEmpty(),
+                                strengthUnit =
+                                    strength?.unit ?: "mg",
+                                dosageForm =
+                                    mapCatalogDosageForm(
+                                        item.dosage_form
+                                    )
+                            )
+                        )
                     },
-                    onRescan = {
-                        flowState = ScanFlowState.CAMERA
+
+                    onSkip = {
+                        onMedicineDraftReady(
+                            draft.copy(
+                                medicineName = "",
+                                strength = "",
+                                dosageForm = ""
+                            )
+                        )
                     }
                 )
             }
         }
     }
 
-    if (showPhotoInfo) {
+    if (showGalleryInfo) {
         AlertDialog(
             onDismissRequest = {
-                showPhotoInfo = false
+                showGalleryInfo = false
             },
             title = {
                 Text("Chọn ảnh thuốc")
             },
             text = {
                 Text(
-                    "MMRA đọc ảnh bạn chọn để gợi ý thông tin thuốc. " +
-                            "Ảnh chỉ được lưu cùng thuốc khi bạn bấm Lưu."
+                    "MMRA đọc ảnh để gợi ý tìm thuốc. " +
+                            "Ảnh chỉ được lưu khi bạn xác nhận lưu thuốc."
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showPhotoInfo = false
-                        photoInfoAccepted = true
-                        openPhotoPicker()
+                        showGalleryInfo = false
+                        galleryAccepted = true
+
+                        picker.launch(
+                            PickVisualMediaRequest(
+                                ActivityResultContracts
+                                    .PickVisualMedia.ImageOnly
+                            )
+                        )
                     }
                 ) {
                     Text("Chọn ảnh")
@@ -366,7 +447,7 @@ fun ScanScreen(
             dismissButton = {
                 TextButton(
                     onClick = {
-                        showPhotoInfo = false
+                        showGalleryInfo = false
                     }
                 ) {
                     Text("Để sau")
@@ -406,135 +487,5 @@ fun ScanScreen(
                 }
             }
         )
-    }
-}
-
-@Composable
-private fun OcrResultContent(
-    rawText: String,
-    draft: ManualMedicineDraft,
-    onBack: () -> Unit,
-    onContinue: () -> Unit,
-    onRescan: () -> Unit
-) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF6FAF9))
-    ) {
-        TextButton(
-            onClick = onBack,
-            modifier = Modifier.padding(8.dp)
-        ) {
-            Text("‹  Quay lại")
-        }
-
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Text(
-                text = "Kết quả đọc chữ",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-
-            Surface(
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                MedicinePhoto(
-                    source = draft.imageUri,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(170.dp),
-                    contentScale = ContentScale.Fit,
-                    maxSide = 1024
-                )
-            }
-
-            Surface(
-                color = Color(0xFFFFF1D6),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = "Thông tin gợi ý từ chữ trên ảnh. " +
-                            "Hãy đối chiếu với hộp/vỉ và kiểm tra lại " +
-                            "trước khi lưu. Đây chưa phải xác minh thuốc.",
-                    modifier = Modifier.padding(14.dp)
-                )
-            }
-
-            Text(
-                text = "Tên gợi ý: ${
-                    draft.medicineName.ifBlank {
-                        "Cần nhập ở bước sau"
-                    }
-                }"
-            )
-
-            Text(
-                text = "Hàm lượng gợi ý: ${
-                    if (draft.strength.isBlank()) {
-                        "Cần kiểm tra ở bước sau"
-                    } else {
-                        "${draft.strength} ${draft.strengthUnit}"
-                    }
-                }"
-            )
-
-            Text(
-                text = "Chữ trong vùng đã chọn",
-                fontWeight = FontWeight.Bold
-            )
-
-            Surface(
-                color = Color.White,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                SelectionContainer {
-                    Text(
-                        text = rawText,
-                        modifier = Modifier.padding(14.dp)
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-        }
-
-        Surface(
-            color = Color.White,
-            shadowElevation = 6.dp
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onContinue,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 52.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF126B62)
-                    )
-                ) {
-                    Text("Kiểm tra thông tin thuốc")
-                }
-
-                TextButton(
-                    onClick = onRescan,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Quét lại")
-                }
-            }
-        }
     }
 }
