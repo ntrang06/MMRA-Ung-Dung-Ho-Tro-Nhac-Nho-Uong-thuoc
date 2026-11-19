@@ -2,14 +2,7 @@ package com.example.project_lttbd.ui.screens.medicine
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.project_lttbd.R
+import com.example.project_lttbd.ui.components.MedicinePhoto
 import com.example.project_lttbd.ui.theme.MMRATheme
 
 enum class MedicineAccent(
@@ -55,7 +49,8 @@ data class MedicineUiModel(
     val scheduleText: String,
     val hasSchedule: Boolean,
     val accent: MedicineAccent = MedicineAccent.GREEN,
-    val scheduleStatusText: String? = null
+    val scheduleStatusText: String? = null,
+    val imageUrl: String? = null
 )
 
 @Composable
@@ -71,10 +66,7 @@ fun MedicineCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         color = Color.White,
-        border = BorderStroke(
-            width = 1.dp,
-            color = Color(0xFFD7E2DF)
-        ),
+        border = BorderStroke(1.dp, Color(0xFFD7E2DF)),
         shadowElevation = 2.dp
     ) {
         Row(
@@ -88,42 +80,52 @@ fun MedicineCard(
                 modifier = Modifier.width(54.dp),
                 shape = RoundedCornerShape(18.dp),
                 color = accent.background,
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = accent.foreground
-                )
+                border = BorderStroke(1.dp, accent.foreground)
             ) {
-                Column(
-                    modifier = Modifier
-                        .heightIn(min = 62.dp)
-                        .padding(
-                            horizontal = 4.dp,
-                            vertical = 8.dp
-                        ),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(
-                        4.dp,
-                        Alignment.CenterVertically
+                if (!medicine.imageUrl.isNullOrBlank()) {
+                    MedicinePhoto(
+                        source = medicine.imageUrl,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(62.dp),
+                        contentDescription =
+                            "Ảnh ${medicine.medicineName}"
                     )
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.thuoc),
-                        contentDescription = null,
-                        modifier = Modifier.size(26.dp),
-                        tint = accent.foreground
-                    )
-
-                    if (medicine.medicineCode.isNotBlank()) {
-                        Text(
-                            text = medicine.medicineCode,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
-                                lineHeight = 13.sp,
-                                letterSpacing = 0.sp,
-                                fontWeight = FontWeight.Bold
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .heightIn(min = 62.dp)
+                            .padding(
+                                horizontal = 4.dp,
+                                vertical = 8.dp
                             ),
-                            color = accent.foreground
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(
+                            4.dp,
+                            Alignment.CenterVertically
                         )
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.thuoc),
+                            contentDescription = null,
+                            modifier = Modifier.size(26.dp),
+                            tint = accent.foreground
+                        )
+
+                        if (medicine.medicineCode.isNotBlank()) {
+                            Text(
+                                text = medicine.medicineCode,
+                                style = MaterialTheme.typography
+                                    .labelSmall.copy(
+                                        fontSize = 10.sp,
+                                        lineHeight = 13.sp,
+                                        letterSpacing = 0.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                color = accent.foreground
+                            )
+                        }
                     }
                 }
             }
@@ -180,9 +182,7 @@ fun MedicineCard(
                 }
             }
 
-            MedicineChevron(
-                modifier = Modifier.size(18.dp)
-            )
+            MedicineChevron(Modifier.size(18.dp))
         }
     }
 }
@@ -191,34 +191,22 @@ fun MedicineCard(
 private fun MedicineChevron(
     modifier: Modifier = Modifier
 ) {
-    Canvas(modifier = modifier) {
+    Canvas(modifier) {
         val color = Color(0xFF526565)
         val strokeWidth = 1.8.dp.toPx()
 
         drawLine(
             color = color,
-            start = Offset(
-                size.width * 0.38f,
-                size.height * 0.25f
-            ),
-            end = Offset(
-                size.width * 0.65f,
-                size.height * 0.5f
-            ),
+            start = Offset(size.width * 0.38f, size.height * 0.25f),
+            end = Offset(size.width * 0.65f, size.height * 0.5f),
             strokeWidth = strokeWidth,
             cap = StrokeCap.Round
         )
 
         drawLine(
             color = color,
-            start = Offset(
-                size.width * 0.65f,
-                size.height * 0.5f
-            ),
-            end = Offset(
-                size.width * 0.38f,
-                size.height * 0.75f
-            ),
+            start = Offset(size.width * 0.65f, size.height * 0.5f),
+            end = Offset(size.width * 0.38f, size.height * 0.75f),
             strokeWidth = strokeWidth,
             cap = StrokeCap.Round
         )
@@ -259,16 +247,14 @@ private fun MedicineCardPreview() {
     )
 
     MMRATheme {
-        Surface(
-            color = Color(0xFFF5FAF9)
-        ) {
+        Surface(color = Color(0xFFF5FAF9)) {
             Column(
                 modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                medicines.forEach { medicine ->
+                medicines.forEach {
                     MedicineCard(
-                        medicine = medicine,
+                        medicine = it,
                         onClick = {}
                     )
                 }

@@ -122,6 +122,7 @@ import com.example.project_lttbd.ui.screens.notifications.NotificationHistoryRou
 
 
 private const val MANUAL_MEDICINE_DRAFT_KEY = "manual_medicine_draft"
+private const val SCANNED_MEDICINE_DRAFT_KEY = "scanned_medicine_draft"
 
 @Composable
 fun MMRANavHost(
@@ -963,9 +964,36 @@ fun MMRANavHost(
         }
 
         composable(MMRADestinations.MANUAL_MEDICINE) { entry ->
+            val scanned = remember(entry) {
+                entry.savedStateHandle
+                    .get<Bundle>(SCANNED_MEDICINE_DRAFT_KEY)
+                    ?: navController.previousBackStackEntry
+                        ?.takeIf {
+                            it.destination.route == MMRADestinations.SCAN
+                        }
+                        ?.savedStateHandle
+                        ?.remove<Bundle>(SCANNED_MEDICINE_DRAFT_KEY)
+                        ?.also {
+                            entry.savedStateHandle[
+                                SCANNED_MEDICINE_DRAFT_KEY
+                            ] = it
+                        }
+            }
+
             MedicineEntryDestination(
                 navController = navController,
-                entry = entry
+                entry = entry,
+                prefilledOwnerUid = scanned?.getString("ownerUid"),
+                prefilledDraft = scanned?.let {
+                    ManualMedicineDraft(
+                        medicineName = it.getString("medicineName").orEmpty(),
+                        strength = it.getString("strength").orEmpty(),
+                        strengthUnit = it.getString("strengthUnit") ?: "mg",
+                        dosageForm = it.getString("dosageForm").orEmpty(),
+                        note = it.getString("note").orEmpty(),
+                        imageUri = it.getString("imageUri")
+                    )
+                }
             )
         }
 
@@ -1117,22 +1145,33 @@ fun MMRANavHost(
 
         composable(MMRADestinations.SCAN) { scanEntry ->
             ScanScreen(
-                onNavigateToSchedule = { draft ->
-                    scanEntry.savedStateHandle[
-                        MANUAL_MEDICINE_DRAFT_KEY
-                    ] = Bundle().apply {
-                        putString("medicineName", draft.medicineName)
-                        putString("strength", draft.strength)
-                        putString("strengthUnit", draft.strengthUnit)
-                        putString("dosageForm", draft.dosageForm)
-                        putString("note", draft.note)
-                        putString("imageUri", draft.imageUri)
-                    }
+                onMedicineDraftReady = { draft ->
+                    val ownerUid = FirebaseProvider.auth.currentUser?.uid
 
-                    navController.navigate(
-                        MMRADestinations.SCHEDULE_SETUP
-                    ) {
-                        launchSingleTop = true
+                    if (ownerUid == null) {
+                        Toast.makeText(
+                            context,
+                            "Vui lòng đăng nhập trước khi lưu thuốc.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        scanEntry.savedStateHandle[
+                            SCANNED_MEDICINE_DRAFT_KEY
+                        ] = Bundle().apply {
+                            putString("ownerUid", ownerUid)
+                            putString("medicineName", draft.medicineName)
+                            putString("strength", draft.strength)
+                            putString("strengthUnit", draft.strengthUnit)
+                            putString("dosageForm", draft.dosageForm)
+                            putString("note", draft.note)
+                            putString("imageUri", draft.imageUri)
+                        }
+
+                        navController.navigate(
+                            MMRADestinations.MANUAL_MEDICINE
+                        ) {
+                            launchSingleTop = true
+                        }
                     }
                 },
                 onNavigateToManualInput = {
@@ -1154,10 +1193,10 @@ fun MMRANavHost(
 
         composable(MMRADestinations.HISTORY) {
             HistoryScreen(
-                onDoseClick = {
+                onDoseClick = { doseId ->
                     navController.openReminder(
-                        it,
-                        readOnly = true
+                        doseId,
+                        readOnly = false
                     )
                 },
                 onAccountClick = {
@@ -1377,7 +1416,9 @@ private fun NavHostController.openReminder(
 private fun MedicineEntryDestination(
     navController: NavHostController,
     entry: NavBackStackEntry,
-    medicineId: String? = null
+    medicineId: String? = null,
+    prefilledDraft: ManualMedicineDraft? = null,
+    prefilledOwnerUid: String? = null
 ) {
     val context = LocalContext.current
     val repository = remember { MedicineRepository() }
@@ -1429,7 +1470,17 @@ private fun MedicineEntryDestination(
 
             userId = uid
             signedIn = uid != null
-            initialDraft = null
+
+            initialDraft = if (
+                medicineId == null &&
+                uid != null &&
+                uid == prefilledOwnerUid
+            ) {
+                prefilledDraft
+            } else {
+                null
+            }
+
             savedImageUrl = null
             loadError = null
             saveError = null
@@ -1589,7 +1640,8 @@ private fun MedicineEntryDestination(
 
     pendingDraft?.let { draft ->
         val hasLocalImage = draft.imageUri?.let {
-            !it.startsWith("https://")
+            !com.example.project_lttbd.data.image.MedicinePhotoCodec
+                .isStoredSource(it)
         } == true
 
         AlertDialog(
@@ -1656,10 +1708,6 @@ private fun MedicineEntryDestination(
                                 dosageForm = draft.dosageForm,
                                 note = draft.note,
                                 imageUrl = draft.imageUri
-                                    ?.takeIf {
-                                        it.startsWith("https://")
-                                    }
-                                    ?: savedImageUrl
                             )
 
                             val task: com.google.android.gms.tasks.Task<*> =

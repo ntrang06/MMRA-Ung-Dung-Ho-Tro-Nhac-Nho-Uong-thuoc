@@ -20,7 +20,8 @@ internal fun MedicineRecord.toMedicineUiModel(
         schedulesLoading -> "Đang tải lịch uống…"
         schedulesFailed -> "Chưa tải được lịch uống"
         linked.isEmpty() -> "Chưa có lịch uống"
-        single != null && !single.enabled -> "Đã tạm dừng lịch uống"
+        single != null && !single.enabled ->
+            "Đã tạm dừng lịch uống"
         single != null -> "Đã có lịch uống"
         else -> "Đã có ${linked.size} lịch uống"
     }
@@ -88,7 +89,8 @@ internal fun MedicineRecord.toMedicineUiModel(
         scheduleText = details,
         hasSchedule = linked.isNotEmpty(),
         scheduleStatusText = status,
-        accent = MedicineAccent.GREEN
+        accent = MedicineAccent.GREEN,
+        imageUrl = data.imageUrl
     )
 }
 

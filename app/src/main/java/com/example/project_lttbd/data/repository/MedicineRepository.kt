@@ -1,5 +1,6 @@
 package com.example.project_lttbd.data.repository
 
+import com.example.project_lttbd.data.image.MedicinePhotoCodec
 import com.example.project_lttbd.data.remote.FirebaseProvider
 import com.example.project_lttbd.data.remote.dto.MedicineDto
 import com.google.android.gms.tasks.Task
@@ -16,13 +17,17 @@ data class MedicineRecord(
 class MedicineRepository {
     fun getMedicines(): Task<List<MedicineRecord>> {
         return withCurrentUser { collection ->
-            collection.orderBy("createdAt", Query.Direction.DESCENDING)
+            collection.orderBy(
+                "createdAt",
+                Query.Direction.DESCENDING
+            )
                 .get()
                 .continueWith { task ->
                     if (!task.isSuccessful) {
-                        throw task.exception ?: IllegalStateException(
-                            "Không thể tải danh sách thuốc."
-                        )
+                        throw task.exception
+                            ?: IllegalStateException(
+                                "Không thể tải danh sách thuốc."
+                            )
                     }
 
                     task.result.documents.map { document ->
@@ -49,9 +54,10 @@ class MedicineRepository {
                 .get()
                 .continueWith { task ->
                     if (!task.isSuccessful) {
-                        throw task.exception ?: IllegalStateException(
-                            "Không thể tải thông tin thuốc."
-                        )
+                        throw task.exception
+                            ?: IllegalStateException(
+                                "Không thể tải thông tin thuốc."
+                            )
                     }
 
                     val document = task.result
@@ -86,9 +92,10 @@ class MedicineRepository {
 
             document.set(fields).continueWith { task ->
                 if (!task.isSuccessful) {
-                    throw task.exception ?: IllegalStateException(
-                        "Không thể thêm thuốc."
-                    )
+                    throw task.exception
+                        ?: IllegalStateException(
+                            "Không thể thêm thuốc."
+                        )
                 }
 
                 document.id
@@ -126,8 +133,8 @@ class MedicineRepository {
 
         val imageUrl = medicine.imageUrl
 
-        require(imageUrl == null || imageUrl.startsWith("https://")) {
-            "Ảnh thuốc phải là URL HTTPS đã tải lên máy chủ."
+        require(MedicinePhotoCodec.isStoredSource(imageUrl)) {
+            "Ảnh thuốc chưa hợp lệ. Vui lòng chọn lại ảnh rồi lưu."
         }
 
         return mapOf(
