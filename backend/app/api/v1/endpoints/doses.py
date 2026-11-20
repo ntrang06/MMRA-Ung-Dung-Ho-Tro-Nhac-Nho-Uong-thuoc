@@ -1,6 +1,6 @@
-from datetime import date, datetime, timezone
+
+from datetime import date
 from typing import Annotated
-from uuid import uuid4
 
 from fastapi import (
     APIRouter,
@@ -16,195 +16,17 @@ from app.repositories.medication_repository import MedicationRepository
 from app.schemas.medication import (
     DoseActionRequest,
     DoseResponse,
-    ScheduleInput,
-    ScheduleResponse,
-    ScheduleUpdate,
     SnoozeRequest,
 )
 from app.services.dose_service import DoseService
 
 
+# CRUD lịch uống chỉ nằm trong schedules.py.
+# File này chỉ đăng ký các API /doses.
 router = APIRouter(
-    tags=["Medication Schedules and Doses"],
+    tags=["Medication Doses"],
 )
 
-
-# =============================================================
-# SCHEDULE ENDPOINTS
-# =============================================================
-
-@router.post(
-    "/schedules",
-    response_model=ScheduleResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_schedule(
-    payload: ScheduleInput,
-    user: AuthenticatedUser,
-):
-    """Tạo lịch uống thuốc mới."""
-    medicine = MedicationRepository.get_medicine(
-        user,
-        payload.medicineId,
-    )
-
-    if medicine is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy thuốc.",
-        )
-
-    now = datetime.now(timezone.utc)
-    schedule_id = uuid4().hex
-
-    schedule_data = payload.model_dump(mode="json")
-
-    schedule_data.update({
-        "scheduleId": schedule_id,
-        "version": 1,
-        "createdAt": now,
-        "updatedAt": now,
-    })
-
-    try:
-        MedicationRepository.create_schedule(
-            user,
-            schedule_id,
-            schedule_data,
-        )
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Không thể tạo lịch uống thuốc.",
-        )
-
-    return schedule_data
-
-
-@router.get(
-    "/schedules",
-    response_model=list[ScheduleResponse],
-)
-def get_schedules(
-    user: AuthenticatedUser,
-    enabled_only: bool = Query(default=False),
-):
-    """Lấy danh sách lịch uống thuốc."""
-    return MedicationRepository.list_schedules(
-        user,
-        enabled_only=enabled_only,
-    )
-
-
-@router.get(
-    "/schedules/{schedule_id}",
-    response_model=ScheduleResponse,
-)
-def get_schedule(
-    schedule_id: str,
-    user: AuthenticatedUser,
-):
-    """Lấy thông tin một lịch uống thuốc."""
-    schedule = MedicationRepository.get_schedule(
-        user,
-        schedule_id,
-    )
-
-    if schedule is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy lịch uống thuốc.",
-        )
-
-    return schedule
-
-
-@router.put(
-    "/schedules/{schedule_id}",
-    response_model=ScheduleResponse,
-)
-def update_schedule(
-    schedule_id: str,
-    payload: ScheduleUpdate,
-    user: AuthenticatedUser,
-):
-    """Cập nhật lịch uống thuốc theo phiên bản hiện tại."""
-    existing = MedicationRepository.get_schedule(
-        user,
-        schedule_id,
-    )
-
-    if existing is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy lịch uống thuốc.",
-        )
-
-    expected_version = payload.expectedVersion
-    current_version = existing.get("version", 1)
-
-    if expected_version != current_version:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Lịch uống thuốc đã được cập nhật. "
-                "Vui lòng tải lại dữ liệu trước khi chỉnh sửa."
-            ),
-        )
-
-    medicine = MedicationRepository.get_medicine(
-        user,
-        payload.medicineId,
-    )
-
-    if medicine is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy thuốc.",
-        )
-
-    now = datetime.now(timezone.utc)
-
-    updated_data = payload.model_dump(
-        mode="json",
-        exclude={"expectedVersion"},
-    )
-
-    updated_data.update({
-        "scheduleId": schedule_id,
-        "version": current_version + 1,
-        "createdAt": existing.get("createdAt"),
-        "updatedAt": now,
-    })
-
-    result = MedicationRepository.update_schedule_if_version(
-        user=user,
-        schedule_id=schedule_id,
-        expected_version=expected_version,
-        data=updated_data,
-    )
-
-    if result is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy lịch uống thuốc.",
-        )
-
-    if result is False:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Lịch uống thuốc đã được cập nhật bởi một thiết bị khác. "
-                "Vui lòng tải lại dữ liệu."
-            ),
-        )
-
-    return result
-
-
-# =============================================================
-# DOSE ENDPOINTS
-# =============================================================
 
 @router.get(
     "/doses",
@@ -217,7 +39,8 @@ def get_doses(
     """
     Lấy danh sách liều theo ngày.
 
-    Liều còn thiếu được sinh từ lịch uống đang có hiệu lực.
+    Liều còn thiếu được sinh từ lịch uống
+    đang có hiệu lực.
     """
     try:
         return DoseService.get_doses_for_date(
@@ -246,8 +69,7 @@ def get_dose(
     """Lấy liều đã lưu theo ID khi mở từ thông báo."""
     response.headers["Cache-Control"] = "no-store"
 
-    # Repository chỉ đọc trong users/{uid}/doses,
-    # không tìm liều thuộc tài khoản khác.
+    # Chỉ đọc liều thuộc tài khoản đã đăng nhập.
     dose = MedicationRepository.get_dose(
         user,
         dose_id,
@@ -259,7 +81,8 @@ def get_dose(
             detail={
                 "code": "dose_not_found",
                 "message": (
-                    "Không tìm thấy liều thuốc trong tài khoản của bạn."
+                    "Không tìm thấy liều thuốc "
+                    "trong tài khoản của bạn."
                 ),
             },
         )
