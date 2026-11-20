@@ -227,7 +227,7 @@ fun ScanScreen(
                 medicineName = suggestion.medicineName,
                 strength = suggestion.strength,
                 strengthUnit = suggestion.strengthUnit,
-                dosageForm = suggestion.dosageForm,
+                dosageForm = "",
                 note = "",
                 imageUri = pair.second
             )
@@ -373,6 +373,8 @@ fun ScanScreen(
             ScanFlowState.LOOKUP -> {
                 MedicineLookupChooser(
                     initialQuery = draft.medicineName,
+                    scannedStrength = draft.strength,
+                    scannedUnit = draft.strengthUnit,
 
                     onBack = {
                         goBack()
