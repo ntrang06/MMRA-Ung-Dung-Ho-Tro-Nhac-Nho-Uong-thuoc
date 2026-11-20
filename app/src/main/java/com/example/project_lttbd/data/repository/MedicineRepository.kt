@@ -1,13 +1,24 @@
+
 package com.example.project_lttbd.data.repository
 
 import com.example.project_lttbd.data.image.MedicinePhotoCodec
+import com.example.project_lttbd.data.remote.BackendSession
 import com.example.project_lttbd.data.remote.FirebaseProvider
+import com.example.project_lttbd.data.remote.MedicineApiClient
+import com.example.project_lttbd.data.remote.MedicineApiDto
 import com.example.project_lttbd.data.remote.dto.MedicineDto
 import com.google.android.gms.tasks.Task
+import com.google.android.gms.tasks.TaskCompletionSource
 import com.google.android.gms.tasks.Tasks
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.Query
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 data class MedicineRecord(
     val id: String,
@@ -15,78 +26,77 @@ data class MedicineRecord(
 )
 
 class MedicineRepository {
+
+    private val api = MedicineApiClient.api
+
+    private val scope = CoroutineScope(Dispatchers.IO)
+
+    // ======================================================
+    // GET DANH SÁCH: FASTAPI
+    // ======================================================
+
     fun getMedicines(): Task<List<MedicineRecord>> {
-        return withCurrentUser { collection ->
-            collection.orderBy(
-                "createdAt",
-                Query.Direction.DESCENDING
-            )
-                .get()
-                .continueWith { task ->
-                    if (!task.isSuccessful) {
-                        throw task.exception
-                            ?: IllegalStateException(
-                                "Không thể tải danh sách thuốc."
-                            )
-                    }
+        return runAsTask {
+            val uid = currentUid()
+            val authorization =
+                BackendSession.authorizationHeader()
 
-                    task.result.documents.map { document ->
-                        val medicine = document.toObject(
-                            MedicineDto::class.java
-                        ) ?: throw IllegalStateException(
-                            "Dữ liệu thuốc không hợp lệ."
-                        )
+            ensureCurrentUser(uid)
 
-                        MedicineRecord(
-                            id = document.id,
-                            data = medicine
-                        )
-                    }
-                }
+            val response = api.getMedicines(authorization)
+
+            ensureCurrentUser(uid)
+
+            response.map { medicine ->
+                medicine.toMedicineRecord()
+            }
         }
     }
 
-    fun getMedicine(medicineId: String): Task<MedicineRecord> {
-        return withCurrentUser { collection ->
+    // ======================================================
+    // GET CHI TIẾT: FASTAPI
+    // ======================================================
+
+    fun getMedicine(
+        medicineId: String
+    ): Task<MedicineRecord> {
+        return runAsTask {
             validateMedicineId(medicineId)
 
-            collection.document(medicineId)
-                .get()
-                .continueWith { task ->
-                    if (!task.isSuccessful) {
-                        throw task.exception
-                            ?: IllegalStateException(
-                                "Không thể tải thông tin thuốc."
-                            )
-                    }
+            val uid = currentUid()
+            val authorization =
+                BackendSession.authorizationHeader()
 
-                    val document = task.result
+            ensureCurrentUser(uid)
 
-                    if (!document.exists()) {
-                        throw IllegalStateException(
-                            "Không tìm thấy thuốc cần sửa."
-                        )
-                    }
+            val response = api.getMedicine(
+                authorization,
+                medicineId
+            )
 
-                    val medicine = document.toObject(
-                        MedicineDto::class.java
-                    ) ?: throw IllegalStateException(
-                        "Dữ liệu thuốc không hợp lệ."
-                    )
+            ensureCurrentUser(uid)
 
-                    MedicineRecord(
-                        id = document.id,
-                        data = medicine
-                    )
-                }
+            response.toMedicineRecord()
         }
     }
 
-    fun addMedicine(medicine: MedicineDto): Task<String> {
+    // ======================================================
+    // POST: FIRESTORE CŨ - SẼ CHUYỂN Ở B2.2
+    // ======================================================
+
+    fun addMedicine(
+        medicine: MedicineDto
+    ): Task<String> {
         return withCurrentUser { collection ->
-            val fields = medicineFields(medicine).toMutableMap()
-            fields["createdAt"] = FieldValue.serverTimestamp()
-            fields["updatedAt"] = FieldValue.serverTimestamp()
+            val fields = medicineFields(
+                medicine
+            ).toMutableMap()
+
+            fields["createdAt"] =
+                FieldValue.serverTimestamp()
+
+            fields["updatedAt"] =
+                FieldValue.serverTimestamp()
 
             val document = collection.document()
 
@@ -103,6 +113,10 @@ class MedicineRepository {
         }
     }
 
+    // ======================================================
+    // PUT: FIRESTORE CŨ - SẼ CHUYỂN Ở B2.2
+    // ======================================================
+
     fun updateMedicine(
         medicineId: String,
         medicine: MedicineDto
@@ -110,19 +124,140 @@ class MedicineRepository {
         return withCurrentUser { collection ->
             validateMedicineId(medicineId)
 
-            val fields = medicineFields(medicine).toMutableMap()
-            fields["updatedAt"] = FieldValue.serverTimestamp()
+            val fields = medicineFields(
+                medicine
+            ).toMutableMap()
 
-            collection.document(medicineId).update(fields)
+            fields["updatedAt"] =
+                FieldValue.serverTimestamp()
+
+            collection.document(medicineId)
+                .update(fields)
         }
     }
 
-    fun deleteMedicine(medicineId: String): Task<Void> {
+    // ======================================================
+    // DELETE: FIRESTORE CŨ - SẼ CHUYỂN Ở B2.2
+    // ======================================================
+
+    fun deleteMedicine(
+        medicineId: String
+    ): Task<Void> {
         return withCurrentUser { collection ->
             validateMedicineId(medicineId)
-            collection.document(medicineId).delete()
+
+            collection.document(medicineId)
+                .delete()
         }
     }
+
+    // ======================================================
+    // CHUYỂN JSON API SANG MODEL HIỆN TẠI
+    // ======================================================
+
+    private fun MedicineApiDto.toMedicineRecord():
+            MedicineRecord {
+
+        require(
+            medicineId.isNotBlank() &&
+                    '/' !in medicineId
+        ) {
+            "Mã thuốc trả về không hợp lệ."
+        }
+
+        return MedicineRecord(
+            id = medicineId,
+            data = MedicineDto(
+                medicineName = medicineName,
+                strength = strength,
+                strengthUnit = strengthUnit,
+                dosageForm = dosageForm,
+                note = note,
+                imageUrl = imageUrl,
+                createdAt = parseTimestamp(createdAt),
+                updatedAt = parseTimestamp(updatedAt)
+            )
+        )
+    }
+
+    private fun parseTimestamp(
+        value: String?
+    ): Timestamp? {
+        if (value.isNullOrBlank()) return null
+
+        return runCatching {
+            // FastAPI trả thời gian ISO 8601.
+            // Firestore Admin SDK lưu UTC.
+            val normalized = value
+                .substringBefore('.')
+                .substringBefore('+')
+                .removeSuffix("Z")
+
+            val parser = SimpleDateFormat(
+                "yyyy-MM-dd'T'HH:mm:ss",
+                Locale.US
+            ).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+                isLenient = false
+            }
+
+            val date = requireNotNull(
+                parser.parse(normalized)
+            )
+
+            Timestamp(date)
+        }.getOrNull()
+    }
+
+    // ======================================================
+    // GIỮ KIỂU TASK ĐỂ KHÔNG PHẢI SỬA MÀN HÌNH
+    // ======================================================
+
+    private fun <T> runAsTask(
+        operation: suspend () -> T
+    ): Task<T> {
+        val source = TaskCompletionSource<T>()
+
+        scope.launch {
+            try {
+                source.trySetResult(operation())
+            } catch (error: Exception) {
+                source.trySetException(error)
+            }
+        }
+
+        return source.task
+    }
+
+    private fun currentUid(): String {
+        return FirebaseProvider.auth.currentUser?.uid
+            ?: throw IllegalStateException(
+                "Vui lòng đăng nhập để xem thuốc."
+            )
+    }
+
+    private fun ensureCurrentUser(uid: String) {
+        check(
+            FirebaseProvider.auth.currentUser?.uid == uid
+        ) {
+            "Tài khoản đã thay đổi. Vui lòng tải lại."
+        }
+    }
+
+    private fun validateMedicineId(
+        medicineId: String
+    ) {
+        require(
+            medicineId.isNotBlank() &&
+                    '/' !in medicineId
+        ) {
+            "Mã thuốc không hợp lệ."
+        }
+    }
+
+    // ======================================================
+    // GIỮ CÁC HELPER FIRESTORE CHO B2.2
+    // ======================================================
 
     private fun medicineFields(
         medicine: MedicineDto
@@ -133,8 +268,10 @@ class MedicineRepository {
 
         val imageUrl = medicine.imageUrl
 
-        require(MedicinePhotoCodec.isStoredSource(imageUrl)) {
-            "Ảnh thuốc chưa hợp lệ. Vui lòng chọn lại ảnh rồi lưu."
+        require(
+            MedicinePhotoCodec.isStoredSource(imageUrl)
+        ) {
+            "Ảnh thuốc chưa hợp lệ. Vui lòng chọn lại."
         }
 
         return mapOf(
@@ -147,24 +284,17 @@ class MedicineRepository {
         )
     }
 
-    private fun validateMedicineId(medicineId: String) {
-        require(medicineId.isNotBlank() && '/' !in medicineId) {
-            "Mã thuốc không hợp lệ."
-        }
-    }
-
     private fun <T> withCurrentUser(
         action: (CollectionReference) -> Task<T>
     ): Task<T> {
         return try {
-            val uid = FirebaseProvider.auth.currentUser?.uid
-                ?: throw IllegalStateException(
-                    "Vui lòng đăng nhập để quản lý thuốc."
-                )
+            val uid = currentUid()
 
-            action(FirebaseProvider.medicinesCollection(uid))
-        } catch (exception: Exception) {
-            Tasks.forException(exception)
+            action(
+                FirebaseProvider.medicinesCollection(uid)
+            )
+        } catch (error: Exception) {
+            Tasks.forException(error)
         }
     }
 }
