@@ -30,7 +30,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
 enum class ScanFlowState {
-    CAMERA, PREVIEW, PROCESSING, RESULT, LOOKUP
+    CAMERA,
+    PREVIEW,
+    PROCESSING,
+    RESULT,
+    LOOKUP
 }
 
 private val OcrDraftSaver =
@@ -60,14 +64,76 @@ private val OcrDraftSaver =
 private val ScanCropSaver =
     listSaver<ScanCropRegion, Float>(
         save = {
-            listOf(it.left, it.top, it.right, it.bottom)
+            listOf(
+                it.left,
+                it.top,
+                it.right,
+                it.bottom
+            )
         },
         restore = {
             ScanCropRegion(
-                it[0], it[1], it[2], it[3]
+                it[0],
+                it[1],
+                it[2],
+                it[3]
             ).normalized()
         }
     )
+
+/**
+ * Giữ thông tin dạng thuốc đặc biệt để người dùng
+ * không nhầm với dạng thuốc thông thường.
+ */
+private fun buildMedicineNote(
+    existingNote: String,
+    catalogForm: String
+): String {
+    val specialReleaseKeywords = listOf(
+        "extended-release",
+        "modified-release",
+        "sustained-release",
+        "delayed-release",
+        "prolonged-release",
+        "controlled-release",
+        "extended release",
+        "modified release",
+        "sustained release",
+        "delayed release",
+        "prolonged release",
+        "controlled release",
+        "giai phong keo dai",
+        "giai phong cham"
+    )
+
+    val isSpecialRelease = specialReleaseKeywords.any {
+        catalogForm.contains(
+            it,
+            ignoreCase = true
+        )
+    }
+
+    if (!isSpecialRelease) {
+        return existingNote
+    }
+
+    return buildString {
+        if (existingNote.isNotBlank()) {
+            appendLine(existingNote.trim())
+            appendLine()
+        }
+
+        appendLine(
+            "Dạng bào chế theo nguồn: $catalogForm"
+        )
+
+        append(
+            "Lưu ý: Thuốc có đặc tính giải phóng " +
+                    "đặc biệt. Cần kiểm tra bao bì hoặc " +
+                    "tờ hướng dẫn sử dụng trước khi lưu."
+        )
+    }
+}
 
 @Composable
 fun ScanScreen(
@@ -122,7 +188,12 @@ fun ScanScreen(
     ) {
         mutableStateOf(
             ManualMedicineDraft(
-                "", "", "mg", "", "", null
+                medicineName = "",
+                strength = "",
+                strengthUnit = "mg",
+                dosageForm = "",
+                note = "",
+                imageUri = null
             )
         )
     }
@@ -134,7 +205,12 @@ fun ScanScreen(
         error = null
 
         draft = ManualMedicineDraft(
-            "", "", "mg", "", "", null
+            medicineName = "",
+            strength = "",
+            strengthUnit = "mg",
+            dosageForm = "",
+            note = "",
+            imageUri = null
         )
 
         state = ScanFlowState.PREVIEW
@@ -163,17 +239,22 @@ fun ScanScreen(
 
     fun goBack() {
         when (state) {
-            ScanFlowState.CAMERA -> onClose()
+            ScanFlowState.CAMERA -> {
+                onClose()
+            }
 
-            ScanFlowState.PREVIEW ->
+            ScanFlowState.PREVIEW -> {
                 state = ScanFlowState.CAMERA
+            }
 
             ScanFlowState.PROCESSING,
-            ScanFlowState.RESULT ->
+            ScanFlowState.RESULT -> {
                 state = ScanFlowState.PREVIEW
+            }
 
-            ScanFlowState.LOOKUP ->
+            ScanFlowState.LOOKUP -> {
                 state = ScanFlowState.RESULT
+            }
         }
     }
 
@@ -203,10 +284,12 @@ fun ScanScreen(
                     source,
                     crop
                 ) { cropped ->
-                    val photo = MedicinePhotoCodec.prepare(
-                        context,
-                        cropped
-                    )
+
+                    val photo =
+                        MedicinePhotoCodec.prepare(
+                            context,
+                            cropped
+                        )
 
                     withContext(Dispatchers.Main) {
                         processingPhoto = photo
@@ -223,6 +306,8 @@ fun ScanScreen(
 
             rawText = pair.first.rawText
 
+            // OCR chỉ gợi ý tên và hàm lượng.
+            // Không dùng OCR để tự xác định dạng thuốc.
             draft = ManualMedicineDraft(
                 medicineName = suggestion.medicineName,
                 strength = suggestion.strength,
@@ -244,12 +329,13 @@ fun ScanScreen(
         } catch (exception: Exception) {
             error = exception.message
                 ?: "Không đọc được ảnh thuốc."
+
             state = ScanFlowState.PREVIEW
         }
     }
 
     Box(
-        modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize()
     ) {
         when (state) {
 
@@ -261,8 +347,12 @@ fun ScanScreen(
                     onPickImageClick = {
                         openGallery()
                     },
-                    onManualInputClick = onNavigateToManualInput,
-                    onCloseClick = onClose
+                    onManualInputClick = {
+                        onNavigateToManualInput()
+                    },
+                    onCloseClick = {
+                        onClose()
+                    }
                 )
             }
 
@@ -311,34 +401,40 @@ fun ScanScreen(
                 ) {
                     Text(
                         text = "Đọc chữ từ ảnh thuốc",
-                        style = MaterialTheme.typography.titleLarge
+                        style =
+                            MaterialTheme.typography.titleLarge
                     )
 
                     Text(
-                        "Thông tin OCR chỉ là gợi ý. " +
-                                "Bước tiếp theo sẽ tìm sản phẩm thật."
+                        text = "Thông tin nhận diện chỉ là " +
+                                "gợi ý. Bạn có thể kiểm tra " +
+                                "và sửa tên thuốc ở bước tiếp theo."
                     )
 
                     Text(
-                        "Tên gợi ý: " +
+                        text = "Tên thuốc gợi ý: " +
                                 draft.medicineName.ifBlank {
                                     "Chưa xác định"
                                 }
                     )
 
                     Text(
-                        "Hàm lượng gợi ý: " +
-                                draft.strength.ifBlank {
+                        text = "Hàm lượng gợi ý: " +
+                                if (draft.strength.isNotBlank()) {
+                                    "${draft.strength} ${draft.strengthUnit}"
+                                } else {
                                     "Chưa xác định"
                                 }
                     )
 
                     Text(
-                        "Dạng bào chế sẽ lấy từ sản phẩm " +
-                                "tìm được, không đoán từ OCR."
+                        text = "Dạng thuốc sẽ được lấy " +
+                                "từ dữ liệu sản phẩm tìm được."
                     )
 
-                    Text("Nội dung đọc từ ảnh:")
+                    Text(
+                        text = "Nội dung đọc từ ảnh:"
+                    )
 
                     Column(
                         modifier = Modifier
@@ -354,18 +450,26 @@ fun ScanScreen(
                         onClick = {
                             state = ScanFlowState.LOOKUP
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 56.dp)
                     ) {
-                        Text("Tra cứu sản phẩm thuốc")
+                        Text(
+                            "Kiểm tra và tìm thuốc"
+                        )
                     }
 
                     OutlinedButton(
                         onClick = {
                             goBack()
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 56.dp)
                     ) {
-                        Text("Quét lại / chọn lại vùng")
+                        Text(
+                            "Quét lại / chọn lại vùng"
+                        )
                     }
                 }
             }
@@ -381,10 +485,23 @@ fun ScanScreen(
                     },
 
                     onChoose = { item ->
-                        val strength =
-                            parseCatalogStrength(
-                                item.strength
-                            )
+
+                        // Hàm lượng từ sản phẩm đã chọn.
+                        val strength = parseCatalogStrength(
+                            item.strength
+                        )
+
+                        // Dạng thuốc từ dữ liệu danh mục.
+                        val dosageForm = mapCatalogDosageForm(
+                            item.dosage_form
+                        )
+
+                        // Giữ đặc tính giải phóng đặc biệt
+                        // trong ghi chú nếu nguồn có thông tin.
+                        val medicineNote = buildMedicineNote(
+                            existingNote = draft.note,
+                            catalogForm = item.dosage_form
+                        )
 
                         onMedicineDraftReady(
                             draft.copy(
@@ -393,10 +510,8 @@ fun ScanScreen(
                                     strength?.amount.orEmpty(),
                                 strengthUnit =
                                     strength?.unit ?: "mg",
-                                dosageForm =
-                                    mapCatalogDosageForm(
-                                        item.dosage_form
-                                    )
+                                dosageForm = dosageForm,
+                                note = medicineNote
                             )
                         )
                     },
@@ -406,7 +521,9 @@ fun ScanScreen(
                             draft.copy(
                                 medicineName = "",
                                 strength = "",
-                                dosageForm = ""
+                                strengthUnit = "mg",
+                                dosageForm = "",
+                                note = ""
                             )
                         )
                     }
@@ -426,7 +543,8 @@ fun ScanScreen(
             text = {
                 Text(
                     "MMRA đọc ảnh để gợi ý tìm thuốc. " +
-                            "Ảnh chỉ được lưu khi bạn xác nhận lưu thuốc."
+                            "Ảnh chỉ được lưu khi bạn xác nhận " +
+                            "lưu thông tin thuốc."
                 )
             },
             confirmButton = {

@@ -4,11 +4,16 @@ package com.example.project_lttbd.ui.screens.scan
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.project_lttbd.data.remote.MedicineLookupCandidate
@@ -20,7 +25,9 @@ import kotlinx.coroutines.launch
 import java.text.Normalizer
 import java.util.Locale
 
-private fun normalizeMedicineName(value: String): String {
+private fun normalizedMedicineName(
+    value: String
+): String {
     return Normalizer.normalize(
         value.lowercase(Locale.ROOT),
         Normalizer.Form.NFD
@@ -32,51 +39,52 @@ private fun normalizeMedicineName(value: String): String {
         .replace(Regex("\\s+"), " ")
 }
 
-private fun findUniqueExactMatch(
+private fun findUniqueMedicine(
     products: List<MedicineLookupCandidate>,
     ocrName: String,
     ocrStrength: String,
     ocrUnit: String
 ): MedicineLookupCandidate? {
 
-    // Thiếu tên hoặc hàm lượng thì không tự xác định thuốc.
     if (ocrName.isBlank() || ocrStrength.isBlank()) {
         return null
     }
 
-    // API hiện giới hạn 20 kết quả.
-    // Nếu đã chạm giới hạn, chưa thể kết luận duy nhất.
+    // API có giới hạn số kết quả. Không tự kết luận
+    // duy nhất nếu danh sách chạm ngưỡng giới hạn.
     if (products.size >= 20) {
         return null
     }
 
-    val expectedName = normalizeMedicineName(ocrName)
+    val expectedName = normalizedMedicineName(ocrName)
+
     val expectedAmount = ocrStrength
         .replace(',', '.')
         .toBigDecimalOrNull() ?: return null
 
-    val matches = products.filter { product ->
-        val catalogStrength = parseCatalogStrength(
+    val matching = products.filter { product ->
+        val catalog = parseCatalogStrength(
             product.strength
         )
 
-        val catalogAmount = catalogStrength
+        val amount = catalog
             ?.amount
             ?.replace(',', '.')
             ?.toBigDecimalOrNull()
 
-        normalizeMedicineName(product.name) == expectedName &&
-                catalogAmount != null &&
-                catalogAmount.compareTo(expectedAmount) == 0 &&
-                catalogStrength.unit.equals(
+        normalizedMedicineName(product.name) == expectedName &&
+                amount != null &&
+                amount.compareTo(expectedAmount) == 0 &&
+                catalog.unit.equals(
                     ocrUnit,
                     ignoreCase = true
                 ) &&
                 product.dosage_form.isNotBlank()
     }
 
-    // Không tự gộp nhiều mã sản phẩm thành một thuốc.
-    return matches.singleOrNull()
+    // Có nhiều mã sản phẩm cùng thông tin thì
+    // người dùng cần tự chọn.
+    return matching.singleOrNull()
 }
 
 @Composable
@@ -93,12 +101,14 @@ fun MedicineLookupChooser(
     }
 
     val scope = rememberCoroutineScope()
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
     var query by rememberSaveable(initialQuery) {
         mutableStateOf(initialQuery.trim())
     }
 
-    var manualMode by rememberSaveable {
+    var manualMode by rememberSaveable(initialQuery) {
         mutableStateOf(false)
     }
 
@@ -114,7 +124,7 @@ fun MedicineLookupChooser(
         mutableStateOf<String?>(null)
     }
 
-    var allResults by remember {
+    var products by remember {
         mutableStateOf(
             emptyList<MedicineLookupCandidate>()
         )
@@ -124,7 +134,7 @@ fun MedicineLookupChooser(
         mutableStateOf<MedicineLookupCandidate?>(null)
     }
 
-    var showAllResults by remember {
+    var showAll by remember {
         mutableStateOf(false)
     }
 
@@ -132,90 +142,108 @@ fun MedicineLookupChooser(
         mutableStateOf<Job?>(null)
     }
 
-    fun search(isAutomatic: Boolean) {
+    var selectedMedicine by remember {
+        mutableStateOf<MedicineLookupCandidate?>(null)
+    }
+
+    var confirmed by remember {
+        mutableStateOf(false)
+    }
+
+    fun search(automatic: Boolean) {
         val keyword = query.trim()
 
         if (keyword.length < 3) {
-            message = "Hãy nhập ít nhất 3 ký tự tên thuốc."
+            message = "Vui lòng nhập ít nhất 3 ký tự."
             return
         }
+
+        // Ẩn bàn phím và bỏ focus khi tìm.
+        keyboard?.hide()
+        focusManager.clearFocus()
 
         searchJob?.cancel()
 
         searchJob = scope.launch {
             loading = true
             searched = true
-            message = null
+            products = emptyList()
             exactResult = null
-            allResults = emptyList()
-            showAllResults = !isAutomatic
+            message = null
+            showAll = !automatic
 
             try {
-                val products = repository.find(keyword)
+                val found = repository.find(keyword)
 
-                allResults = products
+                products = found
 
-                if (products.isEmpty()) {
+                if (found.isEmpty()) {
                     message =
-                        "Không tìm thấy thuốc phù hợp. " +
-                                "Bạn có thể sửa tên hoặc nhập thủ công."
-                } else if (isAutomatic) {
-                    exactResult = findUniqueExactMatch(
-                        products = products,
+                        "Chưa tìm thấy thuốc. " +
+                                "Bạn hãy kiểm tra tên hoặc tìm bằng " +
+                                "một từ khóa khác."
+                } else if (automatic) {
+                    exactResult = findUniqueMedicine(
+                        products = found,
                         ocrName = initialQuery,
                         ocrStrength = scannedStrength,
                         ocrUnit = scannedUnit
                     )
 
                     if (exactResult == null) {
-                        showAllResults = true
+                        showAll = true
                         message =
-                            "Chưa xác định chắc chắn thuốc. " +
-                                    "Vui lòng chọn đúng sản phẩm trên hộp."
+                            "Có thể có nhiều sản phẩm tương tự. " +
+                                    "Hãy chọn đúng thuốc trên bao bì."
                     }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                allResults = emptyList()
+                products = emptyList()
                 exactResult = null
 
                 message =
-                    "Không tra cứu được thuốc. " +
-                            "Hãy kiểm tra Internet hoặc thử lại."
+                    "Không kết nối được dữ liệu thuốc. " +
+                            "Vui lòng kiểm tra Internet và thử lại."
             } finally {
                 loading = false
             }
         }
     }
 
-    // Tự tra cứu ngay sau khi OCR, nếu đã nhận diện được tên.
+    // Chỉ tự tìm khi OCR đã đọc được tên.
     LaunchedEffect(initialQuery) {
         if (
             !manualMode &&
             initialQuery.trim().length >= 3
         ) {
-            search(isAutomatic = true)
+            search(automatic = true)
         }
     }
 
-    val displayedResults = when {
-        manualMode || showAllResults -> allResults
+    val displayedProducts = when {
+        manualMode || showAll -> products
 
-        exactResult != null -> listOfNotNull(exactResult)
+        exactResult != null ->
+            listOfNotNull(exactResult)
 
-        else -> allResults
+        else -> products
     }
 
+    // Toàn bộ màn hình cuộn được khi mở bàn phím.
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 18.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         TextButton(
             onClick = {
                 searchJob?.cancel()
+                keyboard?.hide()
                 onBack()
             },
             modifier = Modifier.heightIn(min = 48.dp)
@@ -233,10 +261,10 @@ fun MedicineLookupChooser(
         )
 
         Text(
-            text = "Kiểm tra tên và hàm lượng trên hộp " +
-                    "trước khi chọn thuốc.",
-            fontSize = 16.sp,
-            lineHeight = 23.sp
+            text = "Kiểm tra tên thuốc trên hộp. " +
+                    "Nếu đọc sai, bạn có thể sửa bên dưới.",
+            fontSize = 17.sp,
+            lineHeight = 24.sp
         )
 
         OutlinedTextField(
@@ -244,31 +272,48 @@ fun MedicineLookupChooser(
             onValueChange = { newValue ->
                 searchJob?.cancel()
                 loading = false
+
                 query = newValue
                 manualMode = true
                 searched = false
-                exactResult = null
-                allResults = emptyList()
-                showAllResults = true
                 message = null
+                exactResult = null
+                products = emptyList()
+                showAll = true
             },
             label = {
                 Text("Tên thuốc")
             },
             placeholder = {
-                Text("Ví dụ: Tylenol")
+                Text("Nhập tên trên hộp thuốc")
             },
             singleLine = true,
             textStyle = LocalTextStyle.current.copy(
                 fontSize = 18.sp
             ),
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Search
+            ),
+            keyboardActions = KeyboardActions(
+                onSearch = {
+                    manualMode = true
+                    search(automatic = false)
+                }
+            ),
             modifier = Modifier.fillMaxWidth()
+        )
+
+        Text(
+            text = "Bạn có thể vuốt màn hình lên để " +
+                    "nhấn nút Tìm thuốc.",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Button(
             onClick = {
                 manualMode = true
-                search(isAutomatic = false)
+                search(automatic = false)
             },
             enabled = query.trim().length >= 3 && !loading,
             modifier = Modifier
@@ -276,8 +321,9 @@ fun MedicineLookupChooser(
                 .heightIn(min = 56.dp)
         ) {
             Text(
-                if (loading) "Đang tìm thuốc..." else "Tìm thuốc",
-                fontSize = 18.sp
+                if (loading) "Đang tìm..." else "Tìm thuốc",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
             )
         }
 
@@ -285,8 +331,9 @@ fun MedicineLookupChooser(
             LinearProgressIndicator(
                 modifier = Modifier.fillMaxWidth()
             )
+
             Text(
-                "Đang kiểm tra dữ liệu sản phẩm...",
+                text = "Đang kiểm tra sản phẩm...",
                 fontSize = 16.sp
             )
         }
@@ -295,132 +342,135 @@ fun MedicineLookupChooser(
             Text(
                 text = info,
                 fontSize = 16.sp,
-                lineHeight = 23.sp,
-                color = MaterialTheme.colorScheme.onSurface
+                lineHeight = 23.sp
             )
         }
 
-        if (exactResult != null && !showAllResults) {
+        if (
+            exactResult != null &&
+            !showAll &&
+            !manualMode
+        ) {
             Text(
-                text = "Đã tìm thấy một sản phẩm khớp",
+                text = "Tìm thấy một sản phẩm khớp",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-        } else if (displayedResults.isNotEmpty()) {
+        } else if (displayedProducts.isNotEmpty()) {
             Text(
-                text = "Chọn sản phẩm phù hợp",
+                text = "Chọn đúng sản phẩm",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (!searched && !loading) {
-                Text(
-                    "Bạn có thể sửa tên thuốc ở trên rồi tìm lại.",
-                    fontSize = 16.sp
-                )
-            }
-
-            displayedResults.forEach { item ->
-                OutlinedCard(
-                    onClick = {
-                        searchJob?.cancel()
-                        onChoose(item)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 100.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(9.dp)
-                    ) {
-                        Text(
-                            text = item.name,
-                            fontSize = 19.sp,
-                            lineHeight = 25.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Text(
-                            text = "Hàm lượng: " +
-                                    item.strength.ifBlank {
-                                        "Chưa có thông tin"
-                                    },
-                            fontSize = 16.sp
-                        )
-
-                        Text(
-                            text = "Dạng thuốc: " +
-                                    item.dosage_form.ifBlank {
-                                        "Chưa có thông tin"
-                                    },
-                            fontSize = 16.sp
-                        )
-
-                        Text(
-                            text = "Mã NDC: " +
-                                    item.registration_number.ifBlank {
-                                        "Không có"
-                                    },
-                            fontSize = 14.sp
-                        )
-
-                        Text(
-                            text = "Nguồn: ${item.source}",
-                            fontSize = 13.sp
-                        )
-
-                        Text(
-                            text = "Chọn thuốc này",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp
-                        )
-                    }
-                }
-            }
-
-            if (
-                exactResult != null &&
-                !manualMode &&
-                !showAllResults
+        displayedProducts.forEach { item ->
+            OutlinedCard(
+                onClick = {
+                    keyboard?.hide()
+                    focusManager.clearFocus()
+                    selectedMedicine = item
+                    confirmed = false
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 110.dp)
             ) {
-                OutlinedButton(
-                    onClick = {
-                        showAllResults = true
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 54.dp)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        "Xem thêm kết quả khác",
+                        text = item.name,
+                        fontSize = 19.sp,
+                        lineHeight = 25.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "Hàm lượng: " +
+                                item.strength.ifBlank {
+                                    "Chưa có thông tin"
+                                },
                         fontSize = 16.sp
                     )
+
+                    Text(
+                        text = "Dạng thuốc: " +
+                                item.dosage_form.ifBlank {
+                                    "Chưa có thông tin"
+                                },
+                        fontSize = 16.sp
+                    )
+
+                    Text(
+                        text = "Hoạt chất: " +
+                                item.active_ingredient.ifBlank {
+                                    "Chưa có thông tin"
+                                },
+                        fontSize = 15.sp
+                    )
+
+                    Text(
+                        text = "Mã sản phẩm: " +
+                                item.registration_number.ifBlank {
+                                    "Chưa có"
+                                },
+                        fontSize = 14.sp
+                    )
+
+                    Text(
+                        text = "Nguồn: ${item.source}",
+                        fontSize = 14.sp,
+                        color =
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Text(
+                        text = "Chọn thuốc này",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
+            }
+        }
+
+        if (
+            exactResult != null &&
+            !manualMode &&
+            !showAll
+        ) {
+            OutlinedButton(
+                onClick = {
+                    showAll = true
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 54.dp)
+            ) {
+                Text(
+                    "Xem thêm sản phẩm khác",
+                    fontSize = 16.sp
+                )
             }
         }
 
         HorizontalDivider()
 
         Text(
-            text = "Thông tin tra cứu chỉ để đối chiếu sản phẩm, " +
-                    "không thay thế hướng dẫn của bác sĩ hoặc dược sĩ.",
-            fontSize = 14.sp,
-            lineHeight = 20.sp
+            text = "Thông tin được lấy từ danh mục thuốc. " +
+                    "Hãy luôn đối chiếu với hộp thuốc hoặc " +
+                    "đơn thuốc trước khi lưu.",
+            fontSize = 15.sp,
+            lineHeight = 22.sp
         )
 
         OutlinedButton(
             onClick = {
                 searchJob?.cancel()
+                keyboard?.hide()
                 onSkip()
             },
             modifier = Modifier
@@ -432,5 +482,105 @@ fun MedicineLookupChooser(
                 fontSize = 16.sp
             )
         }
+
+        Spacer(Modifier.height(12.dp))
+    }
+
+    selectedMedicine?.let { item ->
+        AlertDialog(
+            onDismissRequest = {
+                selectedMedicine = null
+                confirmed = false
+            },
+            title = {
+                Text(
+                    "Kiểm tra trước khi tiếp tục",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = item.name,
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        "Hàm lượng: " +
+                                item.strength.ifBlank {
+                                    "Chưa có thông tin"
+                                },
+                        fontSize = 16.sp
+                    )
+
+                    Text(
+                        "Dạng thuốc: " +
+                                item.dosage_form.ifBlank {
+                                    "Chưa có thông tin"
+                                },
+                        fontSize = 16.sp
+                    )
+
+                    Text(
+                        text = "Thông tin tra cứu có thể không " +
+                                "trùng hoàn toàn với hộp thuốc. " +
+                                "Vui lòng kiểm tra tên, hàm lượng " +
+                                "và dạng thuốc.",
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp
+                    )
+
+                    Row(
+                        verticalAlignment =
+                            androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = confirmed,
+                            onCheckedChange = {
+                                confirmed = it
+                            }
+                        )
+
+                        Text(
+                            text = "Tôi đã kiểm tra thông tin thuốc",
+                            fontSize = 15.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = confirmed,
+                    onClick = {
+                        selectedMedicine = null
+                        confirmed = false
+                        onChoose(item)
+                    }
+                ) {
+                    Text(
+                        "Tiếp tục",
+                        fontSize = 17.sp
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        selectedMedicine = null
+                        confirmed = false
+                    }
+                ) {
+                    Text(
+                        "Chọn lại",
+                        fontSize = 17.sp
+                    )
+                }
+            }
+        )
     }
 }
