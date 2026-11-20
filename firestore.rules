@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -9,17 +10,29 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
+
+      // Giữ quyền quản lý hồ sơ tài khoản.
       allow read, write: if isOwner(uid);
 
       match /medicines/{medicineId} {
-        allow read, write: if isOwner(uid);
+
+        // Tạm giữ quyền đọc cho client cũ.
+        allow read: if isOwner(uid);
+
+        // Tất cả thao tác thêm, sửa, xóa thuốc
+        // phải đi qua FastAPI.
+        allow create, update, delete: if false;
       }
 
       match /devices/{deviceId} {
+
+        // Giữ quyền đăng ký thiết bị nhận FCM.
         allow read, write: if isOwner(uid);
       }
     }
 
+    // Các collection khác không được client
+    // truy cập trực tiếp nếu chưa cấp quyền.
     match /{document=**} {
       allow read, write: if false;
     }
