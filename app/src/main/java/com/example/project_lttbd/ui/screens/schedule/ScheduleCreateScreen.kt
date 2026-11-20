@@ -24,6 +24,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Locale
+import com.example.project_lttbd.data.remote.MedicationOverviewRepository
+import com.example.project_lttbd.notifications.NotificationHelper
+import com.example.project_lttbd.notifications.alarm.MedicationAlarmScheduler
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ScheduleCreateScreen(
@@ -73,6 +78,9 @@ fun ScheduleCreateScreen(
     key(ownerUid, medicineId) {
         val medicines = remember { MedicineRepository() }
         val schedules = remember { ScheduleRepository() }
+        val medicineDeletion = remember {
+            MedicationOverviewRepository()
+        }
         val scope = rememberCoroutineScope()
 
         var record by remember {
@@ -528,32 +536,36 @@ fun ScheduleCreateScreen(
                             deleting = true
                             deleteError = null
 
+
                             scope.launch {
                                 try {
                                     checkOwner()
 
-                                    val existing = schedules
-                                        .listSchedules()
-                                        .filter {
-                                            it.medicineId == medicineId
+                                    // Backend xử lý xóa thuốc, vô hiệu hóa lịch
+                                    // và hủy các liều PENDING liên quan.
+                                    val result = medicineDeletion.deleteMedicine(
+                                        medicineId
+                                    )
+
+                                    checkOwner()
+
+                                    // Hủy báo thức và thông báo cục bộ trên máy.
+                                    // Các ID được trả về từ Backend.
+                                    withContext(Dispatchers.IO) {
+                                        result.doseIdsToCancel.forEach { doseId ->
+                                            checkOwner()
+
+                                            MedicationAlarmScheduler.cancel(
+                                                context.applicationContext,
+                                                doseId
+                                            )
+
+                                            NotificationHelper.cancelNotification(
+                                                context.applicationContext,
+                                                doseId
+                                            )
                                         }
-
-                                    checkOwner()
-
-                                    existing.forEach {
-                                        checkOwner()
-
-                                        schedules.deleteSchedule(
-                                            it.scheduleId,
-                                            it.version
-                                        )
                                     }
-
-                                    checkOwner()
-
-                                    medicines
-                                        .deleteMedicine(medicineId)
-                                        .await()
 
                                     checkOwner()
 
@@ -564,19 +576,23 @@ fun ScheduleCreateScreen(
                                     ).show()
 
                                     onDeleted()
+
                                 } catch (cancelled: CancellationException) {
                                     throw cancelled
+
                                 } catch (_: Exception) {
                                     mustReload = true
 
                                     deleteError =
-                                        "Chưa xác nhận được toàn bộ thao tác xóa. " +
-                                                "Một số lịch có thể đã hủy. " +
-                                                "Hãy thử Xóa thuốc lại hoặc tải lại lịch đã lưu."
+                                        "Chưa xác nhận được toàn bộ thao tác xóa thuốc. " +
+                                                "Vui lòng tải lại danh sách và lịch uống " +
+                                                "trước khi thực hiện thao tác khác."
+
                                 } finally {
                                     deleting = false
                                 }
                             }
+
                         }
                     ) {
                         Text(

@@ -4,21 +4,25 @@ package com.example.project_lttbd.data.repository
 import com.example.project_lttbd.data.image.MedicinePhotoCodec
 import com.example.project_lttbd.data.remote.BackendSession
 import com.example.project_lttbd.data.remote.FirebaseProvider
+import com.example.project_lttbd.data.remote.MedicationOverviewRepository
 import com.example.project_lttbd.data.remote.MedicineApiClient
 import com.example.project_lttbd.data.remote.MedicineApiDto
+import com.example.project_lttbd.data.remote.MedicineRequestDto
 import com.example.project_lttbd.data.remote.dto.MedicineDto
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.TaskCompletionSource
-import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Timestamp
-import com.google.firebase.firestore.CollectionReference
-import com.google.firebase.firestore.FieldValue
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import retrofit2.Response
+import java.io.IOException
 
 data class MedicineRecord(
     val id: String,
@@ -29,12 +33,14 @@ class MedicineRepository {
 
     private val api = MedicineApiClient.api
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val overviewRepository =
+        MedicationOverviewRepository()
 
-    // ======================================================
-    // GET DANH SÁCH: FASTAPI
-    // ======================================================
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO
+    )
 
+    // GET - DANH SÁCH
     fun getMedicines(): Task<List<MedicineRecord>> {
         return runAsTask {
             val uid = currentUid()
@@ -43,20 +49,19 @@ class MedicineRepository {
 
             ensureCurrentUser(uid)
 
-            val response = api.getMedicines(authorization)
+            val result = api.getMedicines(
+                authorization
+            )
 
             ensureCurrentUser(uid)
 
-            response.map { medicine ->
-                medicine.toMedicineRecord()
+            result.map {
+                it.toMedicineRecord()
             }
         }
     }
 
-    // ======================================================
-    // GET CHI TIẾT: FASTAPI
-    // ======================================================
-
+    // GET - CHI TIẾT
     fun getMedicine(
         medicineId: String
     ): Task<MedicineRecord> {
@@ -69,92 +74,189 @@ class MedicineRepository {
 
             ensureCurrentUser(uid)
 
-            val response = api.getMedicine(
+            val result = api.getMedicine(
                 authorization,
                 medicineId
             )
 
             ensureCurrentUser(uid)
 
-            response.toMedicineRecord()
+            result.toMedicineRecord()
         }
     }
 
-    // ======================================================
-    // POST: FIRESTORE CŨ - SẼ CHUYỂN Ở B2.2
-    // ======================================================
-
+    // POST - THÊM THUỐC QUA FASTAPI
     fun addMedicine(
         medicine: MedicineDto
     ): Task<String> {
-        return withCurrentUser { collection ->
-            val fields = medicineFields(
-                medicine
-            ).toMutableMap()
+        return runAsTask {
+            val payload = medicine.toRequest()
 
-            fields["createdAt"] =
-                FieldValue.serverTimestamp()
+            val uid = currentUid()
+            val authorization =
+                BackendSession.authorizationHeader()
 
-            fields["updatedAt"] =
-                FieldValue.serverTimestamp()
+            ensureCurrentUser(uid)
 
-            val document = collection.document()
-
-            document.set(fields).continueWith { task ->
-                if (!task.isSuccessful) {
-                    throw task.exception
-                        ?: IllegalStateException(
-                            "Không thể thêm thuốc."
-                        )
-                }
-
-                document.id
+            val response = try {
+                api.addMedicine(
+                    authorization,
+                    payload
+                )
+            } catch (error: IOException) {
+                throw IllegalStateException(
+                    "Chưa xác nhận được thuốc đã lưu hay chưa. " +
+                            "Vui lòng tải lại danh sách trước khi thử thêm.",
+                    error
+                )
             }
+
+            ensureCurrentUser(uid)
+
+            val result = requireWriteResponse(
+                response
+            )
+
+            check(
+                result.medicineId.isNotBlank() &&
+                        '/' !in result.medicineId
+            ) {
+                "Phản hồi lưu thuốc chưa hợp lệ. " +
+                        "Vui lòng tải lại danh sách."
+            }
+
+            result.medicineId
         }
     }
 
-    // ======================================================
-    // PUT: FIRESTORE CŨ - SẼ CHUYỂN Ở B2.2
-    // ======================================================
-
+    // PUT - SỬA THUỐC QUA FASTAPI
     fun updateMedicine(
         medicineId: String,
         medicine: MedicineDto
     ): Task<Void> {
-        return withCurrentUser { collection ->
+        return runAsVoidTask {
             validateMedicineId(medicineId)
 
-            val fields = medicineFields(
-                medicine
-            ).toMutableMap()
+            val payload = medicine.toRequest()
+            val uid = currentUid()
+            val authorization =
+                BackendSession.authorizationHeader()
 
-            fields["updatedAt"] =
-                FieldValue.serverTimestamp()
+            ensureCurrentUser(uid)
 
-            collection.document(medicineId)
-                .update(fields)
+            val response = try {
+                api.updateMedicine(
+                    authorization,
+                    medicineId,
+                    payload
+                )
+            } catch (error: IOException) {
+                throw IllegalStateException(
+                    "Chưa xác nhận được kết quả sửa thuốc. " +
+                            "Vui lòng tải lại trước khi thử lại.",
+                    error
+                )
+            }
+
+            ensureCurrentUser(uid)
+
+            val result = requireWriteResponse(
+                response
+            )
+
+            check(result.medicineId == medicineId) {
+                "Máy chủ trả về mã thuốc không đúng. " +
+                        "Vui lòng tải lại thông tin thuốc."
+            }
         }
     }
 
-    // ======================================================
-    // DELETE: FIRESTORE CŨ - SẼ CHUYỂN Ở B2.2
-    // ======================================================
-
+    // DELETE - DÙNG API XÓA ĐÃ CÓ TRONG BACKEND
     fun deleteMedicine(
         medicineId: String
     ): Task<Void> {
-        return withCurrentUser { collection ->
+        return runAsVoidTask {
             validateMedicineId(medicineId)
 
-            collection.document(medicineId)
-                .delete()
+            val uid = currentUid()
+
+            overviewRepository.deleteMedicine(
+                medicineId
+            )
+
+            ensureCurrentUser(uid)
         }
     }
 
-    // ======================================================
-    // CHUYỂN JSON API SANG MODEL HIỆN TẠI
-    // ======================================================
+    // CHUYỂN MEDICINE DTO SANG REQUEST BODY
+    private fun MedicineDto.toRequest():
+            MedicineRequestDto {
 
+        require(medicineName.isNotBlank()) {
+            "Vui lòng nhập tên thuốc."
+        }
+
+        require(
+            MedicinePhotoCodec.isStoredSource(
+                imageUrl
+            )
+        ) {
+            "Ảnh thuốc chưa hợp lệ. Vui lòng chọn lại ảnh."
+        }
+
+        return MedicineRequestDto(
+            medicineName = medicineName.trim(),
+            strength = strength.trim(),
+            strengthUnit = strengthUnit.trim(),
+            dosageForm = dosageForm.trim(),
+            note = note.trim(),
+            imageUrl = imageUrl
+        )
+    }
+
+    // XỬ LÝ HTTP RESPONSE CỦA POST VÀ PUT
+    private fun requireWriteResponse(
+        response: Response<MedicineApiDto>
+    ): MedicineApiDto {
+
+        if (!response.isSuccessful) {
+            response.errorBody()?.close()
+
+            val message = when (response.code()) {
+                400, 422 ->
+                    "Thông tin thuốc không hợp lệ. " +
+                            "Vui lòng kiểm tra lại."
+
+                401 ->
+                    "Phiên đăng nhập hết hạn. " +
+                            "Vui lòng đăng nhập lại."
+
+                403 ->
+                    "Bạn không có quyền sửa thuốc."
+
+                404 ->
+                    "Không tìm thấy thuốc cần sửa."
+
+                409 ->
+                    "Dữ liệu đã thay đổi. " +
+                            "Vui lòng tải lại."
+
+                else ->
+                    "Chưa xác nhận được kết quả lưu thuốc. " +
+                            "Vui lòng tải lại danh sách để kiểm tra."
+            }
+
+            throw IllegalStateException(message)
+        }
+
+        return response.body()
+            ?: throw IllegalStateException(
+                "Máy chủ không trả về thông tin thuốc. " +
+                        "Vui lòng tải lại danh sách."
+            )
+    }
+
+    // CHUYỂN RESPONSE THÀNH MODEL GIAO DIỆN
     private fun MedicineApiDto.toMedicineRecord():
             MedicineRecord {
 
@@ -186,8 +288,6 @@ class MedicineRepository {
         if (value.isNullOrBlank()) return null
 
         return runCatching {
-            // FastAPI trả thời gian ISO 8601.
-            // Firestore Admin SDK lưu UTC.
             val normalized = value
                 .substringBefore('.')
                 .substringBefore('+')
@@ -201,18 +301,15 @@ class MedicineRepository {
                 isLenient = false
             }
 
-            val date = requireNotNull(
-                parser.parse(normalized)
+            Timestamp(
+                requireNotNull(
+                    parser.parse(normalized)
+                )
             )
-
-            Timestamp(date)
         }.getOrNull()
     }
 
-    // ======================================================
-    // GIỮ KIỂU TASK ĐỂ KHÔNG PHẢI SỬA MÀN HÌNH
-    // ======================================================
-
+    // GIỮ TASK ĐỂ TƯƠNG THÍCH GIAO DIỆN CŨ
     private fun <T> runAsTask(
         operation: suspend () -> T
     ): Task<T> {
@@ -221,6 +318,27 @@ class MedicineRepository {
         scope.launch {
             try {
                 source.trySetResult(operation())
+            } catch (error: CancellationException) {
+                source.trySetException(error)
+            } catch (error: Exception) {
+                source.trySetException(error)
+            }
+        }
+
+        return source.task
+    }
+
+    private fun runAsVoidTask(
+        operation: suspend () -> Unit
+    ): Task<Void> {
+        val source = TaskCompletionSource<Void>()
+
+        scope.launch {
+            try {
+                operation()
+                source.trySetResult(null)
+            } catch (error: CancellationException) {
+                source.trySetException(error)
             } catch (error: Exception) {
                 source.trySetException(error)
             }
@@ -232,7 +350,7 @@ class MedicineRepository {
     private fun currentUid(): String {
         return FirebaseProvider.auth.currentUser?.uid
             ?: throw IllegalStateException(
-                "Vui lòng đăng nhập để xem thuốc."
+                "Vui lòng đăng nhập để quản lý thuốc."
             )
     }
 
@@ -252,49 +370,6 @@ class MedicineRepository {
                     '/' !in medicineId
         ) {
             "Mã thuốc không hợp lệ."
-        }
-    }
-
-    // ======================================================
-    // GIỮ CÁC HELPER FIRESTORE CHO B2.2
-    // ======================================================
-
-    private fun medicineFields(
-        medicine: MedicineDto
-    ): Map<String, Any?> {
-        require(medicine.medicineName.isNotBlank()) {
-            "Vui lòng nhập tên thuốc."
-        }
-
-        val imageUrl = medicine.imageUrl
-
-        require(
-            MedicinePhotoCodec.isStoredSource(imageUrl)
-        ) {
-            "Ảnh thuốc chưa hợp lệ. Vui lòng chọn lại."
-        }
-
-        return mapOf(
-            "medicineName" to medicine.medicineName.trim(),
-            "strength" to medicine.strength.trim(),
-            "strengthUnit" to medicine.strengthUnit.trim(),
-            "dosageForm" to medicine.dosageForm.trim(),
-            "note" to medicine.note.trim(),
-            "imageUrl" to imageUrl
-        )
-    }
-
-    private fun <T> withCurrentUser(
-        action: (CollectionReference) -> Task<T>
-    ): Task<T> {
-        return try {
-            val uid = currentUid()
-
-            action(
-                FirebaseProvider.medicinesCollection(uid)
-            )
-        } catch (error: Exception) {
-            Tasks.forException(error)
         }
     }
 }
