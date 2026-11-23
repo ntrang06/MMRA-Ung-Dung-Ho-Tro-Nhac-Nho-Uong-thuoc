@@ -2,14 +2,19 @@ package com.example.project_lttbd.notifications.sync
 
 import android.content.Context
 import android.util.Log
+import com.example.project_lttbd.data.remote.DoseRepository
 import com.example.project_lttbd.data.remote.dto.DoseActionDto
 import com.example.project_lttbd.data.remote.dto.DoseResponseDto
 import com.example.project_lttbd.data.remote.dto.DoseStatusDto
 import com.example.project_lttbd.data.remote.dto.DoseUnitDto
 import com.example.project_lttbd.notifications.NotificationHelper
 import com.example.project_lttbd.notifications.alarm.MedicationAlarmScheduler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.text.ParsePosition
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
 
@@ -122,7 +127,9 @@ object MedicationReminderSync {
     fun syncDoses(
         context: Context,
         uid: String,
-        doses: List<DoseResponseDto>
+        doses: List<DoseResponseDto>,
+        queryStartMillis: Long? = null,
+        queryEndMillis: Long? = null
     ) {
         if (uid.isBlank()) return
 
@@ -132,6 +139,8 @@ object MedicationReminderSync {
 
         var scheduledCount = 0
         var cancelledCount = 0
+
+        val activePendingDoseIds = mutableSetOf<String>()
 
         for (dose in doses) {
             if (isDemoDoseId(dose.doseId)) {
@@ -171,6 +180,8 @@ object MedicationReminderSync {
                 continue
             }
 
+            activePendingDoseIds.add(dose.doseId)
+
             val medicineName = medicineLabel(dose)
 
             val message = listOf(
@@ -195,11 +206,83 @@ object MedicationReminderSync {
             scheduledCount++
         }
 
+        // Xác định khoảng thời gian đối soát chính xác
+        val minMillis = queryStartMillis ?: doses.minOfOrNull {
+            parseIsoToMillis(it.nextReminderAt?.takeIf { s -> s.isNotBlank() } ?: it.scheduledAt)
+        }
+        val maxMillis = queryEndMillis ?: doses.maxOfOrNull {
+            parseIsoToMillis(it.nextReminderAt?.takeIf { s -> s.isNotBlank() } ?: it.scheduledAt)
+        }
+
+        if (minMillis != null && maxMillis != null) {
+            val localScheduledIds = MedicationAlarmScheduler.getScheduledDosesForUid(context, uid)
+            val fetchedDoseIds = doses.map { it.doseId }.toSet()
+
+            localScheduledIds.forEach { localId ->
+                if (localId in fetchedDoseIds && localId !in activePendingDoseIds) {
+                    MedicationAlarmScheduler.cancel(context, localId)
+                    NotificationHelper.cancelNotification(context, localId)
+                    cancelledCount++
+                } else if (localId !in fetchedDoseIds) {
+                    val savedTrigger = MedicationAlarmScheduler.getSavedAlarmTriggerMillis(context, uid, localId)
+                    if (savedTrigger in (minMillis - 60_000L)..(maxMillis + 60_000L)) {
+                        MedicationAlarmScheduler.cancel(context, localId)
+                        NotificationHelper.cancelNotification(context, localId)
+                        cancelledCount++
+                    }
+                }
+            }
+        }
+
         Log.d(
             TAG,
             "Đã đồng bộ liều thuốc: $scheduledCount đặt nhắc, " +
                     "$cancelledCount hủy nhắc."
         )
+    }
+
+    fun triggerBackgroundResync(
+        context: Context,
+        uid: String
+    ) {
+        if (uid.isBlank()) return
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val repository = DoseRepository()
+                val format = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
+
+                val cal = Calendar.getInstance()
+                val todayStr = format.format(cal.time)
+
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                val rangeStartMillis = cal.timeInMillis
+
+                cal.add(Calendar.DAY_OF_YEAR, 2)
+                val rangeEndMillis = cal.timeInMillis - 1L
+
+                cal.add(Calendar.DAY_OF_YEAR, -1) // back to tomorrow
+                val tomorrowStr = format.format(cal.time)
+
+                val todayDoses = runCatching { repository.listDoses(todayStr) }.getOrNull().orEmpty()
+                val tomorrowDoses = runCatching { repository.listDoses(tomorrowStr) }.getOrNull().orEmpty()
+
+                val allDoses = todayDoses + tomorrowDoses
+                syncDoses(
+                    context = context,
+                    uid = uid,
+                    doses = allDoses,
+                    queryStartMillis = rangeStartMillis,
+                    queryEndMillis = rangeEndMillis
+                )
+                Log.d(TAG, "Đã tự động đồng bộ lại ${allDoses.size} liều thuốc từ Backend trong khoảng thời gian hôm nay & ngày mai.")
+            } catch (e: Exception) {
+                Log.w(TAG, "Tự động đồng bộ báo thức thất bại (Mạng hoặc API lỗi)", e)
+            }
+        }
     }
 
     fun onDoseAction(

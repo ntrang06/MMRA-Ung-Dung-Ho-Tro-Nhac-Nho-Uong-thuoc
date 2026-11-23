@@ -42,7 +42,6 @@ class MedicationBootReceiver : BroadcastReceiver() {
             )
 
             // Đọc báo thức thật đã lưu trên máy.
-            // Không cần gọi API trong lúc khởi động điện thoại.
             return MedicationAlarmScheduler.restoreSavedAlarms(
                 context = context,
                 uid = uid,
@@ -59,9 +58,15 @@ class MedicationBootReceiver : BroadcastReceiver() {
 
         val supported = action == Intent.ACTION_BOOT_COMPLETED ||
                 action == "android.intent.action.QUICKBOOT_POWERON" ||
+                action == "android.intent.action.TIME_SET" ||
+                action == Intent.ACTION_TIMEZONE_CHANGED ||
+                action == Intent.ACTION_DATE_CHANGED ||
+                action == Intent.ACTION_MY_PACKAGE_REPLACED ||
                 action == ACTION_TEST_BOOT
 
         if (!supported) return
+
+        Log.d(TAG, "Nhận sự kiện hệ thống: $action. Tiến hành tính toán và đặt lại báo thức...")
 
         val requestedUid = intent
             .getStringExtra("extra_uid")
@@ -99,8 +104,11 @@ class MedicationBootReceiver : BroadcastReceiver() {
 
                         Log.d(
                             TAG,
-                            "Đã khôi phục $count báo thức đã lưu."
+                            "Đã khôi phục và tính toán lại $count báo thức đã lưu."
                         )
+
+                        // Đồng bộ lại từ Backend nếu có mạng
+                        MedicationReminderSync.triggerBackgroundResync(appContext, currentUid)
                     }
                 } catch (error: Exception) {
                     Log.e(

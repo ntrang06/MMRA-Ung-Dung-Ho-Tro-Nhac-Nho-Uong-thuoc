@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -83,6 +84,7 @@ object NotificationHelper {
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            setData(Uri.parse("content://com.example.project_lttbd/reminder/$doseId"))
             putExtra(EXTRA_DESTINATION, destination)
             putExtra(EXTRA_DOSE_ID, doseId)
             putExtra(EXTRA_UID, uid)
@@ -145,13 +147,16 @@ object NotificationHelper {
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            setData(Uri.parse("content://com.example.project_lttbd/reminder/${doseId ?: System.currentTimeMillis()}"))
             putExtra(EXTRA_DESTINATION, destination)
             doseId?.let { putExtra(EXTRA_DOSE_ID, it) }
         }
 
+        val reqCode = if (!doseId.isNullOrBlank()) notificationIdForDose(doseId) else (System.currentTimeMillis() % 100000).toInt()
+
         val pendingIntent = PendingIntent.getActivity(
             context,
-            System.currentTimeMillis().toInt(),
+            reqCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -169,8 +174,7 @@ object NotificationHelper {
         try {
             val notificationManager =
                 context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val notificationId = (System.currentTimeMillis() % 100000).toInt()
-            notificationManager.notify(notificationId, notification)
+            notificationManager.notify(reqCode, notification)
         } catch (e: Exception) {
             Log.e("NotificationHelper", "Lỗi khi gửi thông báo chung", e)
         }
