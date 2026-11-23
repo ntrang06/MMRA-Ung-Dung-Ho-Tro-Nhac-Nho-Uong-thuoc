@@ -4,7 +4,9 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import org.json.JSONObject
 
@@ -37,6 +39,30 @@ object MedicationAlarmScheduler {
         val message: String,
         val medicineName: String
     )
+
+    fun canScheduleExactAlarms(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val manager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            return manager?.canScheduleExactAlarms() == true
+        }
+        return true
+    }
+
+    fun openExactAlarmSettings(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val intent = Intent(
+                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.parse("package:${context.packageName}")
+                ).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Không mở được trang cài đặt báo thức chính xác", e)
+            }
+        }
+    }
 
     fun requestCodeForDose(
         doseId: String
@@ -170,6 +196,7 @@ object MedicationAlarmScheduler {
                         alarm.triggerAtMillis,
                         pendingIntent
                     )
+                    Log.w(TAG, "Thiếu quyền EXACT_ALARM, đặt báo thức với cơ chế không chính xác (setAndAllowWhileIdle).")
                 }
             } else if (
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
@@ -306,6 +333,15 @@ object MedicationAlarmScheduler {
             )
             .orEmpty()
             .toSet()
+    }
+
+    @Synchronized
+    fun getSavedAlarmTriggerMillis(
+        context: Context,
+        uid: String,
+        doseId: String
+    ): Long {
+        return readAlarm(context, uid, doseId)?.triggerAtMillis ?: 0L
     }
 
     @Synchronized

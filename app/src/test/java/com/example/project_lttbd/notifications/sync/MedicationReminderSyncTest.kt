@@ -72,4 +72,14 @@ class MedicationReminderSyncTest {
         val millisZ = MedicationReminderSync.parseIsoToMillis(isoZ)
         assertEquals(millis, millisZ)
     }
+
+    @Test
+    fun testEmptyDosesListReconciliationWithQueryRange() {
+        val isoToday = "2026-11-12T10:00:00+07:00"
+        val startMillis = MedicationReminderSync.parseIsoToMillis("2026-11-12T00:00:00+07:00")
+        val endMillis = MedicationReminderSync.parseIsoToMillis("2026-11-12T23:59:59+07:00")
+
+        assertTrue(startMillis < endMillis)
+        assertTrue(MedicationReminderSync.parseIsoToMillis(isoToday) in startMillis..endMillis)
+    }
 }

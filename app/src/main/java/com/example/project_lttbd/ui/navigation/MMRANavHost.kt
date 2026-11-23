@@ -940,6 +940,10 @@ fun MMRANavHost(
                     navController.popBackStack()
                 },
                 onSaved = {
+                    AuthRepository.currentUid?.let { uid ->
+                        MedicationReminderSync.triggerBackgroundResync(context, uid)
+                    }
+
                     Toast.makeText(
                         context,
                         "Đã cập nhật lịch uống",
@@ -1046,6 +1050,10 @@ fun MMRANavHost(
                     navController.popBackStack()
                 },
                 onSaved = {
+                    AuthRepository.currentUid?.let { uid ->
+                        MedicationReminderSync.triggerBackgroundResync(context, uid)
+                    }
+
                     Toast.makeText(
                         context,
                         "Đã lưu lịch uống",
@@ -1095,6 +1103,10 @@ fun MMRANavHost(
                         navController.popBackStack()
                     },
                     onSaved = {
+                        AuthRepository.currentUid?.let { uid ->
+                            MedicationReminderSync.triggerBackgroundResync(context, uid)
+                        }
+
                         Toast.makeText(
                             context,
                             "Đã lưu thuốc và lịch uống",

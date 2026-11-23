@@ -32,6 +32,7 @@ import com.example.project_lttbd.ui.navigation.MMRANavHost
 import com.example.project_lttbd.ui.navigation.mmraBottomNavItems
 import com.example.project_lttbd.ui.theme.MMRATheme
 import com.example.project_lttbd.data.debug.FirebaseAuthDebug
+import com.example.project_lttbd.notifications.sync.NetworkSyncManager
 
 class MainActivity : ComponentActivity() {
 
@@ -41,8 +42,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Khởi tạo kênh thông báo hệ thống.
+        // Khởi tạo kênh thông báo hệ thống và đăng ký lắng nghe phục hồi mạng.
         NotificationHelper.ensureNotificationChannel(this)
+        NetworkSyncManager.registerNetworkCallback(this)
 
         // Kiểm tra Firebase ID token với backend ở bản debug.
         BackendSessionCheck.run(this)
@@ -281,5 +283,10 @@ class MainActivity : ComponentActivity() {
                 currentUid
             )
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        NetworkSyncManager.unregisterNetworkCallback(this)
     }
 }
