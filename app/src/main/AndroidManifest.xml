@@ -72,7 +72,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- Receiver tự động khôi phục báo thức sau khi khởi động thiết bị -->
+        <!-- Receiver tự động khôi phục và tính toán lại báo thức khi khởi động hoặc thay đổi giờ/múi giờ -->
         <receiver
             android:name=".notifications.alarm.MedicationBootReceiver"
             android:enabled="true"
@@ -80,6 +80,10 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="com.example.project_lttbd.ACTION_TEST_BOOT" />
             </intent-filter>
         </receiver>
