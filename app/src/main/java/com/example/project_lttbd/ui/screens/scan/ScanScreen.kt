@@ -1,4 +1,3 @@
-
 package com.example.project_lttbd.ui.screens.scan
 
 import android.net.Uri
@@ -15,10 +14,15 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.project_lttbd.data.image.MedicinePhotoCodec
+import com.example.project_lttbd.data.remote.MedicineLookupCandidate
+import com.example.project_lttbd.data.remote.hasMultipleActiveIngredients
+import com.example.project_lttbd.data.remote.isSafeSingleStrengthForAutoFill
+import com.example.project_lttbd.data.remote.isSpecialReleaseMedicine
 import com.example.project_lttbd.data.remote.mapCatalogDosageForm
-import com.example.project_lttbd.data.remote.parseCatalogStrength
 import com.example.project_lttbd.data.scan.MedicineOcrReader
 import com.example.project_lttbd.data.scan.MedicineScanCrop
 import com.example.project_lttbd.data.scan.ScanCropRegion
@@ -82,57 +86,46 @@ private val ScanCropSaver =
     )
 
 /**
- * Giữ thông tin dạng thuốc đặc biệt để người dùng
- * không nhầm với dạng thuốc thông thường.
+ * Giữ thông tin đặc tính giải phóng đặc biệt hoặc thành phần đa hoạt chất / hàm lượng phức hợp
+ * vào phần ghi chú để người dùng không bị mất dữ liệu và không nhầm với hàm lượng đơn.
  */
-private fun buildMedicineNote(
+internal fun buildMedicineNote(
     existingNote: String,
-    catalogForm: String
+    item: MedicineLookupCandidate
 ): String {
-    val specialReleaseKeywords = listOf(
-        "extended-release",
-        "modified-release",
-        "sustained-release",
-        "delayed-release",
-        "prolonged-release",
-        "controlled-release",
-        "extended release",
-        "modified release",
-        "sustained release",
-        "delayed release",
-        "prolonged release",
-        "controlled release",
-        "giai phong keo dai",
-        "giai phong cham"
-    )
-
-    val isSpecialRelease = specialReleaseKeywords.any {
-        catalogForm.contains(
-            it,
-            ignoreCase = true
-        )
+    val notes = mutableListOf<String>()
+    if (existingNote.isNotBlank()) {
+        notes.add(existingNote.trim())
     }
 
-    if (!isSpecialRelease) {
-        return existingNote
-    }
+    val safeStrength = isSafeSingleStrengthForAutoFill(item)
+    val isComplex = hasMultipleActiveIngredients(item.active_ingredient) ||
+        (item.strength.isNotBlank() && safeStrength == null)
 
-    return buildString {
-        if (existingNote.isNotBlank()) {
-            appendLine(existingNote.trim())
-            appendLine()
+    if (isComplex) {
+        val parts = buildList {
+            if (item.active_ingredient.isNotBlank()) {
+                add("Hoạt chất: ${item.active_ingredient}")
+            }
+            if (item.strength.isNotBlank()) {
+                add("Hàm lượng: ${item.strength}")
+            }
         }
+        if (parts.isNotEmpty()) {
+            notes.add("Thông tin theo nguồn (${item.source.ifBlank { "Danh mục" }}): ${parts.joinToString(" • ")}")
+        }
+    }
 
-        appendLine(
-            "Dạng bào chế theo nguồn: $catalogForm"
-        )
-
-        append(
-            "Lưu ý: Thuốc có đặc tính giải phóng " +
-                    "đặc biệt. Cần kiểm tra bao bì hoặc " +
-                    "tờ hướng dẫn sử dụng trước khi lưu."
+    if (isSpecialReleaseMedicine(item.name, item.dosage_form)) {
+        val formLabel = item.dosage_form.ifBlank { item.name }
+        notes.add(
+            "Dạng bào chế theo nguồn: $formLabel\n" +
+                "Lưu ý: Thuốc có đặc tính giải phóng đặc biệt. " +
+                "Cần kiểm tra bao bì hoặc tờ hướng dẫn sử dụng trước khi lưu."
         )
     }
+
+    return notes.joinToString("\n\n")
 }
 
 @Composable
@@ -171,6 +164,22 @@ fun ScanScreen(
         mutableStateOf("")
     }
 
+    var ocrCandidateNames by rememberSaveable {
+        mutableStateOf("")
+    }
+
+    var ocrDetectedStrengths by rememberSaveable {
+        mutableStateOf("")
+    }
+
+    var ocrAmbiguousStrength by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var ocrSpecialRelease by rememberSaveable {
+        mutableStateOf(false)
+    }
+
     var error by rememberSaveable {
         mutableStateOf<String?>(null)
     }
@@ -202,6 +211,10 @@ fun ScanScreen(
         imageUri = uri.toString()
         fromGallery = gallery
         rawText = ""
+        ocrCandidateNames = ""
+        ocrDetectedStrengths = ""
+        ocrAmbiguousStrength = false
+        ocrSpecialRelease = false
         error = null
 
         draft = ManualMedicineDraft(
@@ -305,9 +318,13 @@ fun ScanScreen(
             val suggestion = pair.first.suggestion
 
             rawText = pair.first.rawText
+            ocrCandidateNames = suggestion.candidateNames.joinToString("\n")
+            ocrDetectedStrengths = suggestion.detectedStrengths.joinToString(", ")
+            ocrAmbiguousStrength = suggestion.isAmbiguousStrength
+            ocrSpecialRelease = suggestion.isSpecialRelease
 
-            // OCR chỉ gợi ý tên và hàm lượng.
-            // Không dùng OCR để tự xác định dạng thuốc.
+            // OCR chỉ gợi ý tên và hàm lượng đơn rõ ràng.
+            // Không dùng OCR để tự suy đoán dạng thuốc hoặc thuốc đa hoạt chất.
             draft = ManualMedicineDraft(
                 medicineName = suggestion.medicineName,
                 strength = suggestion.strength,
@@ -392,48 +409,87 @@ fun ScanScreen(
             }
 
             ScanFlowState.RESULT -> {
+                val candidateList = remember(ocrCandidateNames) {
+                    ocrCandidateNames
+                        .split('\n')
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(20.dp),
                     verticalArrangement =
-                        Arrangement.spacedBy(12.dp)
+                        Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
                         text = "Đọc chữ từ ảnh thuốc",
-                        style =
-                            MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
                     )
 
                     Text(
-                        text = "Thông tin nhận diện chỉ là " +
-                                "gợi ý. Bạn có thể kiểm tra " +
-                                "và sửa tên thuốc ở bước tiếp theo."
+                        text = "Thông tin nhận diện chỉ là gợi ý. " +
+                            "Bạn có thể chọn tên bên dưới hoặc sửa trực tiếp ở bước tra cứu.",
+                        fontSize = 14.sp
                     )
 
                     Text(
                         text = "Tên thuốc gợi ý: " +
-                                draft.medicineName.ifBlank {
-                                    "Chưa xác định"
-                                }
+                            draft.medicineName.ifBlank { "Chưa xác định" },
+                        fontWeight = FontWeight.SemiBold
                     )
+
+                    if (candidateList.size > 1) {
+                        Text(
+                            text = "Chọn nhanh dòng chữ làm tên tra cứu:",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            candidateList.take(3).forEach { candidate ->
+                                FilterChip(
+                                    selected = draft.medicineName == candidate,
+                                    onClick = {
+                                        draft = draft.copy(medicineName = candidate)
+                                    },
+                                    label = { Text(candidate) }
+                                )
+                            }
+                        }
+                    }
 
                     Text(
                         text = "Hàm lượng gợi ý: " +
-                                if (draft.strength.isNotBlank()) {
+                            when {
+                                draft.strength.isNotBlank() ->
                                     "${draft.strength} ${draft.strengthUnit}"
-                                } else {
+                                ocrAmbiguousStrength && ocrDetectedStrengths.isNotBlank() ->
+                                    "Nhiều hàm lượng / phức hợp ($ocrDetectedStrengths) — không tự điền"
+                                else ->
                                     "Chưa xác định"
-                                }
+                            }
+                    )
+
+                    if (ocrSpecialRelease) {
+                        Text(
+                            text = "Lưu ý: Phát hiện dấu hiệu thuốc giải phóng kéo dài/đặc biệt trên bao bì.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    Text(
+                        text = "Dạng thuốc và hàm lượng chuẩn sẽ được đối chiếu từ danh mục thuốc.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Text(
-                        text = "Dạng thuốc sẽ được lấy " +
-                                "từ dữ liệu sản phẩm tìm được."
-                    )
-
-                    Text(
-                        text = "Nội dung đọc từ ảnh:"
+                        text = "Nội dung đọc từ ảnh:",
+                        fontWeight = FontWeight.SemiBold
                     )
 
                     Column(
@@ -454,9 +510,7 @@ fun ScanScreen(
                             .fillMaxWidth()
                             .heightIn(min = 56.dp)
                     ) {
-                        Text(
-                            "Kiểm tra và tìm thuốc"
-                        )
+                        Text("Kiểm tra và tìm thuốc")
                     }
 
                     OutlinedButton(
@@ -467,9 +521,7 @@ fun ScanScreen(
                             .fillMaxWidth()
                             .heightIn(min = 56.dp)
                     ) {
-                        Text(
-                            "Quét lại / chọn lại vùng"
-                        )
+                        Text("Quét lại / chọn lại vùng")
                     }
                 }
             }
@@ -485,31 +537,23 @@ fun ScanScreen(
                     },
 
                     onChoose = { item ->
+                        // Chỉ tự điền hàm lượng khi nguồn có đúng 1 hoạt chất và 1 hàm lượng đơn chuẩn.
+                        val safeStrength = isSafeSingleStrengthForAutoFill(item)
 
-                        // Hàm lượng từ sản phẩm đã chọn.
-                        val strength = parseCatalogStrength(
-                            item.strength
-                        )
+                        // Dạng thuốc ánh xạ từ dữ liệu danh mục; để trống nếu nguồn thiếu thông tin.
+                        val dosageForm = mapCatalogDosageForm(item.dosage_form)
 
-                        // Dạng thuốc từ dữ liệu danh mục.
-                        val dosageForm = mapCatalogDosageForm(
-                            item.dosage_form
-                        )
-
-                        // Giữ đặc tính giải phóng đặc biệt
-                        // trong ghi chú nếu nguồn có thông tin.
+                        // Giữ đặc tính giải phóng đặc biệt và chi tiết phức hợp trong ghi chú.
                         val medicineNote = buildMedicineNote(
                             existingNote = draft.note,
-                            catalogForm = item.dosage_form
+                            item = item
                         )
 
                         onMedicineDraftReady(
                             draft.copy(
                                 medicineName = item.name,
-                                strength =
-                                    strength?.amount.orEmpty(),
-                                strengthUnit =
-                                    strength?.unit ?: "mg",
+                                strength = safeStrength?.amount.orEmpty(),
+                                strengthUnit = safeStrength?.unit ?: "mg",
                                 dosageForm = dosageForm,
                                 note = medicineNote
                             )
@@ -543,8 +587,8 @@ fun ScanScreen(
             text = {
                 Text(
                     "MMRA đọc ảnh để gợi ý tìm thuốc. " +
-                            "Ảnh chỉ được lưu khi bạn xác nhận " +
-                            "lưu thông tin thuốc."
+                        "Ảnh chỉ được lưu khi bạn xác nhận " +
+                        "lưu thông tin thuốc."
                 )
             },
             confirmButton = {

@@ -1,24 +1,31 @@
-
 package com.example.project_lttbd.ui.screens.scan
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.project_lttbd.data.remote.LookupErrorKind
 import com.example.project_lttbd.data.remote.MedicineLookupCandidate
+import com.example.project_lttbd.data.remote.MedicineLookupException
 import com.example.project_lttbd.data.remote.MedicineLookupRepository
-import com.example.project_lttbd.data.remote.parseCatalogStrength
+import com.example.project_lttbd.data.remote.hasMultipleActiveIngredients
+import com.example.project_lttbd.data.remote.isSafeSingleStrengthForAutoFill
+import com.example.project_lttbd.data.remote.isSpecialReleaseMedicine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -45,46 +52,94 @@ private fun findUniqueMedicine(
     ocrStrength: String,
     ocrUnit: String
 ): MedicineLookupCandidate? {
-
     if (ocrName.isBlank() || ocrStrength.isBlank()) {
         return null
     }
 
-    // API có giới hạn số kết quả. Không tự kết luận
-    // duy nhất nếu danh sách chạm ngưỡng giới hạn.
-    if (products.size >= 20) {
+    if (products.size >= 55) {
         return null
     }
 
     val expectedName = normalizedMedicineName(ocrName)
-
     val expectedAmount = ocrStrength
         .replace(',', '.')
         .toBigDecimalOrNull() ?: return null
 
     val matching = products.filter { product ->
-        val catalog = parseCatalogStrength(
-            product.strength
-        )
+        val safeCatalog = isSafeSingleStrengthForAutoFill(product)
+            ?: return@filter false
 
-        val amount = catalog
-            ?.amount
-            ?.replace(',', '.')
-            ?.toBigDecimalOrNull()
+        val amount = safeCatalog.amount
+            .replace(',', '.')
+            .toBigDecimalOrNull()
 
         normalizedMedicineName(product.name) == expectedName &&
-                amount != null &&
-                amount.compareTo(expectedAmount) == 0 &&
-                catalog.unit.equals(
-                    ocrUnit,
-                    ignoreCase = true
-                ) &&
-                product.dosage_form.isNotBlank()
+            amount != null &&
+            amount.compareTo(expectedAmount) == 0 &&
+            safeCatalog.unit.equals(ocrUnit, ignoreCase = true) &&
+            product.dosage_form.isNotBlank()
     }
 
-    // Có nhiều mã sản phẩm cùng thông tin thì
-    // người dùng cần tự chọn.
     return matching.singleOrNull()
+}
+
+@Composable
+private fun SourceBadge(source: String) {
+    val (bgColor, textColor, label) = when {
+        "Việt Nam" in source -> Triple(
+            Color(0xFFE0F2EE),
+            Color(0xFF0F5B51),
+            source.ifBlank { "Việt Nam - Cục Quản lý Dược" }
+        )
+
+        "Mỹ" in source || "openFDA" in source -> Triple(
+            Color(0xFFE3F2FD),
+            Color(0xFF1565C0),
+            source
+        )
+
+        "Canada" in source -> Triple(
+            Color(0xFFFFEBEE),
+            Color(0xFFB71C1C),
+            source
+        )
+
+        else -> Triple(
+            Color(0xFFF1F5F4),
+            Color(0xFF3E4F4C),
+            source.ifBlank { "Danh mục thuốc" }
+        )
+    }
+
+    Surface(
+        color = bgColor,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = textColor,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun WarningChip(text: String, bgColor: Color, borderColor: Color, textColor: Color) {
+    Surface(
+        color = bgColor,
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        Text(
+            text = text,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = textColor,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+    }
 }
 
 @Composable
@@ -124,10 +179,12 @@ fun MedicineLookupChooser(
         mutableStateOf<String?>(null)
     }
 
+    var errorKind by remember {
+        mutableStateOf<LookupErrorKind?>(null)
+    }
+
     var products by remember {
-        mutableStateOf(
-            emptyList<MedicineLookupCandidate>()
-        )
+        mutableStateOf(emptyList<MedicineLookupCandidate>())
     }
 
     var exactResult by remember {
@@ -150,15 +207,15 @@ fun MedicineLookupChooser(
         mutableStateOf(false)
     }
 
-    fun search(automatic: Boolean) {
+    fun search(automatic: Boolean, bypassCache: Boolean = false) {
         val keyword = query.trim()
 
         if (keyword.length < 3) {
             message = "Vui lòng nhập ít nhất 3 ký tự."
+            errorKind = null
             return
         }
 
-        // Ẩn bàn phím và bỏ focus khi tìm.
         keyboard?.hide()
         focusManager.clearFocus()
 
@@ -170,18 +227,17 @@ fun MedicineLookupChooser(
             products = emptyList()
             exactResult = null
             message = null
+            errorKind = null
             showAll = !automatic
 
             try {
-                val found = repository.find(keyword)
-
+                val found = repository.find(keyword, bypassCache = bypassCache)
                 products = found
 
                 if (found.isEmpty()) {
                     message =
-                        "Chưa tìm thấy thuốc. " +
-                                "Bạn hãy kiểm tra tên hoặc tìm bằng " +
-                                "một từ khóa khác."
+                        "Chưa tìm thấy thuốc phù hợp từ dữ liệu Việt Nam, Mỹ và Canada. " +
+                            "Hãy thử tìm theo tên hoạt chất hoặc chọn Nhập thủ công."
                 } else if (automatic) {
                     exactResult = findUniqueMedicine(
                         products = found,
@@ -194,44 +250,41 @@ fun MedicineLookupChooser(
                         showAll = true
                         message =
                             "Có thể có nhiều sản phẩm tương tự. " +
-                                    "Hãy chọn đúng thuốc trên bao bì."
+                                "Hãy đối chiếu nguồn, hoạt chất và chọn đúng thuốc trên bao bì."
                     }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (error: MedicineLookupException) {
                 products = emptyList()
                 exactResult = null
-
+                errorKind = error.kind
+                message = error.message
+            } catch (_: Exception) {
+                products = emptyList()
+                exactResult = null
+                errorKind = LookupErrorKind.NETWORK
                 message =
                     "Không kết nối được dữ liệu thuốc. " +
-                            "Vui lòng kiểm tra Internet và thử lại."
+                        "Vui lòng kiểm tra Internet và thử lại."
             } finally {
                 loading = false
             }
         }
     }
 
-    // Chỉ tự tìm khi OCR đã đọc được tên.
     LaunchedEffect(initialQuery) {
-        if (
-            !manualMode &&
-            initialQuery.trim().length >= 3
-        ) {
+        if (!manualMode && initialQuery.trim().length >= 3) {
             search(automatic = true)
         }
     }
 
     val displayedProducts = when {
         manualMode || showAll -> products
-
-        exactResult != null ->
-            listOfNotNull(exactResult)
-
+        exactResult != null -> listOfNotNull(exactResult)
         else -> products
     }
 
-    // Toàn bộ màn hình cuộn được khi mở bàn phím.
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -248,10 +301,7 @@ fun MedicineLookupChooser(
             },
             modifier = Modifier.heightIn(min = 48.dp)
         ) {
-            Text(
-                "← Quay lại",
-                fontSize = 17.sp
-            )
+            Text("← Quay lại", fontSize = 17.sp)
         }
 
         Text(
@@ -261,10 +311,9 @@ fun MedicineLookupChooser(
         )
 
         Text(
-            text = "Kiểm tra tên thuốc trên hộp. " +
-                    "Nếu đọc sai, bạn có thể sửa bên dưới.",
-            fontSize = 17.sp,
-            lineHeight = 24.sp
+            text = "Tra cứu theo tên thuốc, hoạt chất hoặc số đăng ký (Việt Nam, Mỹ, Canada).",
+            fontSize = 16.sp,
+            lineHeight = 23.sp
         )
 
         OutlinedTextField(
@@ -277,23 +326,16 @@ fun MedicineLookupChooser(
                 manualMode = true
                 searched = false
                 message = null
+                errorKind = null
                 exactResult = null
                 products = emptyList()
                 showAll = true
             },
-            label = {
-                Text("Tên thuốc")
-            },
-            placeholder = {
-                Text("Nhập tên trên hộp thuốc")
-            },
+            label = { Text("Tên thuốc / Hoạt chất / Số ĐK") },
+            placeholder = { Text("Ví dụ: Panfor PR-750 hoặc Metformin") },
             singleLine = true,
-            textStyle = LocalTextStyle.current.copy(
-                fontSize = 18.sp
-            ),
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Search
-            ),
+            textStyle = LocalTextStyle.current.copy(fontSize = 18.sp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(
                 onSearch = {
                     manualMode = true
@@ -301,13 +343,6 @@ fun MedicineLookupChooser(
                 }
             ),
             modifier = Modifier.fillMaxWidth()
-        )
-
-        Text(
-            text = "Bạn có thể vuốt màn hình lên để " +
-                    "nhấn nút Tìm thuốc.",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Button(
@@ -328,12 +363,9 @@ fun MedicineLookupChooser(
         }
 
         if (loading) {
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth()
-            )
-
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             Text(
-                text = "Đang kiểm tra sản phẩm...",
+                text = "Đang tra cứu dữ liệu thuốc chính thống...",
                 fontSize = 16.sp
             )
         }
@@ -341,16 +373,31 @@ fun MedicineLookupChooser(
         message?.let { info ->
             Text(
                 text = info,
-                fontSize = 16.sp,
-                lineHeight = 23.sp
+                fontSize = 15.sp,
+                lineHeight = 22.sp,
+                color = if (errorKind != null) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
             )
         }
 
-        if (
-            exactResult != null &&
-            !showAll &&
-            !manualMode
-        ) {
+        if (errorKind != null && !loading) {
+            OutlinedButton(
+                onClick = {
+                    manualMode = true
+                    search(automatic = false, bypassCache = true)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 50.dp)
+            ) {
+                Text("Thử lại", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        if (exactResult != null && !showAll && !manualMode) {
             Text(
                 text = "Tìm thấy một sản phẩm khớp",
                 fontSize = 18.sp,
@@ -359,13 +406,18 @@ fun MedicineLookupChooser(
             )
         } else if (displayedProducts.isNotEmpty()) {
             Text(
-                text = "Chọn đúng sản phẩm",
+                text = "Chọn đúng sản phẩm (${displayedProducts.size})",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
         }
 
         displayedProducts.forEach { item ->
+            val safeStrength = isSafeSingleStrengthForAutoFill(item)
+            val isComplex = hasMultipleActiveIngredients(item.active_ingredient) ||
+                (item.strength.isNotBlank() && safeStrength == null)
+            val isSpecialRelease = isSpecialReleaseMedicine(item.name, item.dosage_form)
+
             OutlinedCard(
                 onClick = {
                     keyboard?.hide()
@@ -381,6 +433,8 @@ fun MedicineLookupChooser(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    SourceBadge(item.source)
+
                     Text(
                         text = item.name,
                         fontSize = 19.sp,
@@ -388,43 +442,58 @@ fun MedicineLookupChooser(
                         fontWeight = FontWeight.Bold
                     )
 
-                    Text(
-                        text = "Hàm lượng: " +
-                                item.strength.ifBlank {
-                                    "Chưa có thông tin"
-                                },
-                        fontSize = 16.sp
-                    )
+                    if (isSpecialRelease) {
+                        WarningChip(
+                            text = "Giải phóng kéo dài / đặc biệt",
+                            bgColor = Color(0xFFFFF4E5),
+                            borderColor = Color(0xFFE6A23C),
+                            textColor = Color(0xFF8A4B00)
+                        )
+                    }
+
+                    if (isComplex) {
+                        WarningChip(
+                            text = "Nhiều hoạt chất / hàm lượng phức hợp",
+                            bgColor = Color(0xFFF3EFFE),
+                            borderColor = Color(0xFFD0C4F7),
+                            textColor = Color(0xFF4B2B9A)
+                        )
+                    }
 
                     Text(
-                        text = "Dạng thuốc: " +
-                                item.dosage_form.ifBlank {
-                                    "Chưa có thông tin"
-                                },
-                        fontSize = 16.sp
-                    )
-
-                    Text(
-                        text = "Hoạt chất: " +
-                                item.active_ingredient.ifBlank {
-                                    "Chưa có thông tin"
-                                },
+                        text = "Hoạt chất: " + item.active_ingredient.ifBlank {
+                            "Chưa có thông tin"
+                        },
                         fontSize = 15.sp
                     )
 
                     Text(
-                        text = "Mã sản phẩm: " +
-                                item.registration_number.ifBlank {
-                                    "Chưa có"
-                                },
+                        text = "Hàm lượng: " + item.strength.ifBlank {
+                            "Chưa có thông tin"
+                        },
+                        fontSize = 16.sp
+                    )
+
+                    Text(
+                        text = "Dạng bào chế: " + item.dosage_form.ifBlank {
+                            "Chưa có thông tin"
+                        },
+                        fontSize = 16.sp
+                    )
+
+                    Text(
+                        text = "Số đăng ký / Mã SP: " + item.registration_number.ifBlank {
+                            "Chưa có"
+                        },
                         fontSize = 14.sp
                     )
 
                     Text(
-                        text = "Nguồn: ${item.source}",
+                        text = "Nhà sản xuất: " + item.manufacturer.ifBlank {
+                            "Chưa có thông tin"
+                        },
                         fontSize = 14.sp,
-                        color =
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Text(
@@ -437,32 +506,22 @@ fun MedicineLookupChooser(
             }
         }
 
-        if (
-            exactResult != null &&
-            !manualMode &&
-            !showAll
-        ) {
+        if (exactResult != null && !manualMode && !showAll) {
             OutlinedButton(
-                onClick = {
-                    showAll = true
-                },
+                onClick = { showAll = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 54.dp)
             ) {
-                Text(
-                    "Xem thêm sản phẩm khác",
-                    fontSize = 16.sp
-                )
+                Text("Xem thêm sản phẩm khác", fontSize = 16.sp)
             }
         }
 
         HorizontalDivider()
 
         Text(
-            text = "Thông tin được lấy từ danh mục thuốc. " +
-                    "Hãy luôn đối chiếu với hộp thuốc hoặc " +
-                    "đơn thuốc trước khi lưu.",
+            text = "Thông tin được lấy từ danh mục thuốc (Cục Quản lý Dược VN, openFDA, Health Canada). " +
+                "Hãy luôn đối chiếu với hộp thuốc hoặc đơn thuốc trước khi lưu.",
             fontSize = 15.sp,
             lineHeight = 22.sp
         )
@@ -477,16 +536,19 @@ fun MedicineLookupChooser(
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
         ) {
-            Text(
-                "Không thấy thuốc? Nhập thủ công",
-                fontSize = 16.sp
-            )
+            Text("Không thấy thuốc? Nhập thủ công", fontSize = 16.sp)
         }
 
         Spacer(Modifier.height(12.dp))
     }
 
     selectedMedicine?.let { item ->
+        val safeStrength = isSafeSingleStrengthForAutoFill(item)
+        val isComplex = hasMultipleActiveIngredients(item.active_ingredient) ||
+            (item.strength.isNotBlank() && safeStrength == null)
+        val isSpecialRelease = isSpecialReleaseMedicine(item.name, item.dosage_form)
+        val hasMissingFields = item.strength.isBlank() || item.dosage_form.isBlank()
+
         AlertDialog(
             onDismissRequest = {
                 selectedMedicine = null
@@ -500,9 +562,11 @@ fun MedicineLookupChooser(
             },
             text = {
                 Column(
-                    verticalArrangement =
-                        Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    SourceBadge(item.source)
+
                     Text(
                         text = item.name,
                         fontSize = 19.sp,
@@ -510,39 +574,72 @@ fun MedicineLookupChooser(
                     )
 
                     Text(
-                        "Hàm lượng: " +
-                                item.strength.ifBlank {
-                                    "Chưa có thông tin"
-                                },
-                        fontSize = 16.sp
+                        "Hoạt chất: " + item.active_ingredient.ifBlank { "Chưa có thông tin" },
+                        fontSize = 15.sp
                     )
 
                     Text(
-                        "Dạng thuốc: " +
-                                item.dosage_form.ifBlank {
-                                    "Chưa có thông tin"
-                                },
-                        fontSize = 16.sp
+                        "Hàm lượng: " + item.strength.ifBlank { "Chưa có thông tin" },
+                        fontSize = 15.sp
                     )
 
                     Text(
-                        text = "Thông tin tra cứu có thể không " +
-                                "trùng hoàn toàn với hộp thuốc. " +
-                                "Vui lòng kiểm tra tên, hàm lượng " +
-                                "và dạng thuốc.",
-                        fontSize = 15.sp,
-                        lineHeight = 22.sp
+                        "Dạng thuốc: " + item.dosage_form.ifBlank { "Chưa có thông tin" },
+                        fontSize = 15.sp
                     )
 
-                    Row(
-                        verticalAlignment =
-                            androidx.compose.ui.Alignment.CenterVertically
-                    ) {
+                    if (item.registration_number.isNotBlank()) {
+                        Text(
+                            "Số ĐK / Mã SP: ${item.registration_number}",
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    if (item.manufacturer.isNotBlank()) {
+                        Text(
+                            "Nhà sản xuất: ${item.manufacturer}",
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    if (isSpecialRelease) {
+                        WarningChip(
+                            text = "Lưu ý: Thuốc giải phóng kéo dài/đặc biệt. Kiểm tra kỹ bao bì và không tự ý bẻ viên.",
+                            bgColor = Color(0xFFFFF4E5),
+                            borderColor = Color(0xFFE6A23C),
+                            textColor = Color(0xFF8A4B00)
+                        )
+                    }
+
+                    if (isComplex) {
+                        WarningChip(
+                            text = "Thuốc có nhiều hoạt chất hoặc hàm lượng phức hợp: hệ thống sẽ không tự điền ô hàm lượng đơn lẻ và sẽ lưu chi tiết vào Ghi chú.",
+                            bgColor = Color(0xFFF3EFFE),
+                            borderColor = Color(0xFFD0C4F7),
+                            textColor = Color(0xFF4B2B9A)
+                        )
+                    }
+
+                    if (hasMissingFields) {
+                        WarningChip(
+                            text = "Nguồn thiếu thông tin hàm lượng hoặc dạng thuốc. Hệ thống để trống trường thiếu để bạn tự đối chiếu bao bì.",
+                            bgColor = Color(0xFFFFF4E5),
+                            borderColor = Color(0xFFE6A23C),
+                            textColor = Color(0xFF8A4B00)
+                        )
+                    }
+
+                    Text(
+                        text = "Thông tin tra cứu chỉ mang tính đối chiếu. " +
+                            "Vui lòng kiểm tra tên, hàm lượng và dạng thuốc trên hộp.",
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp
+                    )
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = confirmed,
-                            onCheckedChange = {
-                                confirmed = it
-                            }
+                            onCheckedChange = { confirmed = it }
                         )
 
                         Text(
@@ -562,10 +659,7 @@ fun MedicineLookupChooser(
                         onChoose(item)
                     }
                 ) {
-                    Text(
-                        "Tiếp tục",
-                        fontSize = 17.sp
-                    )
+                    Text("Tiếp tục", fontSize = 17.sp)
                 }
             },
             dismissButton = {
@@ -575,10 +669,7 @@ fun MedicineLookupChooser(
                         confirmed = false
                     }
                 ) {
-                    Text(
-                        "Chọn lại",
-                        fontSize = 17.sp
-                    )
+                    Text("Chọn lại", fontSize = 17.sp)
                 }
             }
         )
