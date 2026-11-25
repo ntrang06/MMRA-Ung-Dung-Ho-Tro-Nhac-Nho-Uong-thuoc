@@ -1,3 +1,4 @@
+
 package com.example.project_lttbd.ui.screens.schedule
 
 import android.widget.Toast
@@ -16,6 +17,7 @@ import com.example.project_lttbd.data.remote.ScheduleRepository
 import com.example.project_lttbd.data.remote.dto.*
 import com.example.project_lttbd.data.repository.MedicineRecord
 import com.example.project_lttbd.data.repository.MedicineRepository
+import com.example.project_lttbd.data.repository.MedicineVersionConflictException
 import com.example.project_lttbd.ui.components.ScheduleFormSkeleton
 import com.example.project_lttbd.ui.screens.medicine.ManualMedicineDraft
 import com.google.firebase.auth.FirebaseAuth
@@ -41,7 +43,11 @@ fun ScheduleCreateScreen(
     onFormChange: (MockMedicineSchedule) -> Unit = {},
     onSelectionChange: (String?) -> Unit = {},
     allowDeleteMedicine: Boolean = false,
-    onDeleted: () -> Unit = onBackClick
+    onDeleted: () -> Unit = onBackClick,
+
+    // Chỉ dùng khi đang sửa thông tin thuốc.
+    // Đây là version lấy lúc mở màn sửa.
+    expectedMedicineVersion: Int? = null
 ) {
     val context = LocalContext.current
     val auth = FirebaseProvider.auth
@@ -78,9 +84,11 @@ fun ScheduleCreateScreen(
     key(ownerUid, medicineId) {
         val medicines = remember { MedicineRepository() }
         val schedules = remember { ScheduleRepository() }
+
         val medicineDeletion = remember {
             MedicationOverviewRepository()
         }
+
         val scope = rememberCoroutineScope()
 
         var record by remember {
@@ -88,7 +96,9 @@ fun ScheduleCreateScreen(
         }
 
         var options by remember {
-            mutableStateOf<List<ScheduleResponseDto>>(emptyList())
+            mutableStateOf<List<ScheduleResponseDto>>(
+                emptyList()
+            )
         }
 
         var selected by remember {
@@ -99,15 +109,41 @@ fun ScheduleCreateScreen(
             mutableStateOf<MockMedicineSchedule?>(null)
         }
 
-        var loading by remember { mutableStateOf(true) }
-        var error by remember { mutableStateOf<String?>(null) }
-        var retry by remember { mutableStateOf(0) }
-        var generation by remember { mutableStateOf(0) }
-        var mustReload by remember { mutableStateOf(false) }
-        var confirmReload by remember { mutableStateOf(false) }
-        var confirmDelete by remember { mutableStateOf(false) }
-        var deleting by remember { mutableStateOf(false) }
-        var expanded by remember { mutableStateOf(false) }
+        var loading by remember {
+            mutableStateOf(true)
+        }
+
+        var error by remember {
+            mutableStateOf<String?>(null)
+        }
+
+        var retry by remember {
+            mutableIntStateOf(0)
+        }
+
+        var generation by remember {
+            mutableIntStateOf(0)
+        }
+
+        var mustReload by remember {
+            mutableStateOf(false)
+        }
+
+        var confirmReload by remember {
+            mutableStateOf(false)
+        }
+
+        var confirmDelete by remember {
+            mutableStateOf(false)
+        }
+
+        var deleting by remember {
+            mutableStateOf(false)
+        }
+
+        var expanded by remember {
+            mutableStateOf(false)
+        }
 
         var deleteError by remember {
             mutableStateOf<String?>(null)
@@ -115,7 +151,9 @@ fun ScheduleCreateScreen(
 
         fun checkOwner() {
             if (auth.currentUser?.uid != ownerUid) {
-                throw CancellationException("Tài khoản đã thay đổi.")
+                throw CancellationException(
+                    "Tài khoản đã thay đổi."
+                )
             }
         }
 
@@ -169,13 +207,15 @@ fun ScheduleCreateScreen(
 
                 mustReload = false
                 generation++
+
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (exception: ScheduleException) {
                 error = exception.message
             } catch (_: Exception) {
                 error =
-                    "Chưa tải được thuốc hoặc lịch uống. Vui lòng thử lại."
+                    "Chưa tải được thuốc hoặc lịch uống. " +
+                            "Vui lòng thử lại."
             } finally {
                 loading = false
             }
@@ -189,14 +229,20 @@ fun ScheduleCreateScreen(
             }
 
             error != null -> {
-                Column(Modifier.padding(20.dp)) {
+                Column(
+                    modifier = Modifier.padding(20.dp)
+                ) {
                     Text(error.orEmpty())
 
-                    TextButton(onClick = { retry++ }) {
+                    TextButton(
+                        onClick = { retry++ }
+                    ) {
                         Text("Thử lại")
                     }
 
-                    TextButton(onClick = onBackClick) {
+                    TextButton(
+                        onClick = onBackClick
+                    ) {
                         Text("Quay lại")
                     }
                 }
@@ -205,19 +251,28 @@ fun ScheduleCreateScreen(
             record != null -> {
                 val originalMedicine = record!!.data
 
-                val draft = draftOverride ?: ManualMedicineDraft(
-                    medicineName = originalMedicine.medicineName,
-                    strength = originalMedicine.strength,
-                    strengthUnit = originalMedicine.strengthUnit,
-                    dosageForm = originalMedicine.dosageForm,
-                    note = originalMedicine.note,
-                    imageUri = originalMedicine.imageUrl
-                )
+                val draft = draftOverride
+                    ?: ManualMedicineDraft(
+                        medicineName =
+                            originalMedicine.medicineName,
+                        strength =
+                            originalMedicine.strength,
+                        strengthUnit =
+                            originalMedicine.strengthUnit,
+                        dosageForm =
+                            originalMedicine.dosageForm,
+                        note =
+                            originalMedicine.note,
+                        imageUri =
+                            originalMedicine.imageUrl
+                    )
 
                 Column(Modifier.fillMaxSize()) {
                     if (options.size > 1) {
                         Box(
-                            Modifier.padding(horizontal = 20.dp)
+                            Modifier.padding(
+                                horizontal = 20.dp
+                            )
                         ) {
                             TextButton(
                                 onClick = {
@@ -226,7 +281,11 @@ fun ScheduleCreateScreen(
                             ) {
                                 Text(
                                     selected?.let {
-                                        "Lịch: ${scheduleTimesLabel(it.times)}"
+                                        "Lịch: ${
+                                            scheduleTimesLabel(
+                                                it.times
+                                            )
+                                        }"
                                     } ?: "Chọn lịch uống cần sửa"
                                 )
                             }
@@ -241,19 +300,23 @@ fun ScheduleCreateScreen(
                                     DropdownMenuItem(
                                         text = {
                                             val times =
-                                                scheduleTimesLabel(option.times)
+                                                scheduleTimesLabel(
+                                                    option.times
+                                                )
 
-                                            val status = if (option.enabled) {
-                                                ""
-                                            } else {
-                                                " • Đang tạm dừng"
-                                            }
+                                            val status =
+                                                if (option.enabled) {
+                                                    ""
+                                                } else {
+                                                    " • Đang tạm dừng"
+                                                }
 
                                             Text("$times$status")
                                         },
                                         onClick = {
                                             try {
-                                                val nextForm = option.toEditForm()
+                                                val nextForm =
+                                                    option.toEditForm()
 
                                                 selected = option
                                                 seed = nextForm
@@ -282,12 +345,16 @@ fun ScheduleCreateScreen(
 
                     if (startingForm == null) {
                         Text(
-                            text = "Thuốc có nhiều lịch uống. " +
-                                    "Hãy chọn lịch cần sửa.",
-                            modifier = Modifier.padding(20.dp)
+                            text =
+                                "Thuốc có nhiều lịch uống. " +
+                                        "Hãy chọn lịch cần sửa.",
+                            modifier =
+                                Modifier.padding(20.dp)
                         )
 
-                        TextButton(onClick = onBackClick) {
+                        TextButton(
+                            onClick = onBackClick
+                        ) {
                             Text("Quay lại")
                         }
                     } else {
@@ -295,32 +362,43 @@ fun ScheduleCreateScreen(
                             ScheduleSetupEditor(
                                 draft = draft,
                                 medicineId = medicineId,
-                                modifier = Modifier.weight(1f),
-                                initialSchedule = startingForm,
-                                onDraftChange = onFormChange,
+                                modifier =
+                                    Modifier.weight(1f),
+                                initialSchedule =
+                                    startingForm,
+                                onDraftChange =
+                                    onFormChange,
 
-                                stepLabel = if (draftOverride == null) {
-                                    "Kiểm tra và lưu"
-                                } else {
-                                    "Kiểm tra và lưu thay đổi"
-                                },
+                                stepLabel =
+                                    if (draftOverride == null) {
+                                        "Kiểm tra và lưu"
+                                    } else {
+                                        "Kiểm tra và lưu thay đổi"
+                                    },
 
-                                saveButtonText = if (draftOverride == null) {
-                                    "Lưu lịch uống"
-                                } else {
-                                    "Lưu thay đổi"
-                                },
+                                saveButtonText =
+                                    if (draftOverride == null) {
+                                        "Lưu lịch uống"
+                                    } else {
+                                        "Lưu thay đổi"
+                                    },
 
-                                actionsEnabled = !deleting && !mustReload,
+                                actionsEnabled =
+                                    !deleting && !mustReload,
+
                                 onBackClick = onBackClick,
                                 onSaved = onSaved,
 
                                 footerContent = {
-                                    if (selected?.enabled == false) {
+                                    if (
+                                        selected?.enabled == false
+                                    ) {
                                         Text(
-                                            text = "Lịch đang tạm dừng; " +
-                                                    "lưu thay đổi sẽ giữ trạng thái này.",
-                                            style = MaterialTheme.typography.bodySmall
+                                            text =
+                                                "Lịch đang tạm dừng; " +
+                                                        "lưu thay đổi sẽ giữ trạng thái này.",
+                                            style =
+                                                MaterialTheme.typography.bodySmall
                                         )
                                     }
 
@@ -330,7 +408,9 @@ fun ScheduleCreateScreen(
                                                 confirmReload = true
                                             }
                                         ) {
-                                            Text("Tải lại lịch đã lưu")
+                                            Text(
+                                                "Tải lại lịch đã lưu"
+                                            )
                                         }
                                     }
 
@@ -339,12 +419,14 @@ fun ScheduleCreateScreen(
                                             onClick = {
                                                 confirmDelete = true
                                             },
-                                            modifier = Modifier.fillMaxWidth(),
+                                            modifier =
+                                                Modifier.fillMaxWidth(),
                                             enabled = !deleting
                                         ) {
                                             Text(
                                                 text = "Xóa thuốc",
-                                                color = Color(0xFFB3261E)
+                                                color =
+                                                    Color(0xFFB3261E)
                                             )
                                         }
                                     }
@@ -356,41 +438,69 @@ fun ScheduleCreateScreen(
                                     val baseline = selected
 
                                     val input = form
-                                        .toScheduleInput(medicineId)
+                                        .toScheduleInput(
+                                            medicineId
+                                        )
                                         .copy(
-                                            timeZone = baseline?.timeZone
-                                                ?: "Asia/Ho_Chi_Minh",
-                                            enabled = baseline?.enabled ?: true
+                                            timeZone =
+                                                baseline?.timeZone
+                                                    ?: "Asia/Ho_Chi_Minh",
+                                            enabled =
+                                                baseline?.enabled
+                                                    ?: true
                                         )
 
                                     require(
-                                        com.example.project_lttbd.data.image.MedicinePhotoCodec
-                                            .isStoredSource(draft.imageUri)
+                                        com.example.project_lttbd
+                                            .data.image
+                                            .MedicinePhotoCodec
+                                            .isStoredSource(
+                                                draft.imageUri
+                                            )
                                     ) {
-                                        "Ảnh thuốc chưa hợp lệ. Vui lòng quay lại chọn ảnh."
+                                        "Ảnh thuốc chưa hợp lệ. " +
+                                                "Vui lòng quay lại chọn ảnh."
                                     }
 
+                                    // Không lấy version mới nhất
+                                    // thay cho version đã mở ban đầu.
+                                    if (draftOverride != null) {
+                                        require(
+                                            expectedMedicineVersion != null &&
+                                                    expectedMedicineVersion >= 1
+                                        ) {
+                                            "Thiếu phiên bản thuốc. " +
+                                                    "Vui lòng mở lại màn sửa."
+                                        }
+                                    }
+
+                                    // Giữ nghiệp vụ lưu lịch hiện tại.
                                     val result = try {
                                         val latest = schedules
                                             .listSchedules()
                                             .filter {
-                                                it.medicineId == medicineId
+                                                it.medicineId ==
+                                                        medicineId
                                             }
 
                                         checkOwner()
 
-                                        val current = if (baseline == null) {
-                                            latest.singleOrNull()
-                                        } else {
-                                            latest.firstOrNull {
-                                                it.scheduleId == baseline.scheduleId
+                                        val current =
+                                            if (baseline == null) {
+                                                latest.singleOrNull()
+                                            } else {
+                                                latest.firstOrNull {
+                                                    it.scheduleId ==
+                                                            baseline.scheduleId
+                                                }
                                             }
-                                        }
 
                                         when {
                                             baseline == null &&
                                                     latest.isEmpty() -> {
-                                                schedules.createSchedule(input)
+                                                schedules.createSchedule(
+                                                    input
+                                                )
                                             }
 
                                             current != null &&
@@ -399,7 +509,8 @@ fun ScheduleCreateScreen(
                                             }
 
                                             baseline != null &&
-                                                    current?.version == baseline.version -> {
+                                                    current?.version ==
+                                                    baseline.version -> {
                                                 schedules.updateSchedule(
                                                     baseline.scheduleId,
                                                     input.asUpdate(
@@ -417,9 +528,13 @@ fun ScheduleCreateScreen(
                                                 )
                                             }
                                         }
-                                    } catch (cancelled: CancellationException) {
+                                    } catch (
+                                        cancelled: CancellationException
+                                    ) {
                                         throw cancelled
-                                    } catch (exception: Exception) {
+                                    } catch (
+                                        exception: Exception
+                                    ) {
                                         mustReload = true
                                         throw exception
                                     }
@@ -429,11 +544,16 @@ fun ScheduleCreateScreen(
                                     selected = result
 
                                     options = options.filterNot {
-                                        it.scheduleId == result.scheduleId
+                                        it.scheduleId ==
+                                                result.scheduleId
                                     } + result
 
-                                    onSelectionChange(result.scheduleId)
+                                    onSelectionChange(
+                                        result.scheduleId
+                                    )
 
+                                    // Nếu sửa cả thông tin thuốc,
+                                    // gửi version đã đọc từ bước 1.
                                     if (draftOverride != null) {
                                         try {
                                             checkOwner()
@@ -441,28 +561,93 @@ fun ScheduleCreateScreen(
                                             medicines.updateMedicine(
                                                 medicineId,
                                                 MedicineDto(
-                                                    medicineName = draft.medicineName,
-                                                    strength = draft.strength,
+                                                    medicineName =
+                                                        draft.medicineName,
+                                                    strength =
+                                                        draft.strength,
                                                     strengthUnit =
-                                                        if (draft.strength.isBlank()) {
+                                                        if (
+                                                            draft.strength
+                                                                .isBlank()
+                                                        ) {
                                                             ""
                                                         } else {
                                                             draft.strengthUnit
                                                         },
-                                                    dosageForm = draft.dosageForm,
-                                                    note = draft.note,
-                                                    imageUrl = draft.imageUri
+                                                    dosageForm =
+                                                        draft.dosageForm,
+                                                    note =
+                                                        draft.note,
+                                                    imageUrl =
+                                                        draft.imageUri,
+                                                    version =
+                                                        requireNotNull(
+                                                            expectedMedicineVersion
+                                                        )
                                                 )
                                             ).await()
 
                                             checkOwner()
-                                        } catch (cancelled: CancellationException) {
+
+                                        } catch (
+                                            cancelled: CancellationException
+                                        ) {
                                             throw cancelled
-                                        } catch (_: Exception) {
+
+                                        } catch (
+                                            conflict:
+                                            MedicineVersionConflictException
+                                        ) {
+                                            mustReload = true
+
                                             throw ScheduleException(
-                                                "Lịch uống đã lưu, nhưng chưa xác nhận " +
-                                                        "được thông tin thuốc. Giữ nguyên nội dung " +
-                                                        "và nhấn Lưu thay đổi để thử lại.",
+                                                "Lịch uống đã được lưu, " +
+                                                        "nhưng thông tin thuốc đã thay đổi " +
+                                                        "ở nơi khác nên chưa được cập nhật. " +
+                                                        "Hãy quay lại danh sách thuốc " +
+                                                        "và mở lại màn sửa để xem dữ liệu mới.",
+                                                "medicine_version_conflict",
+                                                409
+                                            )
+
+                                        } catch (
+                                            exception: Exception
+                                        ) {
+                                            // Google Task.await() có thể
+                                            // bọc lỗi trong exception khác.
+                                            var cause: Throwable? = exception
+                                            var hasConflict = false
+
+                                            while (cause != null) {
+                                                if (
+                                                    cause is
+                                                            MedicineVersionConflictException
+                                                ) {
+                                                    hasConflict = true
+                                                    break
+                                                }
+
+                                                cause = cause.cause
+                                            }
+
+                                            mustReload = true
+
+                                            if (hasConflict) {
+                                                throw ScheduleException(
+                                                    "Lịch uống đã được lưu, " +
+                                                            "nhưng thông tin thuốc đã thay đổi. " +
+                                                            "Hãy quay lại danh sách thuốc " +
+                                                            "và mở lại màn sửa.",
+                                                    "medicine_version_conflict",
+                                                    409
+                                                )
+                                            }
+
+                                            throw ScheduleException(
+                                                "Lịch uống đã lưu, " +
+                                                        "nhưng chưa xác nhận được " +
+                                                        "thông tin thuốc. " +
+                                                        "Hãy tải lại trước khi thử tiếp.",
                                                 "medicine_save_failed"
                                             )
                                         }
@@ -487,9 +672,11 @@ fun ScheduleCreateScreen(
                 },
                 text = {
                     Text(
-                        "Các thay đổi liều và giờ chưa lưu sẽ được thay " +
-                                "bằng dữ liệu trên máy chủ. " +
-                                "Thông tin thuốc vừa nhập vẫn được giữ."
+                        "Các thay đổi liều và giờ chưa lưu " +
+                                "sẽ được thay bằng dữ liệu trên máy chủ. " +
+                                "Nếu thông tin thuốc có xung đột, " +
+                                "hãy quay lại danh sách thuốc " +
+                                "và mở lại màn sửa."
                     )
                 },
                 confirmButton = {
@@ -524,8 +711,9 @@ fun ScheduleCreateScreen(
                 },
                 text = {
                     Text(
-                        "Hủy các liều chờ từ thời điểm xóa của mọi lịch " +
-                                "thuộc thuốc này, sau đó xóa thuốc. " +
+                        "Hủy các liều chờ từ thời điểm xóa " +
+                                "của mọi lịch thuộc thuốc này, " +
+                                "sau đó xóa thuốc. " +
                                 "Lịch sử cũ được giữ lại."
                     )
                 },
@@ -536,23 +724,24 @@ fun ScheduleCreateScreen(
                             deleting = true
                             deleteError = null
 
-
                             scope.launch {
                                 try {
                                     checkOwner()
 
-                                    // Backend xử lý xóa thuốc, vô hiệu hóa lịch
-                                    // và hủy các liều PENDING liên quan.
-                                    val result = medicineDeletion.deleteMedicine(
-                                        medicineId
-                                    )
+                                    // Backend xử lý xóa thuốc
+                                    // và các liều liên quan.
+                                    val result =
+                                        medicineDeletion.deleteMedicine(
+                                            medicineId
+                                        )
 
                                     checkOwner()
 
-                                    // Hủy báo thức và thông báo cục bộ trên máy.
-                                    // Các ID được trả về từ Backend.
+                                    // Hủy báo thức trên thiết bị.
                                     withContext(Dispatchers.IO) {
-                                        result.doseIdsToCancel.forEach { doseId ->
+                                        result.doseIdsToCancel.forEach {
+                                                doseId ->
+
                                             checkOwner()
 
                                             MedicationAlarmScheduler.cancel(
@@ -577,22 +766,25 @@ fun ScheduleCreateScreen(
 
                                     onDeleted()
 
-                                } catch (cancelled: CancellationException) {
+                                } catch (
+                                    cancelled: CancellationException
+                                ) {
                                     throw cancelled
 
                                 } catch (_: Exception) {
                                     mustReload = true
 
                                     deleteError =
-                                        "Chưa xác nhận được toàn bộ thao tác xóa thuốc. " +
-                                                "Vui lòng tải lại danh sách và lịch uống " +
-                                                "trước khi thực hiện thao tác khác."
+                                        "Chưa xác nhận được toàn bộ " +
+                                                "thao tác xóa thuốc. " +
+                                                "Vui lòng tải lại danh sách " +
+                                                "và lịch uống trước khi " +
+                                                "thực hiện thao tác khác."
 
                                 } finally {
                                     deleting = false
                                 }
                             }
-
                         }
                     ) {
                         Text(
@@ -685,10 +877,13 @@ private fun ScheduleInputDto.asUpdate(
     )
 }
 
-private fun ScheduleResponseDto.toEditForm(): MockMedicineSchedule {
+private fun ScheduleResponseDto.toEditForm():
+        MockMedicineSchedule {
+
     fun day(value: String): Long {
         require(
-            Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(value)
+            Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}")
+                .matches(value)
         )
 
         val format = SimpleDateFormat(
@@ -698,7 +893,9 @@ private fun ScheduleResponseDto.toEditForm(): MockMedicineSchedule {
             isLenient = false
         }
 
-        return requireNotNull(format.parse(value)).time
+        return requireNotNull(
+            format.parse(value)
+        ).time
     }
 
     return MockMedicineSchedule(

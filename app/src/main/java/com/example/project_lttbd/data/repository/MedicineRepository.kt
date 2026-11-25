@@ -8,10 +8,12 @@ import com.example.project_lttbd.data.remote.MedicationOverviewRepository
 import com.example.project_lttbd.data.remote.MedicineApiClient
 import com.example.project_lttbd.data.remote.MedicineApiDto
 import com.example.project_lttbd.data.remote.MedicineRequestDto
+import com.example.project_lttbd.data.remote.MedicineUpdateRequestDto
 import com.example.project_lttbd.data.remote.dto.MedicineDto
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.TaskCompletionSource
 import com.google.firebase.Timestamp
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -20,14 +22,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 import retrofit2.Response
-import java.io.IOException
 
 data class MedicineRecord(
     val id: String,
     val data: MedicineDto
 )
+
+class MedicineVersionConflictException(
+    message: String
+) : IllegalStateException(message)
 
 class MedicineRepository {
 
@@ -40,7 +44,7 @@ class MedicineRepository {
         SupervisorJob() + Dispatchers.IO
     )
 
-    // GET - DANH SÁCH
+    // GET - DANH SÁCH THUỐC
     fun getMedicines(): Task<List<MedicineRecord>> {
         return runAsTask {
             val uid = currentUid()
@@ -61,7 +65,7 @@ class MedicineRepository {
         }
     }
 
-    // GET - CHI TIẾT
+    // GET - CHI TIẾT THUỐC
     fun getMedicine(
         medicineId: String
     ): Task<MedicineRecord> {
@@ -85,12 +89,12 @@ class MedicineRepository {
         }
     }
 
-    // POST - THÊM THUỐC QUA FASTAPI
+    // POST - THÊM THUỐC
     fun addMedicine(
         medicine: MedicineDto
     ): Task<String> {
         return runAsTask {
-            val payload = medicine.toRequest()
+            val payload = medicine.toCreateRequest()
 
             val uid = currentUid()
             val authorization =
@@ -125,11 +129,15 @@ class MedicineRepository {
                         "Vui lòng tải lại danh sách."
             }
 
+            check(result.version >= 1) {
+                "Phiên bản thuốc trả về không hợp lệ."
+            }
+
             result.medicineId
         }
     }
 
-    // PUT - SỬA THUỐC QUA FASTAPI
+    // PUT - SỬA THUỐC CÓ KIỂM TRA VERSION
     fun updateMedicine(
         medicineId: String,
         medicine: MedicineDto
@@ -137,7 +145,15 @@ class MedicineRepository {
         return runAsVoidTask {
             validateMedicineId(medicineId)
 
-            val payload = medicine.toRequest()
+            // Phải dùng phiên bản đã đọc khi mở màn sửa.
+            // Không tự GET phiên bản mới trước khi PUT.
+            require(medicine.version >= 1) {
+                "Chưa có phiên bản thuốc hợp lệ. " +
+                        "Vui lòng mở lại màn sửa thuốc."
+            }
+
+            val payload = medicine.toUpdateRequest()
+
             val uid = currentUid()
             val authorization =
                 BackendSession.authorizationHeader()
@@ -168,10 +184,15 @@ class MedicineRepository {
                 "Máy chủ trả về mã thuốc không đúng. " +
                         "Vui lòng tải lại thông tin thuốc."
             }
+
+            check(result.version > medicine.version) {
+                "Phiên bản thuốc không được cập nhật. " +
+                        "Vui lòng tải lại."
+            }
         }
     }
 
-    // DELETE - DÙNG API XÓA ĐÃ CÓ TRONG BACKEND
+    // DELETE - GIỮ API XÓA ĐÃ CÓ
     fun deleteMedicine(
         medicineId: String
     ): Task<Void> {
@@ -188,8 +209,8 @@ class MedicineRepository {
         }
     }
 
-    // CHUYỂN MEDICINE DTO SANG REQUEST BODY
-    private fun MedicineDto.toRequest():
+    // DỮ LIỆU CHUNG DÙNG CHO POST VÀ PUT
+    private fun MedicineDto.toCreateRequest():
             MedicineRequestDto {
 
         require(medicineName.isNotBlank()) {
@@ -214,7 +235,28 @@ class MedicineRepository {
         )
     }
 
-    // XỬ LÝ HTTP RESPONSE CỦA POST VÀ PUT
+    // CHỈ PUT MỚI GỬI expectedVersion
+    private fun MedicineDto.toUpdateRequest():
+            MedicineUpdateRequestDto {
+
+        val fields = toCreateRequest()
+
+        require(version >= 1) {
+            "Phiên bản thuốc không hợp lệ."
+        }
+
+        return MedicineUpdateRequestDto(
+            medicineName = fields.medicineName,
+            strength = fields.strength,
+            strengthUnit = fields.strengthUnit,
+            dosageForm = fields.dosageForm,
+            note = fields.note,
+            imageUrl = fields.imageUrl,
+            expectedVersion = version
+        )
+    }
+
+    // XỬ LÝ HTTP RESPONSE
     private fun requireWriteResponse(
         response: Response<MedicineApiDto>
     ): MedicineApiDto {
@@ -238,12 +280,19 @@ class MedicineRepository {
                     "Không tìm thấy thuốc cần sửa."
 
                 409 ->
-                    "Dữ liệu đã thay đổi. " +
-                            "Vui lòng tải lại."
+                    "Thông tin thuốc đã thay đổi " +
+                            "trên thiết bị khác. " +
+                            "Vui lòng thoát và mở lại màn sửa thuốc."
 
                 else ->
                     "Chưa xác nhận được kết quả lưu thuốc. " +
                             "Vui lòng tải lại danh sách để kiểm tra."
+            }
+
+            if (response.code() == 409) {
+                throw MedicineVersionConflictException(
+                    message
+                )
             }
 
             throw IllegalStateException(message)
@@ -256,7 +305,7 @@ class MedicineRepository {
             )
     }
 
-    // CHUYỂN RESPONSE THÀNH MODEL GIAO DIỆN
+    // CHUYỂN API DTO SANG MODEL GIAO DIỆN
     private fun MedicineApiDto.toMedicineRecord():
             MedicineRecord {
 
@@ -265,6 +314,11 @@ class MedicineRepository {
                     '/' !in medicineId
         ) {
             "Mã thuốc trả về không hợp lệ."
+        }
+
+        require(version >= 1) {
+            "Phiên bản thuốc trả về không hợp lệ. " +
+                    "Vui lòng kiểm tra Backend."
         }
 
         return MedicineRecord(
@@ -277,7 +331,8 @@ class MedicineRepository {
                 note = note,
                 imageUrl = imageUrl,
                 createdAt = parseTimestamp(createdAt),
-                updatedAt = parseTimestamp(updatedAt)
+                updatedAt = parseTimestamp(updatedAt),
+                version = version
             )
         )
     }

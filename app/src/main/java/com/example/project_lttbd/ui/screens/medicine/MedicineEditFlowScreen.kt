@@ -1,3 +1,4 @@
+
 package com.example.project_lttbd.ui.screens.medicine
 
 import android.widget.Toast
@@ -59,7 +60,6 @@ fun MedicineEditFlowScreen(
                 Text("Quay lại")
             }
         }
-
         return
     }
 
@@ -70,6 +70,12 @@ fun MedicineEditFlowScreen(
 
         var draft by remember {
             mutableStateOf<ManualMedicineDraft?>(null)
+        }
+
+        // Phiên bản được lấy khi người dùng mở màn sửa.
+        // Không cập nhật phiên bản này khi chuyển bước.
+        var originalVersion by remember {
+            mutableIntStateOf(0)
         }
 
         var savedImageUrl by remember {
@@ -89,7 +95,7 @@ fun MedicineEditFlowScreen(
         }
 
         var step by remember {
-            mutableStateOf(1)
+            mutableIntStateOf(1)
         }
 
         var loading by remember {
@@ -101,10 +107,10 @@ fun MedicineEditFlowScreen(
         }
 
         var retry by remember {
-            mutableStateOf(0)
+            mutableIntStateOf(0)
         }
 
-        LaunchedEffect(retry) {
+        LaunchedEffect(ownerUid, medicineId, retry) {
             loading = true
             error = null
 
@@ -120,6 +126,12 @@ fun MedicineEditFlowScreen(
                     )
                 }
 
+                check(medicine.version >= 1) {
+                    "Phiên bản thuốc không hợp lệ."
+                }
+
+                originalVersion = medicine.version
+
                 draft = ManualMedicineDraft(
                     medicineName = medicine.medicineName,
                     strength = medicine.strength,
@@ -130,10 +142,13 @@ fun MedicineEditFlowScreen(
                 )
 
                 savedImageUrl = medicine.imageUrl
+                pendingImageDraft = null
+
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                error = "Chưa mở được thuốc. Vui lòng thử lại."
+                error =
+                    "Chưa mở được thuốc. Vui lòng thử lại."
             } finally {
                 loading = false
             }
@@ -170,30 +185,35 @@ fun MedicineEditFlowScreen(
                 val medicineDraft = draft!!
 
                 if (step == 1) {
-                    ManualMedicineScreen(
-                        initialDraft = medicineDraft,
-                        isEditing = true,
-                        saveMedicineOnly = true,
-                        primaryButtonText = "Tiếp tục",
-                        deleteAction = null,
+                    // Thay đổi retry sẽ tạo lại form.
+                    // Tránh giữ dữ liệu cũ sau khi tải lại.
+                    key(retry) {
+                        ManualMedicineScreen(
+                            initialDraft = medicineDraft,
+                            isEditing = true,
+                            saveMedicineOnly = true,
+                            primaryButtonText = "Tiếp tục",
+                            deleteAction = null,
 
-                        onBackClick = onBackClick,
+                            onBackClick = onBackClick,
 
-                        onContinue = { updatedDraft ->
-                            val image = updatedDraft.imageUri
+                            onContinue = { updatedDraft ->
+                                val image = updatedDraft.imageUri
 
-                            if (
-                                image != null &&
-                                !com.example.project_lttbd.data.image.MedicinePhotoCodec
-                                    .isStoredSource(image)
-                            ) {
-                                pendingImageDraft = updatedDraft
-                            } else {
-                                draft = updatedDraft
-                                step = 2
+                                if (
+                                    image != null &&
+                                    !com.example.project_lttbd.data.image.MedicinePhotoCodec
+                                        .isStoredSource(image)
+                                ) {
+                                    pendingImageDraft =
+                                        updatedDraft
+                                } else {
+                                    draft = updatedDraft
+                                    step = 2
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 } else {
                     BackHandler {
                         step = 1
@@ -202,6 +222,10 @@ fun MedicineEditFlowScreen(
                     ScheduleCreateScreen(
                         medicineId = medicineId,
                         draftOverride = medicineDraft,
+
+                        // Luôn dùng phiên bản được đọc ở bước 1.
+                        expectedMedicineVersion = originalVersion,
+
                         initialForm = form,
                         initialScheduleId = selectedId,
 
