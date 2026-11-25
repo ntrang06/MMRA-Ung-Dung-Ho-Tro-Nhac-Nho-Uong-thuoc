@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 
 from fastapi import (
     APIRouter,
+    Header,
     HTTPException,
     Response,
     status,
@@ -32,6 +33,11 @@ from app.repositories.user_scope import (
     user_document,
 )
 from app.schemas.medication import DocumentId
+from app.services.medicine_idempotency import (
+    medicine_payload_digest,
+    medicine_request_document_id,
+    validate_idempotency_key,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -82,16 +88,23 @@ class MedicineInput(BaseModel):
         "note",
     )
     @classmethod
-    def clean_text(cls, value: str) -> str:
+    def clean_text(
+        cls,
+        value: str,
+    ) -> str:
         return value.strip()
 
     @field_validator("medicineName")
     @classmethod
-    def validate_name(cls, value: str) -> str:
+    def validate_name(
+        cls,
+        value: str,
+    ) -> str:
         if not value:
             raise ValueError(
                 "Tên thuốc không được để trống."
             )
+
         return value
 
     @field_validator("imageUrl")
@@ -153,8 +166,19 @@ class MedicineInput(BaseModel):
         return value
 
 
+class MedicineUpdateInput(MedicineInput):
+    expectedVersion: int = Field(
+        ge=1,
+        strict=True,
+    )
+
+
 class MedicineResponse(MedicineInput):
     medicineId: DocumentId
+    version: int = Field(
+        ge=1,
+        strict=True,
+    )
     createdAt: AwareDatetime | None = None
     updatedAt: AwareDatetime | None = None
 
@@ -194,6 +218,7 @@ def medicine_from_snapshot(snapshot):
         "imageUrl": data.get(
             "imageUrl"
         ),
+        "version": data.get("version", 1),
         "createdAt": data.get(
             "createdAt"
         ),
@@ -307,7 +332,7 @@ def get_medicine(
 
 
 # ============================================================
-# 5. POST - THÊM THUỐC
+# 5. POST - THÊM THUỐC KHÔNG TẠO TRÙNG
 # ============================================================
 
 @router.post(
@@ -319,39 +344,188 @@ def create_medicine(
     body: MedicineInput,
     user: AuthenticatedUser,
     response: Response,
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+    ),
 ):
     response.headers["Cache-Control"] = "no-store"
 
     try:
-        collection = user_collection(
-            user,
-            "medicines",
+        key = validate_idempotency_key(
+            idempotency_key
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_idempotency_key",
+                "message": str(error),
+            },
+        ) from None
+
+    # Khóa được phân vùng theo tài khoản Firebase.
+    request_id = medicine_request_document_id(
+        user.uid,
+        key,
+    )
+
+    # Dấu vân tay để phát hiện cùng khóa nhưng khác nội dung.
+    fields = body.model_dump()
+    payload_digest = medicine_payload_digest(
+        fields
+    )
+
+    request_ref = user_document(
+        user,
+        "medicineCreateRequests",
+        request_id,
+    )
+
+    medicine_collection = user_collection(
+        user,
+        "medicines",
+    )
+
+    @firestore.transactional
+    def create_once(transaction):
+        # Firestore yêu cầu đọc trước khi ghi.
+        request_snapshot = request_ref.get(
+            transaction=transaction
         )
 
-        reference = collection.document()
+        if request_snapshot.exists:
+            previous = (
+                request_snapshot.to_dict()
+                or {}
+            )
+
+            if (
+                previous.get("payloadDigest")
+                != payload_digest
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "idempotency_key_reused",
+                        "message": (
+                            "Khóa yêu cầu đã được dùng "
+                            "cho nội dung thuốc khác."
+                        ),
+                    },
+                )
+
+            previous_medicine_id = previous.get(
+                "medicineId"
+            )
+
+            if not previous_medicine_id:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "invalid_create_request",
+                        "message": (
+                            "Dữ liệu yêu cầu thêm thuốc "
+                            "không hợp lệ."
+                        ),
+                    },
+                )
+
+            # Không tạo thuốc lần nữa.
+            # Trả kết quả đã lưu của yêu cầu đầu tiên.
+            previous_response = previous.get(
+                "response"
+            )
+
+            if not isinstance(
+                previous_response,
+                dict,
+            ):
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "invalid_create_request",
+                        "message": (
+                            "Chưa xác nhận được kết quả "
+                            "thêm thuốc trước đó."
+                        ),
+                    },
+                )
+
+            saved_response = (
+                MedicineResponse.model_validate(
+                    previous_response
+                )
+            )
+
+            return saved_response, True
 
         now = datetime.now(timezone.utc)
+        medicine_ref = medicine_collection.document()
 
-        fields = body.model_dump()
-
-        fields.update({
+        saved_fields = {
+            **fields,
             "createdAt": now,
             "updatedAt": now,
-        })
+            "version": 1,
+        }
 
-        reference.create(fields)
-
-        return MedicineResponse(
-            medicineId=reference.id,
-            **fields,
+        created_response = MedicineResponse(
+            medicineId=medicine_ref.id,
+            **saved_fields,
         )
+
+        # Hai ghi này nằm trong cùng một transaction.
+        # Hoặc cùng thành công, hoặc cùng thất bại.
+        transaction.create(
+            medicine_ref,
+            saved_fields,
+        )
+
+        transaction.create(
+            request_ref,
+            {
+                "medicineId": medicine_ref.id,
+                "payloadDigest": payload_digest,
+                "response": (
+                    created_response.model_dump(
+                        mode="python"
+                    )
+                ),
+                "createdAt": now,
+            },
+        )
+
+        return created_response, False
+
+    try:
+        client = firestore.client(
+            app=get_firebase_app()
+        )
+
+        result, replayed = create_once(
+            client.transaction()
+        )
+
+        if replayed:
+            response.status_code = 200
+            response.headers[
+                "Idempotency-Replayed"
+            ] = "true"
+        else:
+            response.status_code = 201
+            response.headers[
+                "Idempotency-Replayed"
+            ] = "false"
+
+        return result
 
     except GoogleAPICallError:
         raise medicine_service_unavailable() from None
 
 
 # ============================================================
-# 6. PUT - SỬA THUỐC
+# 6. PUT - SỬA THUỐC CÓ KIỂM TRA VERSION
 # ============================================================
 
 @router.put(
@@ -360,20 +534,23 @@ def create_medicine(
 )
 def update_medicine(
     medicine_id: DocumentId,
-    body: MedicineInput,
+    body: MedicineUpdateInput,
     user: AuthenticatedUser,
     response: Response,
 ):
     response.headers["Cache-Control"] = "no-store"
 
-    try:
-        reference = user_document(
-            user,
-            "medicines",
-            medicine_id,
-        )
+    reference = user_document(
+        user,
+        "medicines",
+        medicine_id,
+    )
 
-        snapshot = reference.get()
+    @firestore.transactional
+    def save(transaction):
+        snapshot = reference.get(
+            transaction=transaction
+        )
 
         if not snapshot.exists:
             raise HTTPException(
@@ -386,22 +563,72 @@ def update_medicine(
                 },
             )
 
+        previous = snapshot.to_dict() or {}
+
+        current_version = previous.get(
+            "version", 1
+        )
+
+        if (
+            type(current_version) is not int
+            or current_version < 1
+        ):
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "medicine_invalid_version",
+                    "message": (
+                        "Phiên bản dữ liệu thuốc không hợp lệ."
+                    ),
+                },
+            )
+
+        if body.expectedVersion != current_version:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "medicine_version_conflict",
+                    "message": (
+                        "Thông tin thuốc đã thay đổi. "
+                        "Vui lòng tải lại trước khi sửa."
+                    ),
+                    "currentVersion": current_version,
+                },
+            )
+
         now = datetime.now(timezone.utc)
+        new_version = current_version + 1
 
-        fields = body.model_dump()
-        fields["updatedAt"] = now
+        fields = body.model_dump(
+            exclude={"expectedVersion"}
+        )
 
-        # Không ghi đè thời điểm tạo ban đầu.
-        reference.update(fields)
+        fields.update({
+            "updatedAt": now,
+            "version": new_version,
+        })
 
-        data = snapshot.to_dict() or {}
+        transaction.update(
+            reference,
+            fields,
+        )
 
         return MedicineResponse(
             medicineId=medicine_id,
-            **body.model_dump(),
-            createdAt=data.get("createdAt"),
+            **body.model_dump(
+                exclude={"expectedVersion"}
+            ),
+            createdAt=previous.get("createdAt"),
             updatedAt=now,
+            version=new_version,
         )
+
+    try:
+        client = firestore.client(
+            app=get_firebase_app()
+        )
+
+        return save(client.transaction())
 
     except NotFound:
         raise HTTPException(
@@ -417,8 +644,8 @@ def update_medicine(
 
 
 # ============================================================
-# 7. DELETE - XÓA THUỐC VÀ XỬ LÝ LỊCH LIÊN QUAN
-# Giữ nguyên nghiệp vụ xóa đang có của nhóm.
+# 7. DELETE - XÓA THUỐC VÀ LỊCH LIÊN QUAN
+# Giữ nguyên nghiệp vụ xóa đã có.
 # ============================================================
 
 @router.delete(
@@ -468,7 +695,6 @@ def delete_medicine(
                 },
             )
 
-        # Đọc toàn bộ dữ liệu trước khi ghi.
         schedules = list(
             schedules_query.stream(
                 transaction=transaction
@@ -521,7 +747,10 @@ def delete_medicine(
             scheduled = data.get("scheduledAt")
 
             if (
-                not isinstance(scheduled, datetime)
+                not isinstance(
+                    scheduled,
+                    datetime,
+                )
                 or scheduled.utcoffset() is None
             ):
                 raise ValueError(
@@ -540,9 +769,10 @@ def delete_medicine(
                     )
                 )
 
-            elif data.get("nextReminderAt") is not None:
-                # Dừng nhắc lại, giữ trạng thái
-                # và giờ gốc của liều quá khứ.
+            elif (
+                data.get("nextReminderAt")
+                is not None
+            ):
                 writes.append(
                     (
                         snapshot.reference,
@@ -559,7 +789,9 @@ def delete_medicine(
                 values,
             )
 
-        transaction.delete(medicine_ref)
+        transaction.delete(
+            medicine_ref
+        )
 
         return MedicineDeletionResponse(
             medicineId=medicine_id,
@@ -574,9 +806,14 @@ def delete_medicine(
             app=get_firebase_app()
         )
 
-        return remove(client.transaction())
+        return remove(
+            client.transaction()
+        )
 
-    except (GoogleAPICallError, ValueError):
+    except (
+        GoogleAPICallError,
+        ValueError,
+    ):
         logger.exception(
             "Không xóa được thuốc và lịch liên quan"
         )

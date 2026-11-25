@@ -1,3 +1,4 @@
+
 package com.example.project_lttbd.data.remote.dto
 
 import com.google.firebase.Timestamp
@@ -10,5 +11,6 @@ data class MedicineDto(
     val note: String = "",
     val imageUrl: String? = null,
     val createdAt: Timestamp? = null,
-    val updatedAt: Timestamp? = null
+    val updatedAt: Timestamp? = null,
+    val version: Int = 0
 )

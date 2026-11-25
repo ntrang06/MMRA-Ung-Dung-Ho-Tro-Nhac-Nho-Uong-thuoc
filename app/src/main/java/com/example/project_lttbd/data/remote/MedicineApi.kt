@@ -6,7 +6,6 @@ import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
-import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -35,6 +34,9 @@ data class MedicineApiDto(
     @SerializedName("imageUrl")
     val imageUrl: String? = null,
 
+    @SerializedName("version")
+    val version: Int = 0,
+
     @SerializedName("createdAt")
     val createdAt: String? = null,
 
@@ -49,6 +51,16 @@ data class MedicineRequestDto(
     val dosageForm: String,
     val note: String,
     val imageUrl: String?
+)
+
+data class MedicineUpdateRequestDto(
+    val medicineName: String,
+    val strength: String,
+    val strengthUnit: String,
+    val dosageForm: String,
+    val note: String,
+    val imageUrl: String?,
+    val expectedVersion: Int
 )
 
 interface MedicineApi {
@@ -71,7 +83,13 @@ interface MedicineApi {
     suspend fun addMedicine(
         @Header("Authorization")
         authorization: String,
-        @Body medicine: MedicineRequestDto
+
+        // B3.3: Bắt buộc gửi cùng khóa khi retry.
+        @Header("Idempotency-Key")
+        idempotencyKey: String,
+
+        @Body
+        medicine: MedicineRequestDto
     ): Response<MedicineApiDto>
 
     @PUT("api/v1/medicines/{medicineId}")
@@ -80,14 +98,13 @@ interface MedicineApi {
         authorization: String,
         @Path("medicineId")
         medicineId: String,
-        @Body medicine: MedicineRequestDto
+        @Body
+        medicine: MedicineUpdateRequestDto
     ): Response<MedicineApiDto>
 }
 
 object MedicineApiClient {
 
-    // Môi trường debug: kết nối qua adb reverse.
-    // Bản phát hành phải sử dụng Backend HTTPS.
     private const val BASE_URL =
         "http://127.0.0.1:8000/"
 

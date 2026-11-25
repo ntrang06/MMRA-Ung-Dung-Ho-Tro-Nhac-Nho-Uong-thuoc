@@ -1,3 +1,4 @@
+
 from typing import Literal
 
 from firebase_admin import firestore
@@ -10,18 +11,23 @@ UserCollection = Literal[
     "medicines",
     "schedules",
     "doses",
+    "medicineCreateRequests",
 ]
+
+
+ALLOWED_USER_COLLECTIONS = {
+    "medicines",
+    "schedules",
+    "doses",
+    "medicineCreateRequests",
+}
 
 
 def user_collection(
     user: CurrentUser,
     name: UserCollection,
 ):
-    if name not in {
-        "medicines",
-        "schedules",
-        "doses",
-    }:
+    if name not in ALLOWED_USER_COLLECTIONS:
         raise ValueError(
             "Collection không được hỗ trợ."
         )
