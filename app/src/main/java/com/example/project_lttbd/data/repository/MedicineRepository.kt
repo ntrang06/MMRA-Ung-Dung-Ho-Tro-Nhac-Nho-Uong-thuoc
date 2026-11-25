@@ -12,11 +12,15 @@ import com.example.project_lttbd.data.remote.MedicineUpdateRequestDto
 import com.example.project_lttbd.data.remote.dto.MedicineDto
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.TaskCompletionSource
+import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
+import com.google.gson.Gson
 import java.io.IOException
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +47,8 @@ class MedicineRepository {
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO
     )
+
+    private val gson = Gson()
 
     // GET - DANH SÁCH THUỐC
     fun getMedicines(): Task<List<MedicineRecord>> {
@@ -89,7 +95,7 @@ class MedicineRepository {
         }
     }
 
-    // POST - THÊM THUỐC
+    // POST - THÊM THUỐC KHÔNG TẠO TRÙNG
     fun addMedicine(
         medicine: MedicineDto
     ): Task<String> {
@@ -102,15 +108,24 @@ class MedicineRepository {
 
             ensureCurrentUser(uid)
 
+            // Lưu khóa trước khi gửi request.
+            // Khi mạng mất, lần retry của cùng nội dung
+            // sẽ sử dụng lại chính khóa này.
+            val request = pendingCreateRequest(
+                uid = uid,
+                payload = payload
+            )
+
             val response = try {
                 api.addMedicine(
-                    authorization,
-                    payload
+                    authorization = authorization,
+                    idempotencyKey = request.key,
+                    medicine = payload
                 )
             } catch (error: IOException) {
                 throw IllegalStateException(
                     "Chưa xác nhận được thuốc đã lưu hay chưa. " +
-                            "Vui lòng tải lại danh sách trước khi thử thêm.",
+                            "Vui lòng kiểm tra danh sách rồi thử lại.",
                     error
                 )
             }
@@ -133,6 +148,10 @@ class MedicineRepository {
                 "Phiên bản thuốc trả về không hợp lệ."
             }
 
+            // Chỉ xóa khóa sau khi Backend xác nhận
+            // yêu cầu đã tạo hoặc được phát lại thành công.
+            clearPendingCreateRequest(request)
+
             result.medicineId
         }
     }
@@ -145,8 +164,6 @@ class MedicineRepository {
         return runAsVoidTask {
             validateMedicineId(medicineId)
 
-            // Phải dùng phiên bản đã đọc khi mở màn sửa.
-            // Không tự GET phiên bản mới trước khi PUT.
             require(medicine.version >= 1) {
                 "Chưa có phiên bản thuốc hợp lệ. " +
                         "Vui lòng mở lại màn sửa thuốc."
@@ -192,7 +209,7 @@ class MedicineRepository {
         }
     }
 
-    // DELETE - GIỮ API XÓA ĐÃ CÓ
+    // DELETE - GIỮ NGUYÊN LUỒNG XÓA
     fun deleteMedicine(
         medicineId: String
     ): Task<Void> {
@@ -209,7 +226,114 @@ class MedicineRepository {
         }
     }
 
+    // =====================================================
+    // B3.3 - LƯU KHÓA YÊU CẦU TRÊN THIẾT BỊ
+    // =====================================================
+
+    private data class PendingCreateRequest(
+        val preferenceKey: String,
+        val key: String
+    )
+
+    private fun pendingCreateRequest(
+        uid: String,
+        payload: MedicineRequestDto
+    ): PendingCreateRequest {
+        val preferenceKey = createPreferenceKey(
+            uid = uid,
+            payload = payload
+        )
+
+        val preferences = FirebaseApp.getInstance()
+            .applicationContext
+            .getSharedPreferences(
+                "mmra_medicine_pending_requests",
+                android.content.Context.MODE_PRIVATE
+            )
+
+        synchronized(createRequestLock) {
+            val previous = preferences.getString(
+                preferenceKey,
+                null
+            )
+
+            if (!previous.isNullOrBlank()) {
+                return PendingCreateRequest(
+                    preferenceKey = preferenceKey,
+                    key = previous
+                )
+            }
+
+            val newKey = UUID.randomUUID().toString()
+
+            val persisted = preferences.edit()
+                .putString(
+                    preferenceKey,
+                    newKey
+                )
+                .commit()
+
+            check(persisted) {
+                "Không lưu được mã yêu cầu trên máy. " +
+                        "Vui lòng kiểm tra bộ nhớ và thử lại."
+            }
+
+            return PendingCreateRequest(
+                preferenceKey = preferenceKey,
+                key = newKey
+            )
+        }
+    }
+
+    private fun clearPendingCreateRequest(
+        request: PendingCreateRequest
+    ) {
+        val preferences = FirebaseApp.getInstance()
+            .applicationContext
+            .getSharedPreferences(
+                "mmra_medicine_pending_requests",
+                android.content.Context.MODE_PRIVATE
+            )
+
+        synchronized(createRequestLock) {
+            // Chỉ xóa nếu đây vẫn là khóa
+            // đã sử dụng cho request thành công.
+            val current = preferences.getString(
+                request.preferenceKey,
+                null
+            )
+
+            if (current == request.key) {
+                preferences.edit()
+                    .remove(request.preferenceKey)
+                    .apply()
+            }
+        }
+    }
+
+    private fun createPreferenceKey(
+        uid: String,
+        payload: MedicineRequestDto
+    ): String {
+        // Băm UID cùng nội dung yêu cầu.
+        // Không lưu trực tiếp tên thuốc hoặc ảnh
+        // trong tên khóa SharedPreferences.
+        val content = "$uid\u0000${gson.toJson(payload)}"
+
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(content.toByteArray(Charsets.UTF_8))
+
+        val hex = digest.joinToString("") {
+            "%02x".format(it.toInt() and 0xFF)
+        }
+
+        return "pending_$hex"
+    }
+
+    // =====================================================
     // DỮ LIỆU CHUNG DÙNG CHO POST VÀ PUT
+    // =====================================================
+
     private fun MedicineDto.toCreateRequest():
             MedicineRequestDto {
 
@@ -222,7 +346,8 @@ class MedicineRepository {
                 imageUrl
             )
         ) {
-            "Ảnh thuốc chưa hợp lệ. Vui lòng chọn lại ảnh."
+            "Ảnh thuốc chưa hợp lệ. " +
+                    "Vui lòng chọn lại ảnh."
         }
 
         return MedicineRequestDto(
@@ -235,7 +360,6 @@ class MedicineRepository {
         )
     }
 
-    // CHỈ PUT MỚI GỬI expectedVersion
     private fun MedicineDto.toUpdateRequest():
             MedicineUpdateRequestDto {
 
@@ -256,7 +380,10 @@ class MedicineRepository {
         )
     }
 
+    // =====================================================
     // XỬ LÝ HTTP RESPONSE
+    // =====================================================
+
     private fun requireWriteResponse(
         response: Response<MedicineApiDto>
     ): MedicineApiDto {
@@ -266,8 +393,8 @@ class MedicineRepository {
 
             val message = when (response.code()) {
                 400, 422 ->
-                    "Thông tin thuốc không hợp lệ. " +
-                            "Vui lòng kiểm tra lại."
+                    "Thông tin gửi lên chưa hợp lệ. " +
+                            "Vui lòng kiểm tra và thử lại."
 
                 401 ->
                     "Phiên đăng nhập hết hạn. " +
@@ -280,9 +407,8 @@ class MedicineRepository {
                     "Không tìm thấy thuốc cần sửa."
 
                 409 ->
-                    "Thông tin thuốc đã thay đổi " +
-                            "trên thiết bị khác. " +
-                            "Vui lòng thoát và mở lại màn sửa thuốc."
+                    "Yêu cầu bị xung đột. " +
+                            "Vui lòng tải lại dữ liệu thuốc."
 
                 else ->
                     "Chưa xác nhận được kết quả lưu thuốc. " +
@@ -305,7 +431,10 @@ class MedicineRepository {
             )
     }
 
+    // =====================================================
     // CHUYỂN API DTO SANG MODEL GIAO DIỆN
+    // =====================================================
+
     private fun MedicineApiDto.toMedicineRecord():
             MedicineRecord {
 
@@ -340,7 +469,9 @@ class MedicineRepository {
     private fun parseTimestamp(
         value: String?
     ): Timestamp? {
-        if (value.isNullOrBlank()) return null
+        if (value.isNullOrBlank()) {
+            return null
+        }
 
         return runCatching {
             val normalized = value
@@ -364,7 +495,10 @@ class MedicineRepository {
         }.getOrNull()
     }
 
-    // GIỮ TASK ĐỂ TƯƠNG THÍCH GIAO DIỆN CŨ
+    // =====================================================
+    // GOOGLE TASK - GIỮ TƯƠNG THÍCH GIAO DIỆN
+    // =====================================================
+
     private fun <T> runAsTask(
         operation: suspend () -> T
     ): Task<T> {
@@ -372,10 +506,16 @@ class MedicineRepository {
 
         scope.launch {
             try {
-                source.trySetResult(operation())
-            } catch (error: CancellationException) {
+                source.trySetResult(
+                    operation()
+                )
+            } catch (
+                error: CancellationException
+            ) {
                 source.trySetException(error)
-            } catch (error: Exception) {
+            } catch (
+                error: Exception
+            ) {
                 source.trySetException(error)
             }
         }
@@ -392,9 +532,13 @@ class MedicineRepository {
             try {
                 operation()
                 source.trySetResult(null)
-            } catch (error: CancellationException) {
+            } catch (
+                error: CancellationException
+            ) {
                 source.trySetException(error)
-            } catch (error: Exception) {
+            } catch (
+                error: Exception
+            ) {
                 source.trySetException(error)
             }
         }
@@ -409,11 +553,14 @@ class MedicineRepository {
             )
     }
 
-    private fun ensureCurrentUser(uid: String) {
+    private fun ensureCurrentUser(
+        uid: String
+    ) {
         check(
             FirebaseProvider.auth.currentUser?.uid == uid
         ) {
-            "Tài khoản đã thay đổi. Vui lòng tải lại."
+            "Tài khoản đã thay đổi. " +
+                    "Vui lòng tải lại."
         }
     }
 
@@ -426,5 +573,9 @@ class MedicineRepository {
         ) {
             "Mã thuốc không hợp lệ."
         }
+    }
+
+    companion object {
+        private val createRequestLock = Any()
     }
 }
