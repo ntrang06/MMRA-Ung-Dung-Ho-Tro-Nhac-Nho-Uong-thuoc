@@ -128,9 +128,7 @@ class MedicineInput(BaseModel):
         encoded = value[len(prefix):]
 
         if not encoded:
-            raise ValueError(
-                "Ảnh không hợp lệ."
-            )
+            raise ValueError("Ảnh không hợp lệ.")
 
         try:
             image_bytes = base64.b64decode(
@@ -153,8 +151,20 @@ class MedicineInput(BaseModel):
         return value
 
 
+class MedicineUpdateInput(MedicineInput):
+    # Phiên bản thuốc mà Android đã đọc trước khi sửa.
+    expectedVersion: int = Field(
+        ge=1,
+        strict=True,
+    )
+
+
 class MedicineResponse(MedicineInput):
     medicineId: DocumentId
+    version: int = Field(
+        ge=1,
+        strict=True,
+    )
     createdAt: AwareDatetime | None = None
     updatedAt: AwareDatetime | None = None
 
@@ -194,6 +204,9 @@ def medicine_from_snapshot(snapshot):
         "imageUrl": data.get(
             "imageUrl"
         ),
+        # Thuốc được tạo trước B3.2 chưa có version.
+        # Khi đọc, xem những thuốc này là version 1.
+        "version": data.get("version", 1),
         "createdAt": data.get(
             "createdAt"
         ),
@@ -337,6 +350,7 @@ def create_medicine(
         fields.update({
             "createdAt": now,
             "updatedAt": now,
+            "version": 1,
         })
 
         reference.create(fields)
@@ -351,7 +365,7 @@ def create_medicine(
 
 
 # ============================================================
-# 6. PUT - SỬA THUỐC
+# 6. PUT - SỬA THUỐC CÓ KIỂM TRA VERSION
 # ============================================================
 
 @router.put(
@@ -360,20 +374,24 @@ def create_medicine(
 )
 def update_medicine(
     medicine_id: DocumentId,
-    body: MedicineInput,
+    body: MedicineUpdateInput,
     user: AuthenticatedUser,
     response: Response,
 ):
     response.headers["Cache-Control"] = "no-store"
 
-    try:
-        reference = user_document(
-            user,
-            "medicines",
-            medicine_id,
-        )
+    reference = user_document(
+        user,
+        "medicines",
+        medicine_id,
+    )
 
-        snapshot = reference.get()
+    @firestore.transactional
+    def save(transaction):
+        # Đọc dữ liệu bên trong transaction.
+        snapshot = reference.get(
+            transaction=transaction
+        )
 
         if not snapshot.exists:
             raise HTTPException(
@@ -386,22 +404,77 @@ def update_medicine(
                 },
             )
 
+        previous = snapshot.to_dict() or {}
+
+        # Thuốc cũ chưa có version được xem là v1.
+        current_version = previous.get(
+            "version", 1
+        )
+
+        if (
+            type(current_version) is not int
+            or current_version < 1
+        ):
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "medicine_invalid_version",
+                    "message": (
+                        "Phiên bản dữ liệu thuốc không hợp lệ."
+                    ),
+                },
+            )
+
+        # Không cho ghi đè nếu client dùng dữ liệu cũ.
+        if body.expectedVersion != current_version:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "medicine_version_conflict",
+                    "message": (
+                        "Thông tin thuốc đã thay đổi. "
+                        "Vui lòng tải lại trước khi sửa."
+                    ),
+                    "currentVersion": current_version,
+                },
+            )
+
         now = datetime.now(timezone.utc)
+        new_version = current_version + 1
 
-        fields = body.model_dump()
-        fields["updatedAt"] = now
+        # expectedVersion chỉ dùng để kiểm tra.
+        # Không lưu nó vào tài liệu thuốc.
+        fields = body.model_dump(
+            exclude={"expectedVersion"}
+        )
 
-        # Không ghi đè thời điểm tạo ban đầu.
-        reference.update(fields)
+        fields.update({
+            "updatedAt": now,
+            "version": new_version,
+        })
 
-        data = snapshot.to_dict() or {}
+        # Ghi trong cùng transaction với thao tác đọc.
+        transaction.update(
+            reference,
+            fields,
+        )
 
         return MedicineResponse(
             medicineId=medicine_id,
-            **body.model_dump(),
-            createdAt=data.get("createdAt"),
+            **body.model_dump(
+                exclude={"expectedVersion"}
+            ),
+            createdAt=previous.get("createdAt"),
             updatedAt=now,
+            version=new_version,
         )
+
+    try:
+        client = firestore.client(
+            app=get_firebase_app()
+        )
+
+        return save(client.transaction())
 
     except NotFound:
         raise HTTPException(
@@ -417,8 +490,8 @@ def update_medicine(
 
 
 # ============================================================
-# 7. DELETE - XÓA THUỐC VÀ XỬ LÝ LỊCH LIÊN QUAN
-# Giữ nguyên nghiệp vụ xóa đang có của nhóm.
+# 7. DELETE - XÓA THUỐC VÀ LỊCH LIÊN QUAN
+# Giữ nguyên nghiệp vụ xóa đã có.
 # ============================================================
 
 @router.delete(
@@ -541,8 +614,8 @@ def delete_medicine(
                 )
 
             elif data.get("nextReminderAt") is not None:
-                # Dừng nhắc lại, giữ trạng thái
-                # và giờ gốc của liều quá khứ.
+                # Dừng nhắc lại, giữ nguyên trạng thái
+                # và thời gian gốc của liều quá khứ.
                 writes.append(
                     (
                         snapshot.reference,
