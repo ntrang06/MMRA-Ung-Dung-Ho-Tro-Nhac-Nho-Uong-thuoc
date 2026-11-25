@@ -44,7 +44,6 @@ data class MedicineApiDto(
     val updatedAt: String? = null
 )
 
-// POST: Thêm thuốc mới, chưa cần expectedVersion.
 data class MedicineRequestDto(
     val medicineName: String,
     val strength: String,
@@ -54,7 +53,6 @@ data class MedicineRequestDto(
     val imageUrl: String?
 )
 
-// PUT: Sửa thuốc dựa trên phiên bản đã đọc.
 data class MedicineUpdateRequestDto(
     val medicineName: String,
     val strength: String,
@@ -85,7 +83,13 @@ interface MedicineApi {
     suspend fun addMedicine(
         @Header("Authorization")
         authorization: String,
-        @Body medicine: MedicineRequestDto
+
+        // B3.3: Bắt buộc gửi cùng khóa khi retry.
+        @Header("Idempotency-Key")
+        idempotencyKey: String,
+
+        @Body
+        medicine: MedicineRequestDto
     ): Response<MedicineApiDto>
 
     @PUT("api/v1/medicines/{medicineId}")
@@ -94,7 +98,8 @@ interface MedicineApi {
         authorization: String,
         @Path("medicineId")
         medicineId: String,
-        @Body medicine: MedicineUpdateRequestDto
+        @Body
+        medicine: MedicineUpdateRequestDto
     ): Response<MedicineApiDto>
 }
 
