@@ -2,16 +2,27 @@
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Response,
+)
 from firebase_admin import firestore
 from google.api_core.exceptions import (
     AlreadyExists,
     GoogleAPICallError,
 )
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy.orm import Session
 
 from app.api.deps import AuthenticatedUser
 from app.core.firebase import get_firebase_app
+from app.db.session import get_db
+from app.services.account_deletion_inventory import (
+    InventoryLimitExceeded,
+    build_account_deletion_inventory,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -22,12 +33,31 @@ router = APIRouter(
 )
 
 
+# ============================================================
+# 1. RESPONSE SCHEMAS
+# ============================================================
+
 class AccountDeletionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: str
     requestedAt: datetime
 
+
+class AccountDeletionPreviewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    userDocuments: int
+    familyLinks: int
+    familyInvitations: int
+    passwordResetRecords: int
+
+    deletionExecuted: bool = False
+
+
+# ============================================================
+# 2. HELPERS
+# ============================================================
 
 def get_deletion_collection():
     client = firestore.client(
@@ -92,6 +122,10 @@ def validate_request_snapshot(
     )
 
 
+# ============================================================
+# 3. POST - GỬI YÊU CẦU XÓA TÀI KHOẢN
+# ============================================================
+
 @router.post(
     "/requests",
     response_model=AccountDeletionResponse,
@@ -104,8 +138,8 @@ def request_account_deletion(
     """
     Tiếp nhận yêu cầu xóa tài khoản.
 
-    Chưa xóa dữ liệu ngay tại endpoint này.
-    Giai đoạn xử lý xóa được triển khai riêng.
+    Chỉ ghi nhận yêu cầu.
+    Chưa thực hiện xóa dữ liệu hoặc Firebase Auth.
     """
     response.headers["Cache-Control"] = "no-store"
 
@@ -130,7 +164,7 @@ def request_account_deletion(
             )
 
         except AlreadyExists:
-            # Gọi lại không tạo yêu cầu trùng.
+            # Gửi lại yêu cầu không tạo bản ghi trùng.
             snapshot = reference.get()
 
             return validate_request_snapshot(
@@ -142,6 +176,10 @@ def request_account_deletion(
         raise deletion_unavailable() from None
 
 
+# ============================================================
+# 4. GET - KIỂM TRA TRẠNG THÁI YÊU CẦU
+# ============================================================
+
 @router.get(
     "/requests/me",
     response_model=AccountDeletionResponse,
@@ -150,6 +188,10 @@ def get_my_deletion_request(
     user: AuthenticatedUser,
     response: Response,
 ):
+    """
+    Chỉ xem yêu cầu xóa của tài khoản
+    đã xác thực bằng Firebase ID Token.
+    """
     response.headers["Cache-Control"] = "no-store"
 
     try:
@@ -176,4 +218,73 @@ def get_my_deletion_request(
     return validate_request_snapshot(
         snapshot,
         user.uid,
+    )
+
+
+# ============================================================
+# 5. GET - XEM TRƯỚC DỮ LIỆU CẦN XÓA
+# ============================================================
+
+@router.get(
+    "/preview",
+    response_model=AccountDeletionPreviewResponse,
+)
+def preview_account_deletion(
+    user: AuthenticatedUser,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """
+    Kiểm kê dữ liệu liên quan đến tài khoản.
+
+    Bao gồm:
+    - Firestore users/{uid} và các subcollection
+    - Firestore familyLinks
+    - Firestore familyInvitations
+    - PostgreSQL password_reset_challenges
+
+    Chỉ đọc và đếm dữ liệu.
+    Không thực hiện thao tác xóa.
+    """
+    response.headers["Cache-Control"] = "no-store"
+
+    try:
+        inventory = build_account_deletion_inventory(
+            user.uid,
+            db,
+        )
+
+    except InventoryLimitExceeded:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "inventory_too_large",
+                "message": (
+                    "Không thể kiểm kê đầy đủ dữ liệu "
+                    "trong một yêu cầu."
+                ),
+            },
+        ) from None
+
+    except Exception:
+        logger.exception(
+            "Account deletion inventory failed"
+        )
+
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "inventory_unavailable",
+                "message": (
+                    "Chưa kiểm tra được dữ liệu tài khoản."
+                ),
+            },
+        ) from None
+
+    return AccountDeletionPreviewResponse(
+        userDocuments=inventory.user_documents,
+        familyLinks=inventory.family_links,
+        familyInvitations=inventory.family_invitations,
+        passwordResetRecords=inventory.password_reset_records,
+        deletionExecuted=False,
     )
