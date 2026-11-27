@@ -3,6 +3,8 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     doses,
+    family,
+    family_shared,
     health,
     history,
     home,
@@ -24,3 +26,9 @@ api_router.include_router(history.router)
 api_router.include_router(home.router)
 api_router.include_router(medicines.router)
 api_router.include_router(medicine_lookup.router)
+
+# Family: tạo lời mời, liên kết, phân quyền.
+api_router.include_router(family.router)
+
+# Family: đọc lịch và trạng thái liều được chia sẻ.
+api_router.include_router(family_shared.router)
