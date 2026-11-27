@@ -173,3 +173,86 @@ jobs:
             tests/test_route_uniqueness.py \
             tests/test_be3_overview.py \
             -v
+
+      - name: Test Firebase Admin authorization
+        run: |
+          python -m pytest \
+            tests/test_admin_permissions.py \
+            -v
+
+      - name: Test Family foundation and permissions
+        run: |
+          python -m pytest \
+            tests/test_family_foundation.py \
+            tests/test_family_permissions.py \
+            -v
+
+      - name: Test Family shared schedules and doses
+        run: |
+          python -m pytest \
+            tests/test_family_shared.py \
+            -v
+
+  # ============================================
+  # 5. WEB ADMIN BUILD
+  # ============================================
+
+  web-admin-build:
+    name: Web Admin build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: web_admin
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web_admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build React and TypeScript
+        run: npm run build
+
+  # ============================================
+  # 6. WEB ADMIN LINT
+  # ============================================
+
+  web-admin-lint:
+    name: Web Admin lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: web_admin
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web_admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
