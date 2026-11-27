@@ -1,3 +1,4 @@
+
 import logging
 from dataclasses import dataclass
 from typing import Annotated
@@ -20,6 +21,7 @@ bearer = HTTPBearer(auto_error=False)
 @dataclass(frozen=True)
 class CurrentUser:
     uid: str
+    is_admin: bool = False
 
 
 def unauthorized() -> HTTPException:
@@ -29,7 +31,22 @@ def unauthorized() -> HTTPException:
             "code": "unauthenticated",
             "message": "Vui lòng đăng nhập lại.",
         },
-        headers={"WWW-Authenticate": "Bearer"},
+        headers={
+            "WWW-Authenticate": "Bearer",
+        },
+    )
+
+
+def forbidden() -> HTTPException:
+    return HTTPException(
+        status_code=403,
+        detail={
+            "code": "permission_denied",
+            "message": (
+                "Bạn không có quyền thực hiện "
+                "thao tác này."
+            ),
+        },
     )
 
 
@@ -39,6 +56,7 @@ def get_current_user(
         Depends(bearer),
     ],
 ) -> CurrentUser:
+    # Không cho phép truy cập nếu thiếu Firebase ID Token.
     if (
         credentials is None
         or credentials.scheme.lower() != "bearer"
@@ -66,9 +84,8 @@ def get_current_user(
         ) from None
 
     try:
-        # Xác minh Firebase ID token.
-        # Đồng thời kiểm tra token bị thu hồi,
-        # tài khoản bị khóa hoặc đã bị xóa.
+        # Firebase xác minh chữ ký, thời hạn token,
+        # tài khoản bị vô hiệu hóa và token bị thu hồi.
         claims = auth.verify_id_token(
             credentials.credentials,
             app=firebase_app,
@@ -85,7 +102,7 @@ def get_current_user(
         raise unauthorized() from None
 
     except Exception as error:
-        # Chỉ ghi loại lỗi, không ghi token.
+        # Không ghi ID Token vào log.
         logger.error(
             "Firebase verification unavailable: %s",
             type(error).__name__,
@@ -111,10 +128,44 @@ def get_current_user(
     ):
         raise unauthorized()
 
-    return CurrentUser(uid=uid)
+    # Chỉ tin tưởng custom claim đã được Firebase
+    # xác minh trong ID Token.
+    #
+    # Không đọc quyền Admin từ dữ liệu do Android
+    # hoặc Web gửi lên.
+    #
+    # Chỉ chấp nhận giá trị boolean True.
+    is_admin = claims.get("admin") is True
+
+    return CurrentUser(
+        uid=uid,
+        is_admin=is_admin,
+    )
 
 
+def get_admin_user(
+    user: Annotated[
+        CurrentUser,
+        Depends(get_current_user),
+    ],
+) -> CurrentUser:
+    # Backend kiểm tra quyền Admin,
+    # không phụ thuộc kiểm tra trên giao diện.
+    if not user.is_admin:
+        raise forbidden()
+
+    return user
+
+
+# Dependency cho tất cả API yêu cầu đăng nhập.
 AuthenticatedUser = Annotated[
     CurrentUser,
     Depends(get_current_user),
+]
+
+
+# Dependency chỉ dành cho các API Admin.
+AdminUser = Annotated[
+    CurrentUser,
+    Depends(get_admin_user),
 ]
