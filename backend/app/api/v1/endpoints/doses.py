@@ -12,6 +12,7 @@ from fastapi import (
 )
 
 from app.api.deps import AuthenticatedUser
+from app.api.write_guard import WritableUser
 from app.repositories.medication_repository import MedicationRepository
 from app.schemas.medication import (
     DoseActionRequest,
@@ -97,7 +98,7 @@ def get_dose(
 def update_dose_action(
     dose_id: str,
     payload: DoseActionRequest,
-    user: AuthenticatedUser,
+    user: WritableUser,
 ):
     """Đánh dấu liều đã uống hoặc bỏ qua."""
     try:
@@ -125,7 +126,7 @@ def update_dose_action(
 def snooze_dose(
     dose_id: str,
     payload: SnoozeRequest,
-    user: AuthenticatedUser,
+    user: WritableUser,
 ):
     """Hoãn thời gian nhắc uống thuốc."""
     try:

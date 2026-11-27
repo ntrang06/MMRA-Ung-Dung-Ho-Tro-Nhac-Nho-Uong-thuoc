@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from google.api_core.exceptions import GoogleAPICallError
 
 from app.api.deps import AuthenticatedUser
+from app.api.write_guard import WritableUser
 from app.repositories import schedule_repository
 from app.schemas.medication import (
     DocumentId,
@@ -93,7 +94,7 @@ def get_schedule(
 )
 def create_schedule(
     body: ScheduleInput,
-    user: AuthenticatedUser,
+    user: WritableUser,
     response: Response,
 ):
     response.headers["Cache-Control"] = "no-store"
@@ -129,7 +130,7 @@ def create_schedule(
 def update_schedule(
     schedule_id: DocumentId,
     body: ScheduleUpdate,
-    user: AuthenticatedUser,
+    user: WritableUser,
     response: Response,
 ):
     response.headers["Cache-Control"] = "no-store"
@@ -187,7 +188,7 @@ def update_schedule(
 )
 def delete_schedule(
     schedule_id: DocumentId,
-    user: AuthenticatedUser,
+    user: WritableUser,
     expected_version: Annotated[
         int,
         Query(alias="expectedVersion", ge=1),

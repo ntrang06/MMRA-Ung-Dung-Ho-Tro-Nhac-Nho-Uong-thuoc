@@ -27,6 +27,7 @@ from pydantic import (
 )
 
 from app.api.deps import AuthenticatedUser
+from app.api.write_guard import WritableUser
 from app.core.firebase import get_firebase_app
 from app.repositories.user_scope import (
     user_collection,
@@ -342,7 +343,7 @@ def get_medicine(
 )
 def create_medicine(
     body: MedicineInput,
-    user: AuthenticatedUser,
+    user: WritableUser,
     response: Response,
     idempotency_key: str = Header(
         ...,
@@ -535,7 +536,7 @@ def create_medicine(
 def update_medicine(
     medicine_id: DocumentId,
     body: MedicineUpdateInput,
-    user: AuthenticatedUser,
+    user: WritableUser,
     response: Response,
 ):
     response.headers["Cache-Control"] = "no-store"
@@ -654,7 +655,7 @@ def update_medicine(
 )
 def delete_medicine(
     medicine_id: DocumentId,
-    user: AuthenticatedUser,
+    user: WritableUser,
     response: Response,
 ):
     response.headers["Cache-Control"] = "no-store"
