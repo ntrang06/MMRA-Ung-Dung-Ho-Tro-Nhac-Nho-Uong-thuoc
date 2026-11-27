@@ -43,7 +43,7 @@ def setup_state(monkeypatch, snapshot):
 
 
 # ============================================================
-# 2. ACCOUNT WITHOUT DELETION REQUEST
+# 2. NO DELETION REQUEST
 # ============================================================
 
 def test_no_request_allows_write(monkeypatch):
@@ -60,23 +60,13 @@ def test_no_request_allows_write(monkeypatch):
 
 
 # ============================================================
-# 3. NORMAL ACCOUNT STATES
+# 3. PENDING - ALLOW WRITES
 # ============================================================
 
-@pytest.mark.parametrize(
-    "state",
-    [
-        "pending",
-        "confirmed",
-    ],
-)
-def test_normal_states_allow_write(
-    monkeypatch,
-    state,
-):
+def test_pending_allows_write(monkeypatch):
     setup_state(
         monkeypatch,
-        make_snapshot(status=state),
+        make_snapshot(status="pending"),
     )
 
     user = write_guard.get_writable_user(
@@ -87,13 +77,15 @@ def test_normal_states_allow_write(
 
 
 # ============================================================
-# 4. ACCOUNT DELETION IN PROGRESS
+# 4. DELETION STATES - BLOCK WRITES
 # ============================================================
 
 @pytest.mark.parametrize(
     "state",
     [
+        "confirmed",
         "processing",
+        "failed",
         "completed",
     ],
 )
@@ -136,6 +128,11 @@ def test_wrong_uid_fails_closed(monkeypatch):
 
     assert error.value.status_code == 503
 
+    assert (
+        error.value.detail["code"]
+        == "account_state_unavailable"
+    )
+
 
 def test_invalid_state_fails_closed(monkeypatch):
     setup_state(
@@ -150,6 +147,15 @@ def test_invalid_state_fails_closed(monkeypatch):
 
     assert error.value.status_code == 503
 
+    assert (
+        error.value.detail["code"]
+        == "account_state_unavailable"
+    )
+
+
+# ============================================================
+# 6. FIRESTORE ERROR
+# ============================================================
 
 def test_firestore_failure_fails_closed(
     monkeypatch,
@@ -172,9 +178,14 @@ def test_firestore_failure_fails_closed(
 
     assert error.value.status_code == 503
 
+    assert (
+        error.value.detail["code"]
+        == "account_state_unavailable"
+    )
+
 
 # ============================================================
-# 6. ENDPOINT REGISTRATION
+# 7. ENDPOINT REGISTRATION
 # ============================================================
 
 def test_all_target_endpoints_use_write_guard():
@@ -217,6 +228,6 @@ def test_all_target_endpoints_use_write_guard():
                 annotations["user"]
                 == write_guard.WritableUser
             ), (
-                f"Missing guard: "
+                f"Missing write guard: "
                 f"{module.__name__}.{name}"
             )

@@ -9,20 +9,19 @@ service cloud.firestore {
           && request.auth.uid == uid;
     }
 
-    // Khong cho ghi du lieu khi tai khoan
-    // dang duoc xu ly xoa hoac da xoa.
+    // Chi cho phep ghi neu chua co yeu cau xoa
+    // hoac yeu cau xoa dang o trang thai pending.
     //
     // Account deletion request do Backend
     // quan ly bang Firebase Admin SDK.
     function isAccountWritable(uid) {
-      let deletionPath = /databases/$(database)/documents/accountDeletionRequests/$(uid);
+      let deletionPath =
+        /databases/$(database)/documents/accountDeletionRequests/$(uid);
 
       return !exists(deletionPath)
-        || !(
-          get(deletionPath).data.status in [
-            'processing',
-            'completed'
-          ]
+        || (
+          get(deletionPath).data.uid == uid
+          && get(deletionPath).data.status == 'pending'
         );
     }
 
@@ -33,20 +32,20 @@ service cloud.firestore {
 
     match /users/{uid} {
 
-      // Chu tai khoan duoc doc ho so.
+      // Chi chu tai khoan duoc doc ho so.
       allow read: if isOwner(uid);
 
-      // Chi duoc ghi khi tai khoan
-      // chua bat dau xu ly xoa.
+      // Chan ghi khi da xac nhan xoa,
+      // dang xoa, xoa loi hoac da xoa.
       allow create, update, delete:
         if canWriteUserData(uid);
 
       match /medicines/{medicineId} {
 
-        // Giu quyen doc cho client cu.
+        // Client Android cu van duoc doc.
         allow read: if isOwner(uid);
 
-        // Ghi thuoc bat buoc qua FastAPI.
+        // Ghi thuoc bat buoc thong qua FastAPI.
         allow create, update, delete: if false;
       }
 
@@ -54,14 +53,14 @@ service cloud.firestore {
 
         allow read: if isOwner(uid);
 
-        // Ngan dang ky / cap nhat FCM
-        // trong luc xoa tai khoan.
+        // Chan thay doi FCM token
+        // khi tai khoan khong con writable.
         allow create, update, delete:
           if canWriteUserData(uid);
       }
     }
 
-    // Mac dinh tu choi cac collection khac.
+    // Mac dinh tu choi tat ca collection khac.
     match /{document=**} {
       allow read, write: if false;
     }

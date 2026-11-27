@@ -26,9 +26,10 @@ let testEnv;
 let passed = 0;
 let failed = 0;
 
-// --------------------------------------------------
-// Helpers
-// --------------------------------------------------
+
+// ============================================================
+// 1. HELPERS
+// ============================================================
 
 async function seedData(status = null) {
   await testEnv.clearFirestore();
@@ -61,6 +62,7 @@ async function seedData(status = null) {
   );
 }
 
+
 async function runTest(name, callback) {
   try {
     await callback();
@@ -71,9 +73,10 @@ async function runTest(name, callback) {
     failed++;
 
     console.error(`FAIL - ${name}`);
-    console.error(error.message);
+    console.error(error);
   }
 }
+
 
 function userDatabase(uid = "user-001") {
   return testEnv
@@ -81,9 +84,10 @@ function userDatabase(uid = "user-001") {
     .firestore();
 }
 
-// --------------------------------------------------
-// Main
-// --------------------------------------------------
+
+// ============================================================
+// 2. MAIN
+// ============================================================
 
 async function main() {
   testEnv = await initializeTestEnvironment({
@@ -99,7 +103,8 @@ async function main() {
   });
 
   try {
-    // 1. Chua co yeu cau xoa
+
+    // TEST 1: Chua co yeu cau xoa
     await runTest(
       "User can update profile without deletion request",
       async () => {
@@ -118,7 +123,8 @@ async function main() {
       }
     );
 
-    // 2. Pending
+
+    // TEST 2: Pending van duoc ghi
     await runTest(
       "User can update profile when pending",
       async () => {
@@ -137,26 +143,28 @@ async function main() {
       }
     );
 
-    // 3. Confirmed
+
+    // TEST 3: Confirmed bi chan
     await runTest(
-      "User can update profile when confirmed",
+      "User cannot update profile when confirmed",
       async () => {
         await seedData("confirmed");
 
         const db = userDatabase();
 
-        await assertSucceeds(
+        await assertFails(
           updateDoc(
             doc(db, "users", "user-001"),
             {
-              displayName: "Confirmed User",
+              displayName: "Should Be Blocked",
             }
           )
         );
       }
     );
 
-    // 4. Processing
+
+    // TEST 4: Processing bi chan
     await runTest(
       "User cannot update profile when processing",
       async () => {
@@ -175,7 +183,28 @@ async function main() {
       }
     );
 
-    // 5. Completed
+
+    // TEST 5: Failed bi chan
+    await runTest(
+      "User cannot update profile when deletion failed",
+      async () => {
+        await seedData("failed");
+
+        const db = userDatabase();
+
+        await assertFails(
+          updateDoc(
+            doc(db, "users", "user-001"),
+            {
+              displayName: "Should Be Blocked",
+            }
+          )
+        );
+      }
+    );
+
+
+    // TEST 6: Completed bi chan
     await runTest(
       "User cannot update profile when completed",
       async () => {
@@ -194,7 +223,8 @@ async function main() {
       }
     );
 
-    // 6. FCM
+
+    // TEST 7: FCM khong duoc dang ky khi xoa
     await runTest(
       "FCM registration blocked during deletion",
       async () => {
@@ -219,7 +249,8 @@ async function main() {
       }
     );
 
-    // 7. Cross-user access
+
+    // TEST 8: Khong duoc ghi ho so nguoi khac
     await runTest(
       "Another user cannot update profile",
       async () => {
@@ -238,7 +269,8 @@ async function main() {
       }
     );
 
-    // 8. Medicine direct write
+
+    // TEST 9: Android khong duoc ghi thuoc truc tiep
     await runTest(
       "Android cannot directly create medicine",
       async () => {
@@ -256,14 +288,15 @@ async function main() {
               "medicine-test"
             ),
             {
-              name: "Test Medicine",
+              medicineName: "Test Medicine",
             }
           )
         );
       }
     );
 
-    // 9. Profile read during deletion
+
+    // TEST 10: Chu tai khoan duoc doc khi dang xoa
     await runTest(
       "Owner can read profile during deletion",
       async () => {
@@ -279,7 +312,8 @@ async function main() {
       }
     );
 
-    // 10. Anonymous user
+
+    // TEST 11: Anonymous khong duoc ghi
     await runTest(
       "Anonymous user cannot update profile",
       async () => {
@@ -299,6 +333,101 @@ async function main() {
         );
       }
     );
+
+
+    // TEST 12: Trang thai xoa khong hop le
+    await runTest(
+      "Invalid deletion status blocks profile writes",
+      async () => {
+        await seedData("unknown");
+
+        const db = userDatabase();
+
+        await assertFails(
+          updateDoc(
+            doc(db, "users", "user-001"),
+            {
+              displayName: "Should Be Blocked",
+            }
+          )
+        );
+      }
+    );
+
+
+    // TEST 13: UID trong yeu cau xoa khong khop
+    await runTest(
+      "Wrong deletion request UID blocks writes",
+      async () => {
+        await seedData("pending");
+
+        await testEnv.withSecurityRulesDisabled(
+          async (context) => {
+            const adminDb = context.firestore();
+
+            await updateDoc(
+              doc(
+                adminDb,
+                "accountDeletionRequests",
+                "user-001"
+              ),
+              {
+                uid: "other-user",
+              }
+            );
+          }
+        );
+
+        const db = userDatabase();
+
+        await assertFails(
+          updateDoc(
+            doc(db, "users", "user-001"),
+            {
+              displayName: "Should Be Blocked",
+            }
+          )
+        );
+      }
+    );
+
+
+    // TEST 14: Thieu status trong yeu cau xoa
+    await runTest(
+      "Missing deletion status blocks writes",
+      async () => {
+        await seedData();
+
+        await testEnv.withSecurityRulesDisabled(
+          async (context) => {
+            const adminDb = context.firestore();
+
+            await setDoc(
+              doc(
+                adminDb,
+                "accountDeletionRequests",
+                "user-001"
+              ),
+              {
+                uid: "user-001",
+              }
+            );
+          }
+        );
+
+        const db = userDatabase();
+
+        await assertFails(
+          updateDoc(
+            doc(db, "users", "user-001"),
+            {
+              displayName: "Should Be Blocked",
+            }
+          )
+        );
+      }
+    );
+
   } finally {
     await testEnv.cleanup();
   }
@@ -312,6 +441,7 @@ async function main() {
     process.exitCode = 1;
   }
 }
+
 
 main().catch((error) => {
   console.error("TEST SETUP FAILED:");

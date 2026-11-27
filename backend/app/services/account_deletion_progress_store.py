@@ -3,6 +3,10 @@ from datetime import datetime
 
 from firebase_admin import firestore
 
+from app.services.account_deletion_consistency import (
+    DeletionConsistencyError,
+    validate_deletion_consistency,
+)
 from app.services.account_deletion_lease import (
     DeletionLease,
     DeletionLeaseInvalid,
@@ -14,7 +18,6 @@ from app.services.account_deletion_lease import (
 from app.services.account_deletion_workflow import (
     DeletionProgress,
     WorkflowStateError,
-    from_firestore_data,
     mark_step_completed,
     to_firestore_data,
 )
@@ -36,12 +39,15 @@ def save_completed_step(
     now: datetime | None = None,
 ) -> DeletionProgress:
     """
-    Ghi nhận một bước đã hoàn thành.
+    Save a completed workflow step.
 
-    Chỉ gọi sau khi thao tác thực tế của bước đó
-    đã thành công và được kiểm tra.
+    The actual deletion operation must
+    succeed before calling this function.
 
-    Không tự thực hiện xóa dữ liệu.
+    A valid lease and consistent persisted
+    state are both required.
+
+    This function does not delete user data.
     """
     if client is None:
         client = get_lease_client()
@@ -51,7 +57,7 @@ def save_completed_step(
 
     if now.tzinfo is None:
         raise ValueError(
-            "Thời gian phải có timezone."
+            "Thoi gian phai co timezone."
         )
 
     reference = get_request_reference(
@@ -67,14 +73,14 @@ def save_completed_step(
 
         if not snapshot.exists:
             raise DeletionLeaseInvalid(
-                "Không tìm thấy yêu cầu xóa."
+                "Khong tim thay yeu cau xoa."
             )
 
         data = snapshot.to_dict() or {}
 
         if data.get("uid") != lease.uid:
             raise DeletionLeaseInvalid(
-                "UID không khớp."
+                "UID khong khop."
             )
 
         require_valid_lease(
@@ -88,18 +94,22 @@ def save_completed_step(
             "processing",
         }:
             raise DeletionLeaseInvalid(
-                "Yêu cầu không còn xử lý được."
+                "Yeu cau khong con xu ly duoc."
             )
 
         try:
-            current = from_firestore_data(
-                data,
-                expected_uid=lease.uid,
+            consistency = (
+                validate_deletion_consistency(
+                    data,
+                    expected_uid=lease.uid,
+                )
             )
+
+            current = consistency.progress
 
             if current.status == "completed":
                 raise DeletionProgressConflict(
-                    "Workflow đã hoàn tất."
+                    "Workflow da hoan tat."
                 )
 
             updated = mark_step_completed(
@@ -107,13 +117,17 @@ def save_completed_step(
                 step,
             )
 
-        except WorkflowStateError as error:
+        except (
+            DeletionConsistencyError,
+            WorkflowStateError,
+        ) as error:
             raise DeletionProgressConflict(
-                str(error)
+                "Trang thai hoac thu tu "
+                "workflow khong hop le."
             ) from error
 
-        # Bước đã ghi nhận ở lần trước:
-        # không cần ghi lại.
+        # A repeated successful step should
+        # not create another Firestore write.
         if updated == current:
             return current
 
@@ -124,7 +138,6 @@ def save_completed_step(
             "lastCompletedStep": step,
         }
 
-        # Bước cuối: không còn worker xử lý.
         if updated.status == "completed":
             changes.update({
                 "completedAt": now,
@@ -139,4 +152,6 @@ def save_completed_step(
 
         return updated
 
-    return save(client.transaction())
+    return save(
+        client.transaction()
+    )

@@ -12,8 +12,12 @@ from app.core.firebase import get_firebase_app
 
 logger = logging.getLogger(__name__)
 
+# Pending: nguoi dung moi gui yeu cau xoa.
+# Cac trang thai con lai khong duoc ghi du lieu.
 BLOCKED_STATUSES = {
+    "confirmed",
     "processing",
+    "failed",
     "completed",
 }
 
@@ -27,7 +31,16 @@ VALID_STATUSES = {
 
 
 def get_deletion_status_reference(uid: str):
-    client = firestore.client(app=get_firebase_app())
+    if (
+        not isinstance(uid, str)
+        or not uid
+        or "/" in uid
+    ):
+        raise ValueError("Invalid Firebase UID")
+
+    client = firestore.client(
+        app=get_firebase_app()
+    )
 
     return (
         client.collection("accountDeletionRequests")
@@ -35,14 +48,15 @@ def get_deletion_status_reference(uid: str):
     )
 
 
-def account_write_blocked(
-    uid: str,
-) -> bool:
+def account_write_blocked(uid: str) -> bool:
     """
     Kiem tra trang thai xoa tai khoan.
 
-    Khong tao, sua hoac xoa du lieu.
-    Khong tin UID do Android tu gui len.
+    - Khong co yeu cau: cho phep
+    - Pending: cho phep
+    - Confirmed/Processing/Failed/Completed: chan
+
+    Khong thuc hien thao tac ghi.
     """
     snapshot = get_deletion_status_reference(
         uid
@@ -75,11 +89,10 @@ def get_writable_user(
     ],
 ) -> CurrentUser:
     """
-    Chi cho phep ghi khi tai khoan
-    khong trong qua trinh xoa.
+    Dependency cho API thay doi du lieu.
 
-    Dung lam FastAPI dependency cho
-    endpoint POST, PUT, PATCH, DELETE.
+    Fail closed: neu khong xac dinh duoc
+    trang thai tai khoan thi tu choi ghi.
     """
     try:
         blocked = account_write_blocked(
@@ -124,7 +137,8 @@ def get_writable_user(
             detail={
                 "code": "account_deletion_in_progress",
                 "message": (
-                    "Tai khoan dang duoc xu ly xoa. "
+                    "Tai khoan da xac nhan xoa "
+                    "hoac dang duoc xu ly xoa. "
                     "Khong the thay doi du lieu."
                 ),
             },

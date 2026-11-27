@@ -6,10 +6,13 @@ from datetime import datetime, timedelta, timezone
 from firebase_admin import firestore
 
 from app.core.firebase import get_firebase_app
+from app.services.account_deletion_consistency import (
+    DeletionConsistencyError,
+    validate_deletion_consistency,
+)
 from app.services.account_deletion_workflow import (
     DeletionProgress,
     WorkflowStateError,
-    from_firestore_data,
     next_step,
     validate_uid,
 )
@@ -57,7 +60,10 @@ def get_request_reference(client, uid: str):
     )
 
 
-def lease_is_active(data: dict, now: datetime) -> bool:
+def lease_is_active(
+    data: dict,
+    now: datetime,
+) -> bool:
     token = data.get("leaseToken")
     expires_at = data.get("leaseExpiresAt")
 
@@ -86,11 +92,30 @@ def require_valid_lease(
         )
 
 
-def read_progress(data: dict, uid: str):
-    return from_firestore_data(
-        data,
-        expected_uid=uid,
-    )
+def read_progress(
+    data: dict,
+    uid: str,
+) -> DeletionProgress:
+    """
+    Validate persisted deletion state before
+    allowing a worker to continue.
+
+    Read-only. Does not delete any data.
+    """
+    try:
+        result = validate_deletion_consistency(
+            data,
+            expected_uid=uid,
+        )
+    except (
+        DeletionConsistencyError,
+        WorkflowStateError,
+    ) as error:
+        raise WorkflowStateError(
+            "Trang thai xoa tai khoan khong nhat quan."
+        ) from error
+
+    return result.progress
 
 
 def acquire_deletion_lease(
@@ -99,10 +124,10 @@ def acquire_deletion_lease(
     now: datetime | None = None,
 ) -> DeletionLease:
     """
-    Cap quyen xu ly bang Firestore transaction.
+    Acquire an exclusive processing lease.
 
-    Khong xoa du lieu.
-    Khong danh dau buoc workflow nao da xong.
+    This operation never deletes user data
+    and never marks a workflow step complete.
     """
     validate_uid(uid)
 
@@ -113,9 +138,15 @@ def acquire_deletion_lease(
         now = utc_now()
 
     if now.tzinfo is None:
-        raise ValueError("now phai co timezone.")
+        raise ValueError(
+            "now phai co timezone."
+        )
 
-    reference = get_request_reference(client, uid)
+    reference = get_request_reference(
+        client,
+        uid,
+    )
+
     token = secrets.token_hex(24)
     expires_at = now + timedelta(
         seconds=LEASE_SECONDS
@@ -139,9 +170,7 @@ def acquire_deletion_lease(
                 "UID khong khop."
             )
 
-        state = data.get("status")
-
-        if state not in {
+        if data.get("status") not in {
             "confirmed",
             "processing",
         }:
@@ -150,7 +179,10 @@ def acquire_deletion_lease(
             )
 
         try:
-            progress = read_progress(data, uid)
+            progress = read_progress(
+                data,
+                uid,
+            )
         except WorkflowStateError as error:
             raise DeletionLeaseInvalid(
                 "Trang thai workflow khong hop le."
@@ -195,9 +227,10 @@ def renew_deletion_lease(
     now: datetime | None = None,
 ) -> DeletionLease:
     """
-    Gia han quyen xu ly neu token van hop le.
-
-    Token cu het han se khong duoc gia han.
+    Renew the lease only if:
+    - its token is still valid;
+    - the request remains runnable;
+    - persisted progress is consistent.
     """
     validate_uid(lease.uid)
 
@@ -208,7 +241,9 @@ def renew_deletion_lease(
         now = utc_now()
 
     if now.tzinfo is None:
-        raise ValueError("now phai co timezone.")
+        raise ValueError(
+            "now phai co timezone."
+        )
 
     reference = get_request_reference(
         client,
@@ -251,10 +286,15 @@ def renew_deletion_lease(
                 "Yeu cau khong con duoc xu ly."
             )
 
-        progress = read_progress(
-            data,
-            lease.uid,
-        )
+        try:
+            progress = read_progress(
+                data,
+                lease.uid,
+            )
+        except WorkflowStateError as error:
+            raise DeletionLeaseInvalid(
+                "Trang thai workflow khong hop le."
+            ) from error
 
         transaction.update(
             reference,
@@ -283,13 +323,11 @@ def release_deletion_lease(
     client=None,
 ) -> bool:
     """
-    Giai phong lease neu token con la
-    token dang duoc luu.
+    Release only the matching lease token.
 
-    Token cu khong the giai phong lease moi.
-
-    Tra ve False neu quyen da duoc chuyen
-    cho mot tien trinh khac.
+    Even if progress is inconsistent,
+    the current worker may release its
+    own token without deleting any data.
     """
     validate_uid(lease.uid)
 
@@ -339,9 +377,8 @@ def get_deletion_lease_status(
     client=None,
 ) -> dict:
     """
-    Chi doc tien do, khong thay doi du lieu.
-
-    Ham nay chua duoc gan vao API.
+    Read deletion progress without
+    executing or modifying any step.
     """
     validate_uid(uid)
 
@@ -367,10 +404,15 @@ def get_deletion_lease_status(
             "UID khong khop."
         )
 
-    progress = read_progress(
-        data,
-        uid,
-    )
+    try:
+        progress = read_progress(
+            data,
+            uid,
+        )
+    except WorkflowStateError as error:
+        raise DeletionLeaseInvalid(
+            "Trang thai workflow khong hop le."
+        ) from error
 
     return {
         "status": progress.status,
