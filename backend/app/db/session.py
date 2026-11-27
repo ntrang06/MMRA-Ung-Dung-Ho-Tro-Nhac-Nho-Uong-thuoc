@@ -2,18 +2,30 @@
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import (
+    Session,
+    sessionmaker,
+)
 
 from app.core.config import get_settings
 
 
 settings = get_settings()
 
+# Local: DATABASE_URL
+# Cloud Run: Cloud SQL Unix socket
+database_connection = settings.get_database_url()
+
 engine = create_engine(
-    settings.database_url,
+    database_connection,
     pool_pre_ping=True,
     pool_size=5,
-    max_overflow=10,
+    max_overflow=5,
+    pool_timeout=30,
+    pool_recycle=1800,
+    connect_args={
+        "connect_timeout": 10,
+    },
 )
 
 SessionLocal = sessionmaker(

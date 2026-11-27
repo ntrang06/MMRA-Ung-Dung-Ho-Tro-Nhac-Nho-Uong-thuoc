@@ -2,11 +2,14 @@
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy.engine import URL
 
 from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import engine
-import app.db.models  # noqa: F401 - register models
+
+# Register database models
+import app.db.models  # noqa: F401
 
 
 config = context.config
@@ -19,12 +22,20 @@ target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     settings = get_settings()
+    database_url = settings.get_database_url()
+
+    if isinstance(database_url, URL):
+        database_url = database_url.render_as_string(
+            hide_password=False
+        )
 
     context.configure(
-        url=settings.database_url,
+        url=database_url,
         target_metadata=target_metadata,
         literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
+        dialect_opts={
+            "paramstyle": "named",
+        },
         compare_type=True,
     )
 

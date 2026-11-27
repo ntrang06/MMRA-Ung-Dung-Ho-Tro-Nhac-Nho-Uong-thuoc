@@ -1,0 +1,50 @@
+
+# Git
+.git
+.gitignore
+.github
+
+# Python environments
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+
+# Environment variables and credentials
+.env
+.env.*
+!.env.example
+secrets
+**/secrets
+*service-account*.json
+*firebase-admin*.json
+*credentials*.json
+
+# Tests and cache
+tests
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Development files
+.idea
+.vscode
+*.log
+*.bak
+*.db
+*.sqlite
+*.sqlite3
+
+# Local Docker and temporary files
+compose.yaml
+Dockerfile*
+!Dockerfile
+.dockerignore
+tmp
+temp
+
+# Documentation
+README.md
