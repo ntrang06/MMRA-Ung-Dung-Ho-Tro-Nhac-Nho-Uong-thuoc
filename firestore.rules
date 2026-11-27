@@ -9,30 +9,59 @@ service cloud.firestore {
           && request.auth.uid == uid;
     }
 
+    // Khong cho ghi du lieu khi tai khoan
+    // dang duoc xu ly xoa hoac da xoa.
+    //
+    // Account deletion request do Backend
+    // quan ly bang Firebase Admin SDK.
+    function isAccountWritable(uid) {
+      let deletionPath = /databases/$(database)/documents/accountDeletionRequests/$(uid);
+
+      return !exists(deletionPath)
+        || !(
+          get(deletionPath).data.status in [
+            'processing',
+            'completed'
+          ]
+        );
+    }
+
+    function canWriteUserData(uid) {
+      return isOwner(uid)
+          && isAccountWritable(uid);
+    }
+
     match /users/{uid} {
 
-      // Giữ quyền quản lý hồ sơ tài khoản.
-      allow read, write: if isOwner(uid);
+      // Chu tai khoan duoc doc ho so.
+      allow read: if isOwner(uid);
+
+      // Chi duoc ghi khi tai khoan
+      // chua bat dau xu ly xoa.
+      allow create, update, delete:
+        if canWriteUserData(uid);
 
       match /medicines/{medicineId} {
 
-        // Tạm giữ quyền đọc cho client cũ.
+        // Giu quyen doc cho client cu.
         allow read: if isOwner(uid);
 
-        // Tất cả thao tác thêm, sửa, xóa thuốc
-        // phải đi qua FastAPI.
+        // Ghi thuoc bat buoc qua FastAPI.
         allow create, update, delete: if false;
       }
 
       match /devices/{deviceId} {
 
-        // Giữ quyền đăng ký thiết bị nhận FCM.
-        allow read, write: if isOwner(uid);
+        allow read: if isOwner(uid);
+
+        // Ngan dang ky / cap nhat FCM
+        // trong luc xoa tai khoan.
+        allow create, update, delete:
+          if canWriteUserData(uid);
       }
     }
 
-    // Các collection khác không được client
-    // truy cập trực tiếp nếu chưa cấp quyền.
+    // Mac dinh tu choi cac collection khac.
     match /{document=**} {
       allow read, write: if false;
     }

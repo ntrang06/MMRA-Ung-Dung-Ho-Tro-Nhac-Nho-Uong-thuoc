@@ -2,6 +2,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    account_deletion,
     doses,
     family,
     family_shared,
@@ -20,6 +21,10 @@ api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(password_reset.router)
 api_router.include_router(session.router)
+
+# Account deletion requests
+api_router.include_router(account_deletion.router)
+
 api_router.include_router(schedules.router)
 api_router.include_router(doses.router)
 api_router.include_router(history.router)
@@ -27,8 +32,6 @@ api_router.include_router(home.router)
 api_router.include_router(medicines.router)
 api_router.include_router(medicine_lookup.router)
 
-# Family: tạo lời mời, liên kết, phân quyền.
+# Family
 api_router.include_router(family.router)
-
-# Family: đọc lịch và trạng thái liều được chia sẻ.
 api_router.include_router(family_shared.router)

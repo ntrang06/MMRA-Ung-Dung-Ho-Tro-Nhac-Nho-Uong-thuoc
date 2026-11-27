@@ -2,6 +2,7 @@
 package com.example.project_lttbd.data.remote
 
 import com.google.gson.annotations.SerializedName
+import okhttp3.OkHttpClient
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -11,6 +12,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import java.util.concurrent.TimeUnit
 
 data class MedicineApiDto(
     @SerializedName("medicineId")
@@ -105,12 +107,32 @@ interface MedicineApi {
 
 object MedicineApiClient {
 
-    private const val BASE_URL =
-        "http://127.0.0.1:8000/"
+    private val httpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(
+                ApiConfig.CONNECT_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            .readTimeout(
+                ApiConfig.READ_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            .writeTimeout(
+                ApiConfig.WRITE_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            .callTimeout(
+                ApiConfig.CALL_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            .retryOnConnectionFailure(false)
+            .build()
+    }
 
     val api: MedicineApi by lazy {
         Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(ApiConfig.BASE_URL)
+            .client(httpClient)
             .addConverterFactory(
                 GsonConverterFactory.create()
             )
