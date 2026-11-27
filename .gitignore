@@ -17,3 +17,14 @@ local.properties
 AGENTS.md
 agent.md
 TODO_HUY.md
+# Firebase Emulator logs
+/firebase-debug.log
+/firestore-debug.log
+/ui-debug.log
+/database-debug.log
+
+# Node.js dependencies
+/rules-tests/node_modules/
+
+# Local emulator data
+/firebase-export/
