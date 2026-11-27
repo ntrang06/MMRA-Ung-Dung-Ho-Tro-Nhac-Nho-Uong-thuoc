@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, iter_route_contexts
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -78,6 +78,7 @@ def test_invitation_rejects_invalid_timestamp():
     now = datetime.now(timezone.utc)
 
     assert is_invitation_expired(None, now)
+
     assert is_invitation_expired(
         datetime(2026, 11, 27, 8, 0),
         now,
@@ -172,13 +173,25 @@ def test_revoked_link_is_hidden():
     ) is None
 
 
+def get_api_operations():
+    operations = set()
+
+    # FastAPI hiện tại sử dụng router lồng nhau.
+    # iter_route_contexts lấy đúng đường dẫn đầy đủ.
+    for context in iter_route_contexts(app.routes):
+        if not isinstance(context.route, APIRoute):
+            continue
+
+        for method in context.methods:
+            operations.add(
+                (method, context.path)
+            )
+
+    return operations
+
+
 def test_family_routes_are_registered():
-    operations = {
-        (method, route.path)
-        for route in app.routes
-        if isinstance(route, APIRoute)
-        for method in route.methods
-    }
+    operations = get_api_operations()
 
     required = {
         ("POST", "/api/v1/family/invitations"),
@@ -186,7 +199,11 @@ def test_family_routes_are_registered():
         ("GET", "/api/v1/family/members"),
     }
 
-    assert required.issubset(operations)
+    missing = required - operations
+
+    assert not missing, (
+        f"Thiếu API Family: {missing}"
+    )
 
 
 def test_family_api_requires_login():
