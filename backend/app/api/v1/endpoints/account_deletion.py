@@ -1,6 +1,8 @@
 
 import logging
+import time
 from datetime import datetime, timezone
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -8,15 +10,16 @@ from fastapi import (
     HTTPException,
     Response,
 )
-from firebase_admin import firestore
+from fastapi.security import HTTPAuthorizationCredentials
+from firebase_admin import auth, firestore
 from google.api_core.exceptions import (
     AlreadyExists,
     GoogleAPICallError,
 )
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import AuthenticatedUser
+from app.api.deps import AuthenticatedUser, bearer
 from app.core.firebase import get_firebase_app
 from app.db.session import get_db
 from app.services.account_deletion_inventory import (
@@ -32,9 +35,12 @@ router = APIRouter(
     tags=["Account Deletion"],
 )
 
+RECENT_LOGIN_SECONDS = 300
+ALLOWED_CLOCK_SKEW_SECONDS = 60
+
 
 # ============================================================
-# 1. RESPONSE SCHEMAS
+# 1. SCHEMAS
 # ============================================================
 
 class AccountDeletionResponse(BaseModel):
@@ -51,7 +57,23 @@ class AccountDeletionPreviewResponse(BaseModel):
     familyLinks: int
     familyInvitations: int
     passwordResetRecords: int
+    deletionExecuted: bool = False
 
+
+class ConfirmDeletionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+
+class ConfirmDeletionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    confirmedAt: datetime
     deletionExecuted: bool = False
 
 
@@ -71,7 +93,7 @@ def get_deletion_collection():
 
 def deletion_unavailable() -> HTTPException:
     logger.exception(
-        "Account deletion request unavailable"
+        "Account deletion service unavailable"
     )
 
     return HTTPException(
@@ -79,8 +101,8 @@ def deletion_unavailable() -> HTTPException:
         detail={
             "code": "deletion_unavailable",
             "message": (
-                "Chưa ghi nhận được yêu cầu. "
-                "Vui lòng thử lại."
+                "Dịch vụ xóa tài khoản tạm thời "
+                "không khả dụng. Vui lòng thử lại."
             ),
         },
     )
@@ -110,6 +132,7 @@ def validate_request_snapshot(
 
     if state not in {
         "pending",
+        "confirmed",
         "processing",
         "failed",
         "completed",
@@ -122,8 +145,89 @@ def validate_request_snapshot(
     )
 
 
+def is_recent_login(
+    auth_time: object,
+    now_seconds: int,
+) -> bool:
+    if (
+        type(auth_time) is not int
+        or auth_time <= 0
+    ):
+        return False
+
+    age = now_seconds - auth_time
+
+    return (
+        -ALLOWED_CLOCK_SKEW_SECONDS
+        <= age
+        <= RECENT_LOGIN_SECONDS
+    )
+
+
+def verify_recent_login(
+    authorization: str,
+    expected_uid: str,
+) -> None:
+    """
+    Xác minh lại Firebase ID Token và thời điểm
+    đăng nhập thật (auth_time).
+
+    Không ghi token vào logs.
+    """
+    try:
+        firebase_app = get_firebase_app()
+
+        claims = auth.verify_id_token(
+            authorization,
+            app=firebase_app,
+            check_revoked=True,
+        )
+
+    except Exception:
+        logger.warning(
+            "Account deletion token verification failed"
+        )
+
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "reauthentication_required",
+                "message": (
+                    "Vui lòng đăng nhập lại để "
+                    "xác nhận xóa tài khoản."
+                ),
+            },
+        ) from None
+
+    if claims.get("uid") != expected_uid:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "invalid_user",
+                "message": (
+                    "Phiên xác thực không hợp lệ."
+                ),
+            },
+        )
+
+    if not is_recent_login(
+        claims.get("auth_time"),
+        int(time.time()),
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "recent_login_required",
+                "message": (
+                    "Bạn cần đăng nhập lại trong "
+                    "5 phút gần nhất để xác nhận."
+                ),
+            },
+        )
+
+
 # ============================================================
-# 3. POST - GỬI YÊU CẦU XÓA TÀI KHOẢN
+# 3. POST - GỬI YÊU CẦU XÓA
 # ============================================================
 
 @router.post(
@@ -135,12 +239,6 @@ def request_account_deletion(
     user: AuthenticatedUser,
     response: Response,
 ):
-    """
-    Tiếp nhận yêu cầu xóa tài khoản.
-
-    Chỉ ghi nhận yêu cầu.
-    Chưa thực hiện xóa dữ liệu hoặc Firebase Auth.
-    """
     response.headers["Cache-Control"] = "no-store"
 
     now = datetime.now(timezone.utc)
@@ -164,11 +262,8 @@ def request_account_deletion(
             )
 
         except AlreadyExists:
-            # Gửi lại yêu cầu không tạo bản ghi trùng.
-            snapshot = reference.get()
-
             return validate_request_snapshot(
-                snapshot,
+                reference.get(),
                 user.uid,
             )
 
@@ -177,7 +272,7 @@ def request_account_deletion(
 
 
 # ============================================================
-# 4. GET - KIỂM TRA TRẠNG THÁI YÊU CẦU
+# 4. GET - TRẠNG THÁI YÊU CẦU
 # ============================================================
 
 @router.get(
@@ -188,10 +283,6 @@ def get_my_deletion_request(
     user: AuthenticatedUser,
     response: Response,
 ):
-    """
-    Chỉ xem yêu cầu xóa của tài khoản
-    đã xác thực bằng Firebase ID Token.
-    """
     response.headers["Cache-Control"] = "no-store"
 
     try:
@@ -222,7 +313,7 @@ def get_my_deletion_request(
 
 
 # ============================================================
-# 5. GET - XEM TRƯỚC DỮ LIỆU CẦN XÓA
+# 5. GET - KIỂM KÊ DỮ LIỆU
 # ============================================================
 
 @router.get(
@@ -234,18 +325,6 @@ def preview_account_deletion(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    """
-    Kiểm kê dữ liệu liên quan đến tài khoản.
-
-    Bao gồm:
-    - Firestore users/{uid} và các subcollection
-    - Firestore familyLinks
-    - Firestore familyInvitations
-    - PostgreSQL password_reset_challenges
-
-    Chỉ đọc và đếm dữ liệu.
-    Không thực hiện thao tác xóa.
-    """
     response.headers["Cache-Control"] = "no-store"
 
     try:
@@ -260,8 +339,8 @@ def preview_account_deletion(
             detail={
                 "code": "inventory_too_large",
                 "message": (
-                    "Không thể kiểm kê đầy đủ dữ liệu "
-                    "trong một yêu cầu."
+                    "Không thể kiểm kê đầy đủ "
+                    "dữ liệu trong một yêu cầu."
                 ),
             },
         ) from None
@@ -288,3 +367,152 @@ def preview_account_deletion(
         passwordResetRecords=inventory.password_reset_records,
         deletionExecuted=False,
     )
+
+
+# ============================================================
+# 6. POST - XÁC NHẬN YÊU CẦU XÓA
+# ============================================================
+
+@router.post(
+    "/confirm",
+    response_model=ConfirmDeletionResponse,
+)
+def confirm_account_deletion(
+    payload: ConfirmDeletionRequest,
+    user: AuthenticatedUser,
+    response: Response,
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(bearer),
+    ],
+):
+    """
+    Xác nhận ý định xóa tài khoản.
+
+    Chưa xóa Firebase Auth hoặc dữ liệu.
+    """
+    response.headers["Cache-Control"] = "no-store"
+
+    if payload.confirmation != "XOA TAI KHOAN":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "confirmation_mismatch",
+                "message": (
+                    "Vui lòng nhập chính xác "
+                    "XOA TAI KHOAN."
+                ),
+            },
+        )
+
+    if credentials is None:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "unauthenticated",
+                "message": "Vui lòng đăng nhập lại.",
+            },
+        )
+
+    verify_recent_login(
+        credentials.credentials,
+        user.uid,
+    )
+
+    now = datetime.now(timezone.utc)
+
+    try:
+        reference = get_deletion_collection().document(
+            user.uid
+        )
+
+        client = firestore.client(
+            app=get_firebase_app()
+        )
+
+        @firestore.transactional
+        def confirm(transaction):
+            snapshot = reference.get(
+                transaction=transaction
+            )
+
+            if not snapshot.exists:
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "code": "request_not_found",
+                        "message": (
+                            "Vui lòng gửi yêu cầu xóa "
+                            "tài khoản trước."
+                        ),
+                    },
+                )
+
+            data = snapshot.to_dict() or {}
+
+            if data.get("uid") != user.uid:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "code": "permission_denied",
+                    },
+                )
+
+            state = data.get("status")
+
+            if state == "confirmed":
+                confirmed_at = data.get(
+                    "confirmedAt"
+                )
+
+                if (
+                    not isinstance(
+                        confirmed_at,
+                        datetime,
+                    )
+                    or confirmed_at.tzinfo is None
+                ):
+                    raise ValueError(
+                        "Invalid confirmation state"
+                    )
+
+                return confirmed_at
+
+            if state != "pending":
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "invalid_deletion_state",
+                        "message": (
+                            "Yêu cầu đang được xử lý "
+                            "hoặc đã hoàn tất."
+                        ),
+                    },
+                )
+
+            transaction.update(
+                reference,
+                {
+                    "status": "confirmed",
+                    "confirmedAt": now,
+                    "updatedAt": now,
+                },
+            )
+
+            return now
+
+        confirmed_at = confirm(
+            client.transaction()
+        )
+
+        return ConfirmDeletionResponse(
+            status="confirmed",
+            confirmedAt=confirmed_at,
+            deletionExecuted=False,
+        )
+
+    except HTTPException:
+        raise
+
+    except (GoogleAPICallError, ValueError):
+        raise deletion_unavailable() from None
