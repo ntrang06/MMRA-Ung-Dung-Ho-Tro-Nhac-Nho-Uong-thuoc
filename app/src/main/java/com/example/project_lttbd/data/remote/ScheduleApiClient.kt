@@ -1,3 +1,4 @@
+
 package com.example.project_lttbd.data.remote
 
 import android.util.Log
@@ -9,12 +10,15 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 object ScheduleApiClient {
-    private const val BASE_URL = "http://127.0.0.1:8000/"
+
+    private val baseUrl: String
+        get() = ApiConfig.BASE_URL
+
     private const val LOG_TAG = "MMRA_API_ERROR"
 
     private val isLocalServer: Boolean
-        get() = BASE_URL.startsWith("http://127.0.0.1:") ||
-                BASE_URL.startsWith("http://localhost:")
+        get() = baseUrl.startsWith("http://127.0.0.1:") ||
+                baseUrl.startsWith("http://localhost:")
 
     private val httpClient: OkHttpClient by lazy {
         val useFreshConnection = isLocalServer
@@ -22,21 +26,32 @@ object ScheduleApiClient {
         Log.i(
             LOG_TAG,
             "INIT ScheduleApiClient " +
-                    "baseUrl=$BASE_URL " +
+                    "baseUrl=$baseUrl " +
                     "freshLocalConnection=$useFreshConnection"
         )
 
         val builder = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
-            .callTimeout(45, TimeUnit.SECONDS)
+            .connectTimeout(
+                ApiConfig.CONNECT_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            .readTimeout(
+                ApiConfig.READ_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            .writeTimeout(
+                ApiConfig.WRITE_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            .callTimeout(
+                ApiConfig.CALL_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
             .retryOnConnectionFailure(false)
             .followRedirects(false)
             .followSslRedirects(false)
 
         if (useFreshConnection) {
-            // API local qua USB: không giữ kết nối nhàn rỗi.
             builder.connectionPool(
                 ConnectionPool(
                     0,
@@ -73,18 +88,19 @@ object ScheduleApiClient {
                 )
 
                 try {
-                    val response = chain.proceed(request)
+                    val result = chain.proceed(request)
 
-                    val elapsedMs = TimeUnit.NANOSECONDS.toMillis(
-                        System.nanoTime() - startedAt
-                    )
+                    val elapsedMs =
+                        TimeUnit.NANOSECONDS.toMillis(
+                            System.nanoTime() - startedAt
+                        )
 
                     Log.i(
                         LOG_TAG,
-                        "HTTP ${response.code} $target (${elapsedMs}ms)"
+                        "HTTP ${result.code} $target (${elapsedMs}ms)"
                     )
 
-                    response
+                    result
                 } catch (error: IOException) {
                     Log.e(
                         LOG_TAG,
@@ -101,9 +117,11 @@ object ScheduleApiClient {
 
     private val retrofit: Retrofit by lazy {
         Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(baseUrl)
             .client(httpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(
+                GsonConverterFactory.create()
+            )
             .build()
     }
 

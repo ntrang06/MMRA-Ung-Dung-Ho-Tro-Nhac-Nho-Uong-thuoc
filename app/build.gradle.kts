@@ -1,3 +1,4 @@
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -19,11 +20,26 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner =
+            "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            buildConfigField(
+                "String",
+                "API_BASE_URL",
+                "\"https://mmra-api.onrender.com/\""
+            )
+        }
+
         release {
+            buildConfigField(
+                "String",
+                "API_BASE_URL",
+                "\"https://mmra-api.onrender.com/\""
+            )
+
             optimization {
                 enable = true
                 packageScope = setOf(
@@ -42,6 +58,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -66,7 +83,6 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // CameraX
     val cameraxVersion = "1.4.2"
 
     implementation("androidx.camera:camera-core:$cameraxVersion")
@@ -74,13 +90,10 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
 
-    // Firebase: quản lý phiên bản chung
     implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
 
-    // Đăng ký, đăng nhập và quản lý phiên
     implementation("com.google.firebase:firebase-auth")
 
-    // Credential Manager và đăng nhập Google
     implementation("androidx.credentials:credentials:1.3.0")
     implementation(
         "androidx.credentials:credentials-play-services-auth:1.3.0"
@@ -89,20 +102,13 @@ dependencies {
         "com.google.android.libraries.identity.googleid:googleid:1.1.1"
     )
 
-    // Cloud Firestore
     implementation("com.google.firebase:firebase-firestore")
-
-    // Thông báo đẩy và Analytics
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-analytics")
 
-    // Retrofit: gọi API FastAPI
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
-
-    // Gson: chuyển đổi JSON giữa backend và các lớp dữ liệu Kotlin
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
 
-    // OCR hộp/vỉ thuốc: model đi kèm app.
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 }
