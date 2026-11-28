@@ -36,6 +36,11 @@ LinkId = Annotated[
     Path(pattern=r"^[0-9a-f]{64}$"),
 ]
 
+InvitationId = Annotated[
+    str,
+    Path(pattern=r"^[0-9a-f]{64}$"),
+]
+
 
 # ============================================================
 # 1. SCHEMAS
@@ -55,6 +60,11 @@ class InvitationResponse(BaseModel):
     invitationId: str
     code: str
     expiresAt: datetime
+
+
+class InvitationActionResponse(BaseModel):
+    invitationId: str
+    status: str
 
 
 class AcceptInvitationResponse(BaseModel):
@@ -257,6 +267,111 @@ def get_active_link(
         )
 
     return data
+
+
+def _revoke_pending_invitation(
+    db,
+    invitation_ref,
+    invitation_id: str,
+    actor_uid: str,
+    *,
+    require_owner: bool,
+) -> InvitationActionResponse:
+    """
+    Hủy hoặc từ chối lời mời đang ở trạng thái pending trong transaction.
+    Nếu lời mời đã quá hạn thì cập nhật status = 'expired' trước khi trả lỗi 400.
+    """
+
+    @google_firestore.transactional
+    def update_invitation(transaction):
+        invitation_snapshot = invitation_ref.get(
+            transaction=transaction
+        )
+
+        if not invitation_snapshot.exists:
+            raise family_error(
+                "invitation_not_found",
+                "Không tìm thấy lời mời.",
+                404,
+            )
+
+        invitation = (
+            invitation_snapshot.to_dict() or {}
+        )
+
+        owner_uid = invitation.get("ownerUid")
+
+        if (
+            not isinstance(owner_uid, str)
+            or not owner_uid
+            or "/" in owner_uid
+        ):
+            raise family_error(
+                "invitation_invalid",
+                "Lời mời không hợp lệ.",
+                400,
+            )
+
+        if require_owner:
+            if owner_uid != actor_uid:
+                raise family_error(
+                    "permission_denied",
+                    "Chỉ người tạo lời mời mới có quyền hủy.",
+                    403,
+                )
+        elif owner_uid == actor_uid:
+            raise family_error(
+                "self_invitation",
+                "Chủ lời mời không thể tự từ chối lời mời của mình.",
+                400,
+            )
+
+        if invitation.get("status") != "pending":
+            raise family_error(
+                "invitation_unavailable",
+                "Mã mời đã được sử dụng hoặc thu hồi.",
+                409,
+            )
+
+        now = now_utc()
+
+        if is_invitation_expired(
+            invitation.get("expiresAt"),
+            now,
+        ):
+            transaction.update(
+                invitation_ref,
+                {
+                    "status": "expired",
+                    "updatedAt": now,
+                },
+            )
+            return "expired"
+
+        transaction.update(
+            invitation_ref,
+            {
+                "status": "revoked",
+                "revokedByUid": actor_uid,
+                "revokedAt": now,
+                "updatedAt": now,
+            },
+        )
+        return "revoked"
+
+    outcome = update_invitation(db.transaction())
+
+    if outcome == "expired":
+        raise family_error(
+            "invitation_expired",
+            "Mã mời đã hết hạn.",
+            400,
+        )
+
+    return InvitationActionResponse(
+        invitationId=invitation_id,
+        status="revoked",
+    )
 
 
 # ============================================================
@@ -463,6 +578,86 @@ def accept_invitation(
         linkId=link_id,
         status="active",
     )
+
+
+# ============================================================
+# 4B. POST - TỪ CHỐI LỜI MỜI
+# ============================================================
+
+
+@router.post(
+    "/invitations/decline",
+    response_model=InvitationActionResponse,
+)
+def decline_invitation(
+    payload: AcceptInvitationRequest,
+    user: AuthenticatedUser,
+    response: Response,
+):
+    response.headers["Cache-Control"] = "no-store"
+
+    invitation_id = invite_hash(payload.code)
+
+    try:
+        db = get_firestore_client()
+
+        invitation_ref = (
+            db.collection("familyInvitations")
+            .document(invitation_id)
+        )
+
+        return _revoke_pending_invitation(
+            db,
+            invitation_ref,
+            invitation_id,
+            user.uid,
+            require_owner=False,
+        )
+
+    except HTTPException:
+        raise
+
+    except GoogleAPICallError:
+        raise unavailable() from None
+
+
+# ============================================================
+# 4C. DELETE - HỦY LỜI MỜI ĐÃ TẠO
+# ============================================================
+
+
+@router.delete(
+    "/invitations/{invitation_id}",
+    response_model=InvitationActionResponse,
+)
+def cancel_invitation(
+    invitation_id: InvitationId,
+    user: AuthenticatedUser,
+    response: Response,
+):
+    response.headers["Cache-Control"] = "no-store"
+
+    try:
+        db = get_firestore_client()
+
+        invitation_ref = (
+            db.collection("familyInvitations")
+            .document(invitation_id)
+        )
+
+        return _revoke_pending_invitation(
+            db,
+            invitation_ref,
+            invitation_id,
+            user.uid,
+            require_owner=True,
+        )
+
+    except HTTPException:
+        raise
+
+    except GoogleAPICallError:
+        raise unavailable() from None
 
 
 # ============================================================
