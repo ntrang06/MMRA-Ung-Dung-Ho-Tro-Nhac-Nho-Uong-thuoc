@@ -1,6 +1,6 @@
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Annotated
 
 from fastapi import (
@@ -11,6 +11,7 @@ from fastapi import (
     Response,
 )
 from google.api_core.exceptions import GoogleAPICallError
+from google.cloud.firestore_v1.base_query import FieldFilter
 from pydantic import BaseModel, ConfigDict
 
 from app.api.deps import (
@@ -66,6 +67,25 @@ class SharedDosesResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     items: list[SharedDose]
+
+
+class FamilyAlert(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    alertId: str
+    linkId: str
+    ownerUid: str
+    doseId: str
+    localDate: date
+    scheduledAt: datetime
+    status: DoseStatus
+    actionAt: datetime | None = None
+
+
+class FamilyAlertsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[FamilyAlert]
 
 
 # ============================================================
@@ -196,6 +216,38 @@ def family_read_unavailable() -> HTTPException:
     )
 
 
+def _extract_missed_alerts(
+    link_id: str,
+    owner_uid: str,
+    saved_doses: list[dict],
+) -> list[FamilyAlert]:
+    """Chỉ tạo cảnh báo cho các liều đã được xác nhận trạng thái MISSED."""
+    alerts: list[FamilyAlert] = []
+
+    for dose in saved_doses:
+        if dose.get("status") != DoseStatus.MISSED:
+            continue
+
+        dose_id = str(dose.get("doseId") or "")
+        if not dose_id:
+            continue
+
+        alerts.append(
+            FamilyAlert.model_validate({
+                "alertId": f"{link_id}:{dose_id}",
+                "linkId": link_id,
+                "ownerUid": owner_uid,
+                "doseId": dose_id,
+                "localDate": dose.get("localDate"),
+                "scheduledAt": dose.get("scheduledAt"),
+                "status": dose.get("status"),
+                "actionAt": dose.get("actionAt"),
+            })
+        )
+
+    return alerts
+
+
 # ============================================================
 # 3. GET - LỊCH UỐNG CỦA NGƯỜI THÂN
 # ============================================================
@@ -302,6 +354,147 @@ def get_shared_doses(
         return SharedDosesResponse(
             items=items
         )
+
+    except HTTPException:
+        raise
+
+    except GoogleAPICallError:
+        raise family_read_unavailable() from None
+
+
+# ============================================================
+# 5. GET - CẢNH BÁO CHO NGƯỜI CHĂM SÓC
+# ============================================================
+
+
+@router.get(
+    "/alerts",
+    response_model=FamilyAlertsResponse,
+)
+def get_family_alerts(
+    user: AuthenticatedUser,
+    response: Response,
+    target_date: Annotated[
+        date | None,
+        Query(alias="date"),
+    ] = None,
+    link_id: Annotated[
+        str | None,
+        Query(
+            alias="linkId",
+            pattern=r"^[0-9a-f]{64}$",
+        ),
+    ] = None,
+):
+    response.headers["Cache-Control"] = "no-store"
+    resolved_date = (
+        target_date or datetime.now(timezone.utc).date()
+    )
+
+    try:
+        alerts: list[FamilyAlert] = []
+
+        if link_id is not None:
+            owner = get_shared_owner(
+                link_id,
+                user,
+                "receiveMissedDoseAlerts",
+            )
+            saved_doses = MedicationRepository.list_doses(
+                owner,
+                resolved_date,
+            )
+            ensure_permission_still_active(
+                link_id,
+                user,
+                "receiveMissedDoseAlerts",
+            )
+            alerts = _extract_missed_alerts(
+                link_id,
+                owner.uid,
+                saved_doses,
+            )
+        else:
+            db = family.get_firestore_client()
+            snapshots = (
+                db.collection("familyLinks")
+                .where(
+                    filter=FieldFilter(
+                        "caregiverUid",
+                        "==",
+                        user.uid,
+                    )
+                )
+                .stream()
+            )
+            seen_links: set[str] = set()
+
+            for snapshot in snapshots:
+                if not getattr(snapshot, "exists", True):
+                    continue
+
+                current_link_id = snapshot.id
+                if current_link_id in seen_links:
+                    continue
+
+                data = snapshot.to_dict() or {}
+                if data.get("status") != "active":
+                    continue
+
+                owner_uid = data.get("ownerUid")
+                caregiver_uid = data.get("caregiverUid")
+
+                if (
+                    caregiver_uid != user.uid
+                    or not isinstance(owner_uid, str)
+                    or not owner_uid
+                    or "/" in owner_uid
+                    or owner_uid == caregiver_uid
+                ):
+                    continue
+
+                permissions = data.get("permissions") or {}
+                if (
+                    not isinstance(permissions, dict)
+                    or permissions.get(
+                        "receiveMissedDoseAlerts"
+                    )
+                    is not True
+                ):
+                    continue
+
+                seen_links.add(current_link_id)
+
+                saved_doses = (
+                    MedicationRepository.list_doses(
+                        CurrentUser(uid=owner_uid),
+                        resolved_date,
+                    )
+                )
+
+                ensure_permission_still_active(
+                    current_link_id,
+                    user,
+                    "receiveMissedDoseAlerts",
+                )
+
+                alerts.extend(
+                    _extract_missed_alerts(
+                        current_link_id,
+                        owner_uid,
+                        saved_doses,
+                    )
+                )
+
+        alerts.sort(
+            key=lambda item: (
+                item.scheduledAt,
+                item.linkId,
+                item.doseId,
+            )
+        )
+
+        return FamilyAlertsResponse(items=alerts)
 
     except HTTPException:
         raise
