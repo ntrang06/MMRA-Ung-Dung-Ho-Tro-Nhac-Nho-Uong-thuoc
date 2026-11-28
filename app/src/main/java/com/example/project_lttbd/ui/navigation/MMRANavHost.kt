@@ -1221,9 +1221,9 @@ fun MMRANavHost(
 
         composable(MMRADestinations.FAMILY) {
             FamilyScreen(
-                onMemberClick = { memberId ->
+                onMemberClick = { linkId ->
                     navController.navigate(
-                        MMRADestinations.familyMemberDetail(memberId)
+                        MMRADestinations.familyPermissions(linkId)
                     )
                 },
                 onInviteClick = {
@@ -1259,13 +1259,12 @@ fun MMRANavHost(
 
         composable(MMRADestinations.FAMILY_INVITE_DETAIL) {
             FamilyInviteDetailScreen(
-                onAcceptClick = {
+                onAcceptSuccess = { linkId ->
                     navController.navigate(
-                        MMRADestinations.FAMILY_PERMISSIONS
-                    )
-                },
-                onDeclineClick = {
-                    navController.popBackStack()
+                        MMRADestinations.familyPermissions(linkId)
+                    ) {
+                        popUpTo(MMRADestinations.FAMILY)
+                    }
                 },
                 onBackClick = {
                     navController.popBackStack()
@@ -1315,19 +1314,10 @@ fun MMRANavHost(
                 ?.getString("memberId")
                 ?: ""
 
-            val member = MockFamilyData.mockMembers.firstOrNull {
-                it.id == memberId
-            }
-
             FamilyPermissionsScreen(
+                linkId = memberId,
                 onBackClick = {
                     navController.popBackStack()
-                },
-                memberName = member?.fullName ?: "Nguyễn Minh Anh",
-                memberRole = if (member != null) {
-                    "${member.relationship} • Hồ sơ theo dõi"
-                } else {
-                    "Con gái • Người chăm sóc"
                 }
             )
         }
@@ -1340,12 +1330,12 @@ fun MMRANavHost(
                 }
             )
         ) { backStackEntry ->
-            val memberId = backStackEntry.arguments
+            val linkId = backStackEntry.arguments
                 ?.getString("memberId")
                 ?: ""
 
             CaregiverMemberDetailScreen(
-                memberId = memberId,
+                linkId = linkId,
                 onBackClick = {
                     navController.popBackStack()
                 },
@@ -1356,7 +1346,7 @@ fun MMRANavHost(
                 },
                 onPermissionsClick = {
                     navController.navigate(
-                        MMRADestinations.familyPermissions(memberId)
+                        MMRADestinations.familyPermissions(linkId)
                     )
                 }
             )

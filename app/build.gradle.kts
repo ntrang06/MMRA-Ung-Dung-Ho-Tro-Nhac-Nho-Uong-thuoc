@@ -111,4 +111,5 @@ dependencies {
 
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+    implementation("com.google.zxing:core:3.5.4")
 }

@@ -18,17 +18,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Divider
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,23 +34,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.project_lttbd.R
 import com.example.project_lttbd.data.mock.CaregiverAlert
-import com.example.project_lttbd.data.mock.MockAlertData
+import com.example.project_lttbd.data.model.UserProfileManager
+import com.example.project_lttbd.ui.viewmodel.FamilyViewModel
 
 @Composable
 fun FamilyAlertsScreen(
     onBackClick: () -> Unit,
     onAlertClick: (CaregiverAlert) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    familyViewModel: FamilyViewModel = viewModel()
 ) {
-    var selectedFilter by remember { mutableStateOf("Tất cả") }
-    var alertsList by remember { mutableStateOf(MockAlertData.mockAlerts) }
+    val alerts = familyViewModel.familyAlerts
+    val isLoading = familyViewModel.isLoadingAlerts
+    val error = familyViewModel.alertsError
 
-    val filteredAlerts = when (selectedFilter) {
-        "Chưa xử lý" -> alertsList.filter { !it.isRead }
-        "Đã đọc" -> alertsList.filter { it.isRead }
-        else -> alertsList
+    LaunchedEffect(Unit) {
+        familyViewModel.loadFamilyAlerts()
     }
 
     Column(
@@ -104,7 +102,7 @@ fun FamilyAlertsScreen(
                 )
             }
 
-            // Avatar MA
+            // Avatar tài khoản
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
                     modifier = Modifier
@@ -114,7 +112,7 @@ fun FamilyAlertsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "MA",
+                        text = UserProfileManager.getInitials(),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         fontSize = 13.sp
@@ -137,440 +135,152 @@ fun FamilyAlertsScreen(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Card chọn người thân
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2ECEA))
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else if (error != null) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFFFEE2E2)
+                ) {
+                    Text(
+                        text = error,
+                        color = Color(0xFFDC2626),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(16.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else if (alerts.isNotEmpty()) {
+                alerts.forEach { alert ->
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Color(0xFFFCA5A5))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFEE2E2)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_bell),
+                                    contentDescription = null,
+                                    tint = Color(0xFFDC2626),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Bỏ lỡ liều uống",
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF991B1B)
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Ngày: ${alert.localDate} • Lúc: ${alert.scheduledAt.take(16).replace("T", " ")}",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = Color(0xFF4B5563)
+                                    )
+                                )
+                            }
+                            spanStatus(alert.status)
+                        }
+                    }
+                }
+            } else {
+                // Thẻ Empty State thiết kế thân thiện
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFFE2ECEA))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(46.dp)
+                                .size(56.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFFDDF2EE)),
+                                .background(Color(0xFFE8F7F2)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "TM",
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_bell),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+
+                        Text(
+                            text = "Hiện chưa có cảnh báo mới từ người thân.",
+                            style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
+                                textAlign = TextAlign.Center,
                                 fontSize = 16.sp
                             )
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Trần Văn Minh",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold
-                                )
-                            )
-                            Text(
-                                text = "Bố • Hồ sơ minh họa",
-                                style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF6B7280))
-                            )
-                        }
-
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_chevron_down),
-                            contentDescription = "Chọn người thân",
-                            tint = Color(0xFF0F6053),
-                            modifier = Modifier.size(20.dp)
                         )
-                    }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFE8F7F2)
-                        ) {
-                            Text(
-                                text = "Đã liên kết",
-                                color = Color(0xFF0F6053),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        Text(
+                            text = "Hệ thống tự động kiểm tra trạng thái trễ liều từ người thân đã cấp quyền.",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = Color(0xFF6B7280),
+                                textAlign = TextAlign.Center,
+                                lineHeight = 18.sp
                             )
-                        }
+                        )
 
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFDDF2EE)
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFEFF8F6)
                         ) {
                             Text(
-                                text = "Quyền xem đang hiệu lực",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                text = "Dữ liệu cảnh báo tự động sẽ xuất hiện khi hệ thống phát hiện liều quá giờ từ liên kết người thân.",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 11.sp,
+                                    textAlign = TextAlign.Center
+                                ),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                             )
                         }
                     }
                 }
             }
 
-            // Banner thông báo cần kiểm tra
+            // Thẻ ghi chú nguyên tắc phân quyền
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                color = Color(0xFFEFF8F6)
+                color = Color(0xFFF3F4F6)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "1 cảnh báo cần kiểm tra",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F6053)
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Liều của bố quá giờ nhưng chưa có xác nhận. Hãy liên hệ để biết tình hình.",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = Color(0xFF1E8272),
-                            lineHeight = 18.sp
-                        )
-                    )
-                }
-            }
-
-            // Thanh lọc Tabs
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterTab(
-                    title = "Tất cả • 3",
-                    isSelected = selectedFilter == "Tất cả",
-                    onClick = { selectedFilter = "Tất cả" },
-                    modifier = Modifier.weight(1f)
-                )
-                FilterTab(
-                    title = "Chưa xử lý • 1",
-                    isSelected = selectedFilter == "Chưa xử lý",
-                    onClick = { selectedFilter = "Chưa xử lý" },
-                    modifier = Modifier.weight(1.1f)
-                )
-                FilterTab(
-                    title = "Đã đọc • 2",
-                    isSelected = selectedFilter == "Đã đọc",
-                    onClick = { selectedFilter = "Đã đọc" },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // Subheader
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = "Thông báo của bố",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                )
-                Text(
-                    text = "02/10 • 1 cần xử lý, 2 thông tin đã đọc",
-                    style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF6B7280))
-                )
-            }
-
-            // Card 1: Liều 08:00 chưa được xác nhận (Chưa xử lý)
-            if (selectedFilter == "Tất cả" || selectedFilter == "Chưa xử lý") {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            val alert = alertsList.firstOrNull() ?: MockAlertData.mockAlerts.first()
-                            onAlertClick(alert)
-                        },
-                    shape = RoundedCornerShape(18.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFDC2626))
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFFFEE2E2)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.ic_clock),
-                                        contentDescription = null,
-                                        tint = Color(0xFFDC2626),
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Chưa xử lý",
-                                        color = Color(0xFFDC2626),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = "Chưa đọc",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = Color(0xFF0F6053),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            )
-                        }
-
-                        Text(
-                            text = "Liều 08:00 chưa được xác nhận",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
-                        )
-
-                        Text(
-                            text = "Trần Văn Minh (Bố) • Thứ Sáu, 02/10",
-                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF6B7280))
-                        )
-
-                        Text(
-                            text = "Amlodipine 5 mg • 1 viên • Sau ăn sáng",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF374151)
-                            )
-                        )
-
-                        Text(
-                            text = "Quá giờ • Chưa có xác nhận từ bố.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = Color(0xFFDC2626),
-                                fontWeight = FontWeight.Medium
-                            )
-                        )
-
-                        HorizontalDivider(
-                            modifier = Modifier.fillMaxWidth(),
-                            thickness = 1.dp,
-                            color = Color(0xFFF3F4F6)
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Xem chi tiết cảnh báo",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            )
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_chevron_right),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Card 2: Liều 20:30 đang chờ xác nhận (Đã đọc • Sắp tới)
-            if (selectedFilter == "Tất cả" || selectedFilter == "Đã đọc") {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFE2ECEA))
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFFFEF3C7)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.ic_clock),
-                                        contentDescription = null,
-                                        tint = Color(0xFF92400E),
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Sắp tới • Thông tin",
-                                        color = Color(0xFF92400E),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = "Đã đọc",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = Color(0xFF9CA3AF),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            )
-                        }
-
-                        Text(
-                            text = "Liều 20:30 đang chờ xác nhận",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
-                        )
-
-                        Text(
-                            text = "Trần Văn Minh (Bố) • Thứ Sáu, 02/10",
-                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF6B7280))
-                        )
-
-                        Text(
-                            text = "Atorvastatin 20 mg • 1 viên • Sau ăn tối",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF374151)
-                            )
-                        )
-
-                        Text(
-                            text = "Chưa đến giờ • Không phải liều quá giờ.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = Color(0xFF92400E),
-                                fontWeight = FontWeight.Medium
-                            )
-                        )
-                    }
-                }
-            }
-
-            // Card 3: Đã liên kết hồ sơ của bố
-            if (selectedFilter == "Tất cả" || selectedFilter == "Đã đọc") {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFE2ECEA))
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFFE8F7F2)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.ic_users),
-                                        contentDescription = null,
-                                        tint = Color(0xFF0F6053),
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Cập nhật kết nối",
-                                        color = Color(0xFF0F6053),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = "Đã đọc",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = Color(0xFF9CA3AF),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            )
-                        }
-
-                        Text(
-                            text = "Đã liên kết hồ sơ của bố",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
-                        )
-
-                        Text(
-                            text = "Cập nhật gia đình • Hôm qua, 01/10",
-                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF6B7280))
-                        )
-
-                        Text(
-                            text = "Kết nối với Trần Văn Minh đã được thiết lập.",
-                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF374151))
-                        )
-
-                        Text(
-                            text = "Quyền dữ liệu được cấp riêng cho kết nối.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        )
-                    }
-                }
-            }
-
-            // Gợi ý về trạng thái đọc
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = Color(0xFFF3F4F6)
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = "Đọc thông báo ≠ xác nhận liều",
+                        text = "Về quyền nhận cảnh báo",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF374151)
@@ -578,7 +288,7 @@ fun FamilyAlertsScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Đánh dấu đã đọc chỉ thay đổi trạng thái thông báo, không xác nhận uống thuốc hay xử lý trạng thái liều.",
+                        text = "Người chăm sóc chỉ nhận được thông báo khi chủ sở hữu lịch cấp quyền 'Nhận cảnh báo trễ liều' (receiveMissedDoseAlerts) trong mục Phân quyền.",
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = Color(0xFF6B7280),
                             lineHeight = 18.sp
@@ -587,45 +297,25 @@ fun FamilyAlertsScreen(
                 }
             }
 
-            Text(
-                text = "Dữ liệu sức khỏe minh họa • Không phải dữ liệu thật hay hướng dẫn điều trị.",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    color = Color(0xFF9CA3AF),
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center
-                ),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
-private fun FilterTab(
-    title: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+private fun spanStatus(status: String) {
     Surface(
-        modifier = modifier
-            .height(40.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(10.dp),
-        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
-        border = if (isSelected) null else BorderStroke(1.dp, Color(0xFFE5E7EB))
+        shape = RoundedCornerShape(6.dp),
+        color = Color(0xFFFEE2E2)
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = title,
-                color = if (isSelected) Color.White else Color(0xFF4B5563),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 11.sp
-                )
-            )
-        }
+        Text(
+            text = status.uppercase(),
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFDC2626),
+                fontSize = 10.sp
+            ),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
     }
 }
