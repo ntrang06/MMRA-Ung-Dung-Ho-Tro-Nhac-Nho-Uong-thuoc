@@ -136,4 +136,8 @@ object ScheduleApiClient {
     val overviewApi: MedicationOverviewApi by lazy {
         retrofit.create(MedicationOverviewApi::class.java)
     }
+
+    val familyApi: FamilyApi by lazy {
+        retrofit.create(FamilyApi::class.java)
+    }
 }

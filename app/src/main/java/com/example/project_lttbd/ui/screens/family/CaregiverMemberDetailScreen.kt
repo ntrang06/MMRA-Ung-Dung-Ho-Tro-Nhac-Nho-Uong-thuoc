@@ -1,11 +1,7 @@
 package com.example.project_lttbd.ui.screens.family
 
-import android.content.Intent
-import android.net.Uri
-import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -32,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,30 +38,71 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.project_lttbd.R
-import com.example.project_lttbd.data.mock.DoseStatus
-import com.example.project_lttbd.data.mock.FamilyMember
-import com.example.project_lttbd.data.mock.MockFamilyData
+import com.example.project_lttbd.data.remote.dto.DoseUnitDto
+import com.example.project_lttbd.data.remote.dto.ScheduleResponseDto
+import com.example.project_lttbd.data.remote.dto.family.SharedDoseDto
+import com.example.project_lttbd.ui.screens.schedule.ScheduleDoseStatus
+import com.example.project_lttbd.ui.viewmodel.FamilyViewModel
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 @Composable
 fun CaregiverMemberDetailScreen(
-    memberId: String,
     onBackClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    linkId: String = "",
     onViewHistoryClick: () -> Unit = {},
     onPermissionsClick: () -> Unit = {},
-    modifier: Modifier = Modifier
+    familyViewModel: FamilyViewModel = viewModel()
 ) {
-    val context = LocalContext.current
-    val member = MockFamilyData.mockMembers.firstOrNull { it.id == memberId }
-        ?: MockFamilyData.mockMembers.first()
 
+    val isLoadingMembers = familyViewModel.isLoadingMembers
+    val membersError = familyViewModel.membersError
+    val member = familyViewModel.members.firstOrNull { it.linkId == linkId }
+
+    val canViewSchedule = member?.permissions?.viewSchedule == true
+    val canViewDoseStatus = member?.permissions?.viewDoseStatus == true
+
+    var selectedDate by remember { mutableStateOf(getTodayDateString()) }
     var showReminderDialog by remember { mutableStateOf(false) }
-    var reminderMessage by remember { mutableStateOf("${member.relationship} nhớ uống thuốc đúng giờ nhé!") }
+
+    val sharedSchedules = familyViewModel.sharedSchedules
+    val sharedDoses = familyViewModel.sharedDoses
+    val isLoadingShared = familyViewModel.isLoadingSharedData
+    val sharedError = familyViewModel.sharedDataError
+
+    // Chỉ gọi API chia sẻ khi danh sách thành viên đã tải xong và thành viên tồn tại với quyền được cấp
+    LaunchedEffect(linkId, selectedDate, member) {
+        if (linkId.isNotBlank() && member != null) {
+            if (canViewSchedule) {
+                familyViewModel.loadSharedSchedules(linkId)
+            }
+            if (canViewDoseStatus) {
+                familyViewModel.loadSharedDoses(linkId, selectedDate)
+            }
+        }
+    }
+
+    val displayUid = if (member != null) {
+        val uid = member.memberUid
+        if (uid.length > 8) "UID: ${uid.take(8)}..." else "UID: $uid"
+    } else {
+        if (linkId.length > 8) "Link: ${linkId.take(8)}..." else "Link: $linkId"
+    }
+
+    val displayRole = if (member != null) {
+        if (member.role == "owner") "Chủ sở hữu lịch" else "Người chăm sóc"
+    } else {
+        "Thành viên liên kết"
+    }
 
     if (showReminderDialog) {
         AlertDialog(
@@ -75,39 +114,20 @@ fun CaregiverMemberDetailScreen(
                 )
             },
             text = {
-                Column {
-                    Text(
-                        text = "Gửi thông báo nhắc nhở đến thiết bị của ${member.fullName}:",
-                        style = MaterialTheme.typography.bodyMedium
+                Text(
+                    text = "Ứng dụng hiện chưa hỗ trợ gửi lời nhắc trực tiếp đến thiết bị của người thân. Bạn có thể liên hệ với người thân qua điện thoại hoặc ứng dụng nhắn tin.",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = Color(0xFF4B5563),
+                        lineHeight = 20.sp
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFFF3F4F6),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "“$reminderMessage”",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-                }
+                )
             },
             confirmButton = {
                 Button(
-                    onClick = {
-                        showReminderDialog = false
-                        Toast.makeText(context, "Đã gửi nhắc nhở đến ${member.fullName}!", Toast.LENGTH_SHORT).show()
-                    },
+                    onClick = { showReminderDialog = false },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("Gửi ngay")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showReminderDialog = false }) {
-                    Text("Hủy")
+                    Text("Đã hiểu")
                 }
             }
         )
@@ -152,7 +172,7 @@ fun CaregiverMemberDetailScreen(
                     )
                 )
                 Text(
-                    text = "Cập nhật lúc 13:24",
+                    text = displayUid,
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = MaterialTheme.colorScheme.secondary,
                         fontSize = 11.sp
@@ -175,34 +195,6 @@ fun CaregiverMemberDetailScreen(
                     modifier = Modifier.size(20.dp)
                 )
             }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFDDF2EE)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "NL",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 13.sp
-                    )
-                }
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Tài khoản",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.sp,
-                        color = Color(0xFF0F6053),
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
         }
 
         // Nội dung cuộn
@@ -213,360 +205,254 @@ fun CaregiverMemberDetailScreen(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Card hồ sơ người thân
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2ECEA))
-            ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFDDF2EE)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "NL",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(14.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = member.fullName,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "${member.relationship} • ${member.age} tuổi • ${member.doseSchedules.size} thuốc",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = Color(0xFF6B7280)
-                            )
-                        )
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFFE8F7F2)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_wifi),
-                                contentDescription = null,
-                                tint = Color(0xFF0F6053),
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "ĐANG HOẠT ĐỘNG",
-                                color = Color(0xFF0F6053),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Card Cảnh báo trễ liều (nếu có)
-            if (member.hasLateDose) {
+            // Trạng thái Tải danh sách thành viên / Lỗi / Hồ sơ thành viên
+            if (isLoadingMembers && member == null) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    color = Color(0xFFFFF1F2),
-                    border = BorderStroke(1.dp, Color(0xFFFECDD3))
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFFE2ECEA))
                 ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFBE123C)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_triangle_alert),
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp
+                            )
                             Spacer(modifier = Modifier.width(12.dp))
-
-                            Column {
-                                Text(
-                                    text = "Đã trễ liều 24 phút",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF9F1239)
-                                    )
-                                )
-                                Text(
-                                    text = "Liều 13:00 • Metformin 500 mg",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = Color(0xFFBE123C),
-                                        fontSize = 12.sp
-                                    )
-                                )
-                            }
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "1 viên • Cùng bữa trưa",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFFFEE2E2)
-                                ) {
-                                    Text(
-                                        text = "CHƯA XÁC NHẬN",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFFDC2626),
-                                            fontSize = 10.sp
-                                        ),
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        // 2 Nút hành động trực tiếp
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(
-                                onClick = {
-                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${member.phone.replace(" ", "")}"))
-                                    context.startActivity(intent)
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(46.dp),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.ic_phone),
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Gọi cho ${member.relationship.lowercase()}", fontSize = 13.sp)
-                                }
-                            }
-
-                            OutlinedButton(
-                                onClick = { showReminderDialog = true },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(46.dp),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.ic_message_circle),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Nhắn kiểm tra", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
-                                }
-                            }
+                            Text(
+                                text = "Đang kiểm tra thông tin liên kết...",
+                                style = MaterialTheme.typography.bodyMedium.copy(color = Color(0xFF4B5563))
+                            )
                         }
                     }
                 }
-            }
-
-            // Section: Tiến độ hôm nay
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2ECEA))
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+            } else if (membersError != null && member == null) {
+                ErrorCard(
+                    message = membersError,
+                    onRetry = { familyViewModel.loadMembers() }
+                )
+            } else if (member == null) {
+                EmptyStateCard(
+                    message = "Liên kết người thân không tồn tại hoặc đã bị hủy."
+                )
+            } else {
+                // Thẻ hồ sơ người thân chính thức
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFFE2ECEA))
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.padding(18.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Tiến độ hôm nay",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Text(
-                            text = "1 / 3 liều",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                        Box(
+                            modifier = Modifier
+                                .size(54.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFDDF2EE)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "FM",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             )
-                        )
-                    }
+                        }
 
-                    // 3 viên thuốc liều uống theo Figma
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = displayUid,
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "$displayRole • Hồ sơ kết nối",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = Color(0xFF6B7280)
+                                )
+                            )
+                        }
+
                         Surface(
-                            modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
                             color = Color(0xFFE8F7F2)
                         ) {
                             Row(
-                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
-                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    painter = painterResource(id = R.drawable.ic_check),
+                                    painter = painterResource(id = R.drawable.ic_wifi),
                                     contentDescription = null,
                                     tint = Color(0xFF0F6053),
                                     modifier = Modifier.size(12.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "08:00 Đã uống", fontWeight = FontWeight.Bold, color = Color(0xFF0F6053), fontSize = 11.sp)
-                            }
-                        }
-
-                        Surface(
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFFEE2E2)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_triangle_alert),
-                                    contentDescription = null,
-                                    tint = Color(0xFFDC2626),
-                                    modifier = Modifier.size(12.dp)
+                                Text(
+                                    text = "ĐÃ LIÊN KẾT",
+                                    color = Color(0xFF0F6053),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "13:00 Trễ", fontWeight = FontWeight.Bold, color = Color(0xFFDC2626), fontSize = 11.sp)
-                            }
-                        }
-
-                        Surface(
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFF3F4F6)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_clock),
-                                    contentDescription = null,
-                                    tint = Color(0xFF4B5563),
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "20:00 Sắp tới", fontWeight = FontWeight.Bold, color = Color(0xFF4B5563), fontSize = 11.sp)
                             }
                         }
                     }
                 }
             }
 
-            // Section: Hoạt động gần đây
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Nút nhắn nhắc nhở
+            OutlinedButton(
+                onClick = { showReminderDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
             ) {
-                Text(
-                    text = "Hoạt động gần đây",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                )
-                Text(
-                    text = "Xem lịch sử",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    modifier = Modifier.clickable { onViewHistoryClick() }
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_message_circle),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Gửi lời nhắc kiểm tra", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
+                }
             }
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE2ECEA))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    ActivityItem(
-                        iconResId = R.drawable.ic_message_circle,
-                        iconTint = Color(0xFF0284C7),
-                        iconBg = Color(0xFFE0F2FE),
-                        title = "Đã gửi lời nhắc kiểm tra",
-                        description = "Bạn nhắn: “Mẹ nhớ uống thuốc nhé.”",
-                        time = "13:22"
+            // Section 1: TRẠNG THÁI LIỀU UỐNG CỦA NGƯỜI THÂN
+            Text(
+                text = "Trạng thái liều uống",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            )
+
+            // Selector ngày hiển thị
+            DateSelectorRow(
+                selectedDate = selectedDate,
+                onPrevDay = { selectedDate = changeDateByDays(selectedDate, -1) },
+                onNextDay = { selectedDate = changeDateByDays(selectedDate, 1) },
+                onTodayClick = { selectedDate = getTodayDateString() }
+            )
+
+            if (isLoadingMembers && member == null) {
+                // Đang tải thông tin thành viên, hiển thị khung chờ thay vì báo thiếu quyền
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else if (member == null) {
+                EmptyStateCard(
+                    message = "Không thể kiểm tra quyền do không tìm thấy thông tin liên kết."
+                )
+            } else if (!canViewDoseStatus) {
+                PermissionWarningCard(
+                    message = "Chủ sở hữu chưa cấp quyền xem trạng thái liều uống.",
+                    onSettingsClick = onPermissionsClick
+                )
+            } else {
+                if (isLoadingShared && sharedDoses.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                } else if (sharedError != null && sharedDoses.isEmpty()) {
+                    ErrorCard(
+                        message = sharedError,
+                        onRetry = { familyViewModel.loadSharedDoses(linkId, selectedDate) }
                     )
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF3F4F6)))
-                    ActivityItem(
-                        iconResId = R.drawable.ic_check,
-                        iconTint = Color(0xFF0F6053),
-                        iconBg = Color(0xFFE8F7F2),
-                        title = "Đã uống Amlodipine 5 mg",
-                        description = "Đúng giờ • Xác nhận bởi cô Lan",
-                        time = "08:03"
+                } else if (sharedDoses.isEmpty()) {
+                    EmptyStateCard(
+                        message = "Không có liều uống thuốc trong ngày ${formatDisplayDate(selectedDate)}."
                     )
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF3F4F6)))
-                    ActivityItem(
-                        iconResId = R.drawable.ic_check,
-                        iconTint = Color(0xFF0F6053),
-                        iconBg = Color(0xFFE8F7F2),
-                        title = "Hoàn thành 3/3 liều",
-                        description = "Tất cả liều đúng lịch",
-                        time = "Hôm qua"
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        sharedDoses.forEach { dose ->
+                            SharedDoseItemCard(dose = dose)
+                        }
+                    }
+                }
+            }
+
+            // Section 2: LỊCH UỐNG THUỐC ĐƯỢC CHIA SẺ
+            Text(
+                text = "Lịch uống thuốc được chia sẻ",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            )
+
+            if (isLoadingMembers && member == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else if (member == null) {
+                EmptyStateCard(
+                    message = "Không thể kiểm tra quyền do không tìm thấy thông tin liên kết."
+                )
+            } else if (!canViewSchedule) {
+                PermissionWarningCard(
+                    message = "Chủ sở hữu chưa cấp quyền xem lịch uống thuốc.",
+                    onSettingsClick = onPermissionsClick
+                )
+            } else {
+                if (isLoadingShared && sharedSchedules.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                } else if (sharedError != null && sharedSchedules.isEmpty()) {
+                    ErrorCard(
+                        message = sharedError,
+                        onRetry = { familyViewModel.loadSharedSchedules(linkId) }
                     )
+                } else if (sharedSchedules.isEmpty()) {
+                    EmptyStateCard(
+                        message = "Chủ sở hữu chưa có lịch uống thuốc nào được lập."
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        sharedSchedules.forEach { schedule ->
+                            SharedScheduleItemCard(schedule = schedule)
+                        }
+                    }
                 }
             }
 
@@ -576,51 +462,438 @@ fun CaregiverMemberDetailScreen(
 }
 
 @Composable
-private fun ActivityItem(
-    iconResId: Int,
-    title: String,
-    description: String,
-    time: String,
-    iconTint: Color = Color(0xFF0F6053),
-    iconBg: Color = Color(0xFFEAF5F2)
+private fun DateSelectorRow(
+    selectedDate: String,
+    onPrevDay: () -> Unit,
+    onNextDay: () -> Unit,
+    onTodayClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE2ECEA))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF3F4F6))
+                    .clickable { onPrevDay() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_chevron_left),
+                    contentDescription = "Ngày trước",
+                    tint = Color(0xFF374151),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable { onTodayClick() }
+            ) {
+                Text(
+                    text = formatDisplayDate(selectedDate),
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1F2937)
+                    )
+                )
+                if (selectedDate == getTodayDateString()) {
+                    Text(
+                        text = "Hôm nay",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF3F4F6))
+                    .clickable { onNextDay() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_chevron_right),
+                    contentDescription = "Ngày sau",
+                    tint = Color(0xFF374151),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SharedDoseItemCard(dose: SharedDoseDto) {
+    val doseStatus = mapDoseStatus(dose.status)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE2ECEA))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(doseStatus.background),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = doseStatus.symbol,
+                    color = doseStatus.foreground,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Giờ uống: ${formatIsoTime(dose.scheduledAt)}",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                    )
+                }
+
+                if (!dose.actionAt.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Thực hiện lúc: ${formatIsoTime(dose.actionAt)}",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = Color(0xFF4B5563),
+                            fontSize = 11.sp
+                        )
+                    )
+                }
+
+                if (!dose.nextReminderAt.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Nhắc tiếp theo: ${formatIsoTime(dose.nextReminderAt)}",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = Color(0xFF6B7280),
+                            fontSize = 11.sp
+                        )
+                    )
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = doseStatus.background
+            ) {
+                Text(
+                    text = doseStatus.label,
+                    color = doseStatus.foreground,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    ),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SharedScheduleItemCard(schedule: ScheduleResponseDto) {
+    val timesText = schedule.times.joinToString(", ") { formatMinuteOfDay(it) }
+    val weekdaysText = formatWeekdays(schedule.weekdays)
+    val quantityText = "${schedule.doseQuantity} ${formatUnit(schedule.doseUnit)}"
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE2ECEA))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Giờ uống: $timesText",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (schedule.enabled) Color(0xFFE8F7F2) else Color(0xFFF3F4F6)
+                ) {
+                    Text(
+                        text = if (schedule.enabled) "Đang bật" else "Đã tắt",
+                        color = if (schedule.enabled) Color(0xFF0F6053) else Color(0xFF6B7280),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        ),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = "Liều lượng: $quantityText",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF1F2937)
+                )
+            )
+
+            Text(
+                text = "Lịch lặp: $weekdaysText",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = Color(0xFF4B5563)
+                )
+            )
+
+            if (schedule.mealInstruction.isNotBlank()) {
+                Text(
+                    text = "Hướng dẫn: ${schedule.mealInstruction}",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = Color(0xFF6B7280),
+                        fontSize = 11.sp
+                    )
+                )
+            }
+
+            Text(
+                text = "Ngày bắt đầu: ${schedule.startDate}${if (!schedule.endDate.isNullOrBlank()) " • Kết thúc: ${schedule.endDate}" else ""}",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = Color(0xFF9CA3AF),
+                    fontSize = 11.sp
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun PermissionWarningCard(
+    message: String,
+    onSettingsClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFFEF3C7),
+        border = BorderStroke(1.dp, Color(0xFFFDE68A))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_shield_check),
+                    contentDescription = null,
+                    tint = Color(0xFF92400E),
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Chưa được cấp quyền",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF92400E)
+                    )
+                )
+            }
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = Color(0xFF78350F),
+                    lineHeight = 18.sp
+                )
+            )
+            TextButton(
+                onClick = onSettingsClick,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text(
+                    text = "Quản lý phân quyền",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = Color(0xFF92400E),
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyStateCard(message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE2ECEA))
     ) {
         Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(iconBg),
+            modifier = Modifier.padding(20.dp),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                painter = painterResource(id = iconResId),
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(16.dp)
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = Color(0xFF6B7280),
+                    textAlign = TextAlign.Center
+                )
             )
         }
+    }
+}
 
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
+@Composable
+private fun ErrorCard(
+    message: String,
+    onRetry: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFFEE2E2),
+        border = BorderStroke(1.dp, Color(0xFFFECDD3))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                text = message,
+                color = Color(0xFFDC2626),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
             )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF6B7280), fontSize = 11.sp)
-            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+            ) {
+                Text("Tải lại")
+            }
         }
+    }
+}
 
-        Text(
-            text = time,
-            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF9CA3AF), fontSize = 11.sp)
-        )
+private fun getTodayDateString(): String {
+    val cal = Calendar.getInstance()
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    return sdf.format(cal.time)
+}
+
+private fun formatDisplayDate(dateStr: String): String {
+    return try {
+        val parts = dateStr.split("-")
+        if (parts.size == 3) {
+            "${parts[2]}/${parts[1]}/${parts[0]}"
+        } else dateStr
+    } catch (_: Exception) {
+        dateStr
+    }
+}
+
+private fun changeDateByDays(dateStr: String, days: Int): String {
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val date = sdf.parse(dateStr) ?: return dateStr
+        val cal = Calendar.getInstance()
+        cal.time = date
+        cal.add(Calendar.DAY_OF_MONTH, days)
+        sdf.format(cal.time)
+    } catch (_: Exception) {
+        dateStr
+    }
+}
+
+private fun formatMinuteOfDay(minute: Int): String {
+    val h = minute / 60
+    val m = minute % 60
+    return String.format(Locale.US, "%02d:%02d", h, m)
+}
+
+private fun formatIsoTime(isoString: String?): String {
+    if (isoString.isNullOrBlank()) return ""
+    return try {
+        if (isoString.contains("T")) {
+            val timePart = isoString.split("T")[1]
+            timePart.take(5)
+        } else {
+            isoString.take(5)
+        }
+    } catch (_: Exception) {
+        isoString
+    }
+}
+
+private fun formatUnit(doseUnit: DoseUnitDto): String {
+    return when (doseUnit) {
+        DoseUnitDto.TABLET -> "viên"
+        DoseUnitDto.SACHET -> "gói"
+        DoseUnitDto.ML -> "ml"
+        DoseUnitDto.DROP -> "giọt"
+        DoseUnitDto.DOSE -> "liều"
+    }
+}
+
+private fun formatWeekdays(weekdays: List<Int>): String {
+    if (weekdays.size == 7) return "Hằng ngày"
+    val names = mapOf(
+        1 to "T2",
+        2 to "T3",
+        3 to "T4",
+        4 to "T5",
+        5 to "T6",
+        6 to "T7",
+        7 to "CN"
+    )
+    return weekdays.mapNotNull { names[it] }.joinToString(", ")
+}
+
+private fun mapDoseStatus(statusString: String): ScheduleDoseStatus {
+    return when (statusString.uppercase()) {
+        "TAKEN" -> ScheduleDoseStatus.TAKEN
+        "PENDING" -> ScheduleDoseStatus.PENDING
+        "OVERDUE" -> ScheduleDoseStatus.OVERDUE
+        "UNCONFIRMED" -> ScheduleDoseStatus.UNCONFIRMED
+        "SNOOZED" -> ScheduleDoseStatus.SNOOZED
+        "SKIPPED" -> ScheduleDoseStatus.SKIPPED
+        "MISSED" -> ScheduleDoseStatus.MISSED
+        "CANCELLED" -> ScheduleDoseStatus.CANCELLED
+        else -> ScheduleDoseStatus.PENDING
     }
 }
