@@ -3,6 +3,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     account_deletion,
+    admin,
     doses,
     family,
     family_shared,
@@ -35,3 +36,6 @@ api_router.include_router(medicine_lookup.router)
 # Family
 api_router.include_router(family.router)
 api_router.include_router(family_shared.router)
+
+# Admin
+api_router.include_router(admin.router)
