@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { auth, googleProvider } from "./firebase/config";
 import { signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { apiFetch } from "./api/client";
@@ -77,16 +77,20 @@ function DashboardPage() {
   const [recentLogs, setRecentLogs] = useState<AuditLogItem[]>([]);
   const [loadingLogs, setLoadingLogs] = useState<boolean>(true);
 
-  const fetchDashboardData = () => {
-    setLoadingSummary(true);
+  const fetchDashboardData = useCallback((showLoading = true) => {
+    if (showLoading) {
+      setLoadingSummary(true);
+      setLoadingLogs(true);
+    }
     setSummaryError(null);
 
     apiFetch<AdminSummary>("/api/v1/admin/summary")
       .then((res) => {
         setSummary(res);
       })
-      .catch((err) => {
-        setSummaryError(err.message || "Không tải được thống kê hệ thống.");
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : "Không tải được thống kê hệ thống.";
+        setSummaryError(message);
       })
       .finally(() => {
         setLoadingSummary(false);
@@ -96,17 +100,19 @@ function DashboardPage() {
       .then((res) => {
         setRecentLogs(res.items || []);
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.error("Lỗi tải nhật ký gần đây", err);
       })
       .finally(() => {
         setLoadingLogs(false);
       });
-  };
+  }, []);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    queueMicrotask(() => {
+      fetchDashboardData(true);
+    });
+  }, [fetchDashboardData]);
 
   return (
     <div className="page-content">
@@ -117,7 +123,7 @@ function DashboardPage() {
             Theo dõi danh mục thuốc dùng chung và hoạt động quản trị của MMRA.
           </p>
         </div>
-        <button className="primary-button" onClick={fetchDashboardData} disabled={loadingSummary}>
+        <button className="primary-button" onClick={() => fetchDashboardData(true)} disabled={loadingSummary}>
           {loadingSummary ? "Đang làm mới..." : "Làm mới số liệu"}
         </button>
       </div>
@@ -219,8 +225,10 @@ function MedicinesPage() {
   const [formSubmitting, setFormSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const fetchMedicines = (query = "") => {
-    setLoading(true);
+  const fetchMedicines = useCallback((query = "", showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     setError(null);
     const endpoint = query ? `/api/v1/admin/medicines?search=${encodeURIComponent(query)}` : "/api/v1/admin/medicines";
 
@@ -228,21 +236,24 @@ function MedicinesPage() {
       .then((res) => {
         setMedicines(res.items || []);
       })
-      .catch((err) => {
-        setError(err.message || "Không tải được danh mục thuốc.");
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : "Không tải được danh mục thuốc.";
+        setError(message);
       })
       .finally(() => {
         setLoading(false);
       });
-  };
+  }, []);
 
   useEffect(() => {
-    fetchMedicines();
-  }, []);
+    queueMicrotask(() => {
+      fetchMedicines("", true);
+    });
+  }, [fetchMedicines]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchMedicines(searchQuery);
+    fetchMedicines(searchQuery, true);
   };
 
   const openAddModal = () => {
@@ -296,9 +307,10 @@ function MedicinesPage() {
         });
       }
       setShowAddModal(false);
-      fetchMedicines(searchQuery);
-    } catch (err: any) {
-      setFormError(err.message || "Không lưu được thông tin thuốc.");
+      fetchMedicines(searchQuery, true);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Không lưu được thông tin thuốc.";
+      setFormError(message);
     } finally {
       setFormSubmitting(false);
     }
@@ -311,9 +323,10 @@ function MedicinesPage() {
       await apiFetch(`/api/v1/admin/medicines/${catalogId}`, {
         method: "DELETE",
       });
-      fetchMedicines(searchQuery);
-    } catch (err: any) {
-      alert(`Lỗi khi ẩn thuốc: ${err.message}`);
+      fetchMedicines(searchQuery, true);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Lỗi không xác định";
+      alert(`Lỗi khi ẩn thuốc: ${message}`);
     }
   };
 
@@ -525,16 +538,19 @@ function AuditLogsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<{ items: AuditLogItem[] }>("/api/v1/admin/audit-logs?limit=50")
-      .then((res) => {
-        setLogs(res.items || []);
-      })
-      .catch((err) => {
-        setError(err.message || "Không tải được nhật ký quản trị.");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    queueMicrotask(() => {
+      apiFetch<{ items: AuditLogItem[] }>("/api/v1/admin/audit-logs?limit=50")
+        .then((res) => {
+          setLogs(res.items || []);
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : "Không tải được nhật ký quản trị.";
+          setError(message);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    });
   }, []);
 
   return (
@@ -682,7 +698,7 @@ function AccessDeniedPage({
   user,
   onSignOut,
 }: {
-  user: any;
+  user: { email?: string | null } | null;
   onSignOut: () => void;
 }) {
   return (
@@ -717,21 +733,21 @@ function App() {
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ email?: string | null } | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [checkingAuth, setCheckingAuth] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: any) => {
-      setUser(firebaseUser);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: unknown) => {
+      setUser(firebaseUser as { email?: string | null } | null);
       if (firebaseUser) {
         try {
-          const tokenResult = await firebaseUser.getIdTokenResult(true);
+          const tokenResult = await (firebaseUser as { getIdTokenResult: (forceRefresh?: boolean) => Promise<{ claims: Record<string, unknown> }> }).getIdTokenResult(true);
           const adminClaim = tokenResult.claims.admin === true;
           setIsAdmin(adminClaim);
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error("Lỗi kiểm tra admin claim", err);
           setIsAdmin(false);
           setAuthError("Không thể xác minh quyền quản trị từ máy chủ.");
@@ -750,8 +766,9 @@ function App() {
     setAuthError(null);
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (err: any) {
-      setAuthError(err.message || "Đăng nhập Google thất bại.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Đăng nhập Google thất bại.";
+      setAuthError(message);
     } finally {
       setAuthLoading(false);
     }
@@ -767,8 +784,9 @@ function App() {
     setAuthError(null);
     try {
       await signInWithEmailAndPassword(auth, emailInput, passInput);
-    } catch (err: any) {
-      setAuthError(err.message || "Đăng nhập email thất bại.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Đăng nhập email thất bại.";
+      setAuthError(message);
     } finally {
       setAuthLoading(false);
     }
@@ -777,7 +795,7 @@ function App() {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Lỗi đăng xuất", err);
     }
   };

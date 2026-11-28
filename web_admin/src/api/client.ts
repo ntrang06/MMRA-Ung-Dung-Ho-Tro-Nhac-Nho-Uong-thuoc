@@ -4,9 +4,9 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://mmra-api.onre
 
 export class ApiError extends Error {
   status: number;
-  data?: any;
+  data?: unknown;
 
-  constructor(status: number, message: string, data?: any) {
+  constructor(status: number, message: string, data?: unknown) {
     super(message);
     this.status = status;
     this.data = data;
@@ -14,7 +14,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T = any>(
+export async function apiFetch<T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -24,7 +24,7 @@ export async function apiFetch<T = any>(
   if (user) {
     try {
       token = await user.getIdToken();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Không lấy được Firebase ID token", error);
     }
   }
@@ -44,7 +44,7 @@ export async function apiFetch<T = any>(
       ...options,
       headers,
     });
-  } catch (error) {
+  } catch {
     throw new ApiError(0, "Không kết nối được máy chủ. Vui lòng kiểm tra kết nối mạng.");
   }
 
@@ -57,19 +57,29 @@ export async function apiFetch<T = any>(
   }
 
   if (!response.ok) {
-    let errorData: any;
+    let errorData: unknown;
     try {
       errorData = await response.json();
     } catch {
       errorData = null;
     }
 
-    const message =
-      errorData?.detail?.message ||
-      errorData?.detail ||
-      `Yêu cầu thất bại (HTTP ${response.status})`;
+    let message = `Yêu cầu thất bại (HTTP ${response.status})`;
+    if (errorData && typeof errorData === "object") {
+      const errObj = errorData as Record<string, unknown>;
+      if (errObj.detail) {
+        if (typeof errObj.detail === "string") {
+          message = errObj.detail;
+        } else if (typeof errObj.detail === "object" && errObj.detail !== null) {
+          const detailObj = errObj.detail as Record<string, unknown>;
+          if (typeof detailObj.message === "string") {
+            message = detailObj.message;
+          }
+        }
+      }
+    }
 
-    throw new ApiError(response.status, typeof message === "string" ? message : JSON.stringify(message), errorData);
+    throw new ApiError(response.status, message, errorData);
   }
 
   if (response.status === 204) {
